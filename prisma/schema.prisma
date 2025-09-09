@@ -1,0 +1,215 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Authentication Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id                    String                 @id @default(cuid())
+  name                  String?
+  email                 String                 @unique
+  emailVerified         DateTime?
+  image                 String?
+  role                  UserRole               @default(STAFF)
+  accounts              Account[]
+  sessions              Session[]
+  inventoryTransactions InventoryTransaction[] // Added missing relation
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+  READONLY
+}
+
+// Products & Inventory
+model Product {
+  id               String           @id @default(cuid())
+  sku              String           @unique
+  name             String
+  description      String?
+  shopifyProductId String?          @unique
+  variants         ProductVariant[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id                    String                 @id @default(cuid())
+  productId             String
+  sku                   String                 @unique
+  upc                   String?                @unique
+  name                  String
+  costPrice             Decimal?               @db.Decimal(10, 2)
+  sellingPrice          Decimal?               @db.Decimal(10, 2)
+  weight                Decimal?               @db.Decimal(8, 2)
+  dimensions            Json?
+  shopifyVariantId      String?                @unique
+  product               Product                @relation(fields: [productId], references: [id])
+  inventory             Inventory[]
+  orderItems            OrderItem[]
+  inventoryTransactions InventoryTransaction[] // Added missing relation
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@map("product_variants")
+}
+
+model Location {
+  id                    String                 @id @default(cuid())
+  name                  String                 @unique
+  type                  LocationType           @default(GENERAL) // Added type field
+  zone                  String?
+  aisle                 String?
+  shelf                 String?
+  bin                   String?
+  isPickable            Boolean                @default(true)
+  isReceivable          Boolean                @default(true)
+  inventory             Inventory[]
+  inventoryTransactions InventoryTransaction[] // Added missing relation
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@map("locations")
+}
+
+enum LocationType {
+  RECEIVING
+  STORAGE
+  PICKING
+  PACKING
+  SHIPPING
+  RETURNS
+  GENERAL
+}
+
+model Inventory {
+  id               String         @id @default(cuid())
+  productVariantId String
+  locationId       String
+  quantityOnHand   Int            @default(0)
+  quantityReserved Int            @default(0)
+  reorderPoint     Int?
+  maxQuantity      Int?
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  location         Location       @relation(fields: [locationId], references: [id])
+  lastCounted      DateTime?
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([productVariantId, locationId])
+  @@map("inventory")
+}
+
+// Order Management
+model Order {
+  id              String      @id @default(cuid())
+  shopifyOrderId  String?     @unique
+  orderNumber     String      @unique
+  customerName    String
+  customerEmail   String?
+  status          OrderStatus @default(PENDING)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  shippingAddress Json
+  billingAddress  Json? // Added billing address
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String         @id @default(cuid())
+  orderId          String
+  productVariantId String
+  quantity         Int
+  unitPrice        Decimal        @db.Decimal(10, 2)
+  totalPrice       Decimal        @db.Decimal(10, 2) // Added total price field
+  order            Order          @relation(fields: [orderId], references: [id])
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@map("order_items")
+}
+
+enum OrderStatus {
+  PENDING
+  ALLOCATED
+  PICKING
+  PICKED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+// Activity Tracking
+model InventoryTransaction {
+  id               String          @id @default(cuid())
+  productVariantId String
+  locationId       String?
+  transactionType  TransactionType
+  quantityChange   Int
+  referenceId      String?
+  referenceType    String?
+  userId           String?
+  notes            String?
+  productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
+  location         Location?       @relation(fields: [locationId], references: [id])
+  user             User?           @relation(fields: [userId], references: [id])
+  createdAt        DateTime        @default(now())
+
+  @@map("inventory_transactions")
+}
+
+enum TransactionType {
+  ADJUSTMENT
+  RECEIPT
+  SALE
+  TRANSFER
+  COUNT
+  ALLOCATION
+  DEALLOCATION
+}
