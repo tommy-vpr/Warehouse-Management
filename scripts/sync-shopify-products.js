@@ -118,7 +118,7 @@ async function syncShopifyProducts() {
           syncedVariants++;
 
           // Create initial inventory (you can adjust quantities)
-          const initialQuantity = 50; // Default inventory
+          const initialQuantity = 100; // Default inventory
           await prisma.inventory.create({
             data: {
               productVariantId: variant.id,

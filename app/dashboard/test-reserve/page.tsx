@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
 export default function TestReserve() {
   const { data: session, status } = useSession();
   const [orderId, setOrderId] = useState("");
+
   const [result, setResult] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -125,14 +126,14 @@ export default function TestReserve() {
           .map(
             (order) =>
               `📋 Order: ${order.orderNumber} (ID: ${order.id})
-👤 Customer: ${order.customerName}
-📊 Status: ${order.status}
-💰 Total: $${order.totalAmount}
-📦 Items: ${order.itemCount} (${order.totalQuantity} units)
-📅 Created: ${new Date(order.createdAt).toLocaleString()}
-🔗 Order ID: ${order.id} [Click Copy button to use]
+                👤 Customer: ${order.customerName}
+                📊 Status: ${order.status}
+                💰 Total: $${order.totalAmount}
+                📦 Items: ${order.itemCount} (${order.totalQuantity} units)
+                📅 Created: ${new Date(order.createdAt).toLocaleString()}
+                🔗 Order ID: ${order.id} [Click Copy button to use]
 
-`
+              `
           )
           .join("\n");
       }
@@ -165,7 +166,10 @@ export default function TestReserve() {
           {/* Action Buttons */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <Button
-              onClick={handleGetOrders}
+              onClick={() => {
+                handleGetOrders();
+                setOrderId("");
+              }}
               variant="outline"
               disabled={isLoading}
             >

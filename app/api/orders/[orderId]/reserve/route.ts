@@ -9,6 +9,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -93,7 +94,7 @@ export async function POST(
               quantityChange: -quantityToReserve,
               referenceId: orderId,
               referenceType: "ORDER",
-              userId: session.user.id,
+              userId: session?.user?.id,
               notes: `Auto-reserved ${quantityToReserve} units for order ${order.orderNumber}`,
             },
           });

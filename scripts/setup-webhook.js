@@ -69,7 +69,7 @@ async function setupWebhook() {
 
     console.log("📤 Creating webhook...");
     const response = await fetch(
-      `https://${SHOPIFY_DOMAIN}/admin/api/2023-10/webhooks.json`,
+      `https://${SHOPIFY_DOMAIN}/admin/api/2025-07/webhooks.json`,
       {
         method: "POST",
         headers: {

@@ -9,6 +9,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ---------------------------------------------------
+// 📦 Core Models
+// ---------------------------------------------------
+
 // Authentication Models
 model Account {
   id                String  @id @default(cuid())
@@ -51,8 +55,14 @@ model User {
   inventoryTransactions InventoryTransaction[] // Added missing relation
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  assignedPickLists PickList[]     @relation()
+  pickedItems       PickListItem[] @relation()
+  pickEvents        PickEvent[]
 
   @@map("users")
+  statusChanges     OrderStatusHistory[]
+  assignedCountTasks CycleCountTask[]
+  countEvents        CycleCountEvent[]
 }
 
 enum UserRole {
@@ -74,6 +84,8 @@ model Product {
   updatedAt        DateTime         @updatedAt
 
   @@map("products")
+  brand         String?
+  category      String?
 }
 
 model ProductVariant {
@@ -93,8 +105,13 @@ model ProductVariant {
   inventoryTransactions InventoryTransaction[] // Added missing relation
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  pickListItems         PickListItem[]
 
   @@map("product_variants")
+  countTasks         CycleCountTask[]
+  category      String?     
+  supplier      String?
+  barcode       String?
 }
 
 model Location {
@@ -111,8 +128,10 @@ model Location {
   inventoryTransactions InventoryTransaction[] // Added missing relation
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  pickListItems     PickListItem[]
 
   @@map("locations")
+  countTasks         CycleCountTask[]
 }
 
 enum LocationType {
@@ -152,12 +171,44 @@ model Order {
   status          OrderStatus @default(PENDING)
   totalAmount     Decimal     @db.Decimal(10, 2)
   shippingAddress Json
-  billingAddress  Json? // Added billing address
+  billingAddress  Json?
   items           OrderItem[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  pickListItems   PickListItem[]
+  
+  // Existing shipping fields
+  trackingNumber    String?
+  trackingUrl       String?  
+  shippedAt         DateTime?
+  shippingStatus    String?
+  
+  // ADD THESE NEW FIELDS:
+  shippingCost      String?     // Store as string to preserve decimal precision
+  shippingCarrier   String?     // usps, fedex, ups, etc.
+  shippingService   String?     // usps_ground_advantage, fedex_ground, etc.
+  labelUrl          String?     // Direct link to shipping label
+  notes             String?     // Packing/shipping notes
+
+  packages        ShippingPackage[]
 
   @@map("orders")
+  statusHistory     OrderStatusHistory[]
+}
+
+model OrderStatusHistory {
+  id             String      @id @default(cuid())
+  orderId        String
+  previousStatus OrderStatus  
+  newStatus      OrderStatus
+  changedBy      String
+  changedAt      DateTime    @default(now())
+  notes          String?
+  
+  order          Order       @relation(fields: [orderId], references: [id])
+  changedByUser  User        @relation(fields: [changedBy], references: [id])
+  
+  @@map("order_status_history")
 }
 
 model OrderItem {
@@ -183,6 +234,7 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   RETURNED
+  FULFILLED
 }
 
 // Activity Tracking
@@ -212,4 +264,292 @@ enum TransactionType {
   COUNT
   ALLOCATION
   DEALLOCATION
+}
+
+// ---------------------------------------------------
+// 🚚 Picking System Models
+// ---------------------------------------------------
+
+// Add these models to your existing prisma/schema.prisma
+
+// Pick Lists - Batched picking assignments
+model PickList {
+  id          String    @id @default(cuid())
+  batchNumber String    @unique
+  status      PickStatus @default(PENDING)
+  assignedTo  String?   // User ID of assigned picker
+  priority    Int       @default(0)
+  totalItems  Int
+  pickedItems Int       @default(0)
+  startTime   DateTime?
+  endTime     DateTime?
+  notes       String?
+  
+  // Relations
+  items       PickListItem[]
+  events      PickEvent[]
+  assignedUser User?     @relation(fields: [assignedTo], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("pick_lists")
+}
+
+// Individual items within a pick list
+model PickListItem {
+  id               String         @id @default(cuid())
+  pickListId       String
+  orderId          String
+  productVariantId String
+  locationId       String
+  quantityToPick   Int
+  quantityPicked   Int            @default(0)
+  pickSequence     Int            // Order to pick items (route optimization)
+  status           PickItemStatus @default(PENDING)
+  pickedAt         DateTime?
+  pickedBy         String?        // User ID who picked this item
+  shortPickReason  String?        // Reason if short picked
+  notes            String?
+  
+  // Relations
+  pickList         PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  order            Order          @relation(fields: [orderId], references: [id])
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  location         Location       @relation(fields: [locationId], references: [id])
+  picker           User?          @relation(fields: [pickedBy], references: [id])
+  
+  @@unique([pickListId, orderId, productVariantId, locationId])
+  @@map("pick_list_items")
+}
+
+// Audit trail for pick events
+model PickEvent {
+  id          String        @id @default(cuid())
+  pickListId  String
+  itemId      String?       // PickListItem ID (optional for list-level events)
+  eventType   PickEventType
+  userId      String
+  location    String?       // Location code scanned
+  scannedCode String?       // Barcode scanned
+  data        Json?         // Additional event data
+  notes       String?
+  createdAt   DateTime      @default(now())
+  
+  // Relations
+  pickList    PickList      @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id])
+
+  @@map("pick_events")
+}
+
+// Enums for picking system
+enum PickStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum PickItemStatus {
+  PENDING
+  PICKED
+  SHORT_PICK
+  SKIPPED
+  DAMAGED
+}
+
+enum PickEventType {
+  PICK_STARTED
+  PICK_PAUSED
+  PICK_RESUMED
+  ITEM_PICKED
+  ITEM_SHORT_PICKED
+  ITEM_SKIPPED
+  LOCATION_SCANNED
+  BARCODE_SCANNED
+  PICK_COMPLETED
+  PICK_CANCELLED
+  ERROR_OCCURRED
+}
+
+// ---------------------------------------------------
+// 🚚 Shipping System Models
+// ---------------------------------------------------
+
+model ShippingPackage {
+  id             String   @id @default(cuid())
+  orderId        String
+  carrierCode    String
+  serviceCode    String
+  packageCode    String?
+  trackingNumber String
+  labelUrl       String
+  cost           Decimal  @db.Decimal(10,2)
+  currency       String
+  weight         Decimal? @db.Decimal(8,2)
+  dimensions     Json?
+
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("shipping_packages")
+}
+
+// Cycle Count Campaigns - Overall counting initiatives
+model CycleCountCampaign {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  countType   CycleCountType
+  status      CampaignStatus      @default(PLANNED)
+  startDate   DateTime
+  endDate     DateTime?
+  frequency   CountFrequency?     // For recurring campaigns
+  
+  // Criteria for what to count
+  locationIds String[]            // Specific locations to count
+  zoneFilter  String?             // Count by zone
+  abcClass    String?             // Count by ABC classification
+  lastCountedBefore DateTime?     // Items not counted since this date
+  
+  // Progress tracking
+  totalTasks    Int               @default(0)
+  completedTasks Int              @default(0)
+  variancesFound Int              @default(0)
+  
+  // Relations
+  tasks       CycleCountTask[]
+  createdBy   String
+  assignedTo  String[]            // User IDs who can perform counts
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("cycle_count_campaigns")
+}
+
+// Individual counting tasks within a campaign
+model CycleCountTask {
+  id                String              @id @default(cuid())
+  campaignId        String?             // Optional - for ad-hoc counts
+  locationId        String
+  productVariantId  String?             // null for location counts
+  
+  // Task details
+  taskNumber        String              @unique
+  priority          Int                 @default(0)
+  status            TaskStatus          @default(PENDING)
+  countType         CycleCountType
+  
+  // Expected vs actual counts
+  systemQuantity    Int                 // What system says
+  countedQuantity   Int?                // What was actually counted
+  variance          Int?                // Difference (counted - system)
+  variancePercentage Decimal?           @db.Decimal(5,2)
+  
+  // Assignment and timing
+  assignedTo        String?             // User ID
+  assignedAt        DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  
+  // Additional details
+  notes             String?
+  tolerancePercentage Decimal?          @db.Decimal(5,2) @default(5.0)
+  requiresRecount   Boolean             @default(false)
+  recountReason     String?
+  
+  // Relations
+  campaign          CycleCountCampaign? @relation(fields: [campaignId], references: [id])
+  location          Location            @relation(fields: [locationId], references: [id])
+  productVariant    ProductVariant?     @relation(fields: [productVariantId], references: [id])
+  assignedUser      User?               @relation(fields: [assignedTo], references: [id])
+  events            CycleCountEvent[]
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  @@unique([locationId, productVariantId]) // Prevent duplicate tasks
+  @@map("cycle_count_tasks")
+}
+
+// Audit trail for counting events
+model CycleCountEvent {
+  id              String            @id @default(cuid())
+  taskId          String
+  eventType       CountEventType
+  userId          String
+  
+  // Event data
+  previousValue   Int?              // Previous quantity
+  newValue        Int?              // New quantity
+  notes           String?
+  metadata        Json?             // Additional event data
+  
+  // Relations
+  task            CycleCountTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime          @default(now())
+  
+  @@map("cycle_count_events")
+}
+
+// Enums for cycle counting
+enum CycleCountType {
+  FULL              // Count everything
+  PARTIAL           // Count specific items/locations
+  ABC_ANALYSIS      // Count based on ABC classification
+  FAST_MOVING       // High-velocity items
+  SLOW_MOVING       // Low-velocity items
+  NEGATIVE_STOCK    // Items with negative quantities
+  ZERO_STOCK        // Items showing zero quantity
+  HIGH_VALUE        // High-dollar-value items
+  DAMAGED_LOCATION  // Specific location audit
+}
+
+enum CampaignStatus {
+  PLANNED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  VARIANCE_REVIEW
+  RECOUNT_REQUIRED
+  SKIPPED
+  CANCELLED
+}
+
+enum CountEventType {
+  TASK_CREATED
+  TASK_ASSIGNED
+  COUNT_STARTED
+  COUNT_RECORDED
+  COUNT_SKIPPED
+  VARIANCE_NOTED
+  RECOUNT_REQUESTED
+  TASK_COMPLETED
+  TASK_CANCELLED
+  NOTE_ADDED
+}
+
+enum CountFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  AD_HOC
 }

@@ -45,9 +45,9 @@ export async function POST(
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (order.status !== "ALLOCATED") {
+    if (order.status !== "SHIPPED") {
       return NextResponse.json(
-        { error: "Order must be allocated before completion" },
+        { error: "Order must be SHIPPED before completion" },
         { status: 400 }
       );
     }
@@ -70,6 +70,13 @@ export async function POST(
 
     // Properly map Shopify address format to ShipEngine format
     const shippingAddr = order.shippingAddress as any;
+
+    if (!shippingAddr || typeof shippingAddr !== "object") {
+      console.warn(
+        `⚠️ Missing or malformed shipping address for order ${order.id}`
+      );
+    }
+
     const customerAddress = {
       name: shippingAddr?.name || order.customerName || "Customer",
       company_name: shippingAddr?.company || undefined,
@@ -205,9 +212,11 @@ export async function POST(
       }
 
       // Update order to DELIVERED
+      // Update order to FULFILLED
       const finalOrder = await tx.order.update({
         where: { id: orderId },
-        data: { status: "DELIVERED" },
+        // data: { status: "DELIVERED" },
+        data: { status: "FULFILLED" },
       });
 
       return { order: finalOrder, fulfillmentResults };
@@ -226,6 +235,7 @@ export async function POST(
           trackingCompany: carrierCode || "USPS",
           lineItems: order.items.map((item) => ({
             id: item.id,
+            sku: item.productVariant.sku,
             quantity: item.quantity,
           })),
         });

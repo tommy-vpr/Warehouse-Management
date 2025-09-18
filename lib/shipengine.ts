@@ -164,6 +164,7 @@ class ShipEngineAPI {
     this.isSandbox = process.env.SHIPENGINE_SANDBOX === "true";
   }
 
+  // In your lib/shipengine.ts, update the request method:
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
 
@@ -178,11 +179,29 @@ class ShipEngineAPI {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
+
+      // Log the full error details for debugging
+      console.error("ShipEngine API Error Details:", {
+        status: response.status,
+        statusText: response.statusText,
+        url: url,
+        errorData: errorData,
+        requestBody: options.body, // This will show what we sent
+      });
+
+      const error = new Error(
         `ShipEngine API Error: ${response.status} - ${
           errorData.message || response.statusText
         }`
       );
+
+      // Attach the full error data to the error object
+      (error as any).response = {
+        status: response.status,
+        data: errorData,
+      };
+
+      throw error;
     }
 
     return response.json();

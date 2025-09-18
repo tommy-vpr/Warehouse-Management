@@ -216,11 +216,12 @@ async function processShopifyOrder(shopifyOrder: any) {
 }
 
 async function autoReserveOrder(orderId: string) {
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl = process.env.WEBHOOK_BASE_URL || "http://localhost:3000";
   const response = await fetch(`${baseUrl}/api/orders/${orderId}/reserve`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-webhook-secret": process.env.WEBHOOK_SECRET!,
     },
   });
 
