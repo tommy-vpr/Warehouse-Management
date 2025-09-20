@@ -13,14 +13,17 @@ import {
   AlignCenterHorizontal,
   PackagePlus,
   Package2,
+  Menu,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import UserMenu from "@/components/UserMenu";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const [showScanner, setShowScanner] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -34,29 +37,56 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
+          {/* Left: logo + search */}
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-gray-900">WMS Dashboard</h1>
-            <div className="relative">
+            {/* Mobile menu button */}
+            <button
+              className="sm:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-gray-700" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-700" />
+              )}
+            </button>
+
+            {/* <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
+              WMS Dashboard
+            </h1> */}
+            <div className="relative w-10 h-10 sm:w-12 sm:h-12">
+              <Image
+                src="/images/headquarter-logo.webp"
+                alt="HQ warehouse management"
+                fill
+                className="object-contain"
+                sizes="(max-width: 640px) 32px, 48px" // helps Next.js optimize
+              />
+            </div>
+
+            {/* Search (hidden on very small screens) */}
+            <div className="relative hidden sm:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 placeholder="Search products, orders, SKUs..."
-                className="pl-10 w-64"
+                className="pl-10 w-48 md:w-64"
               />
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <Button
-              onClick={() => setShowScanner(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Scan className="w-4 h-4 mr-2" />
-              Quick Scan
-            </Button>
+          {/* Right: actions */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <Link href={"/dashboard/inventory/receive"}>
+              <Button className="bg-blue-600 hover:bg-blue-700 hidden sm:flex">
+                <Scan className="w-4 h-4 mr-2" />
+                Quick Scan
+              </Button>
+            </Link>
+
             <Button variant="outline" size="icon">
               <Bell className="w-4 h-4" />
             </Button>
@@ -65,18 +95,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* Layout with Aside */}
-      <div className="flex">
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-screen">
+      <div className="flex flex-1">
+        {/* Sidebar */}
+        <aside
+          className={`
+    fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200
+    transform transition-transform duration-200 ease-in-out
+    sm:static sm:translate-x-0 sm:transform-none
+    ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+  `}
+        >
+          {/* Mobile-only close button */}
+          <div className="flex justify-end sm:hidden p-2">
+            <button onClick={() => setMobileMenuOpen(false)}>
+              <X className="w-6 h-6 text-gray-700" />
+            </button>
+          </div>
+
           <nav className="p-4 space-y-2">
             {menuItems.map((item) => (
-              //   <button
-              //     key={item.id}
-              //     className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-700 hover:bg-gray-50 transition-colors"
-              //   >
-              //     <item.icon className="w-5 h-5" />
-              //     <span>{item.label}</span>
-              //   </button>
               <Link
                 href={
                   item.id === "dashboard"
@@ -85,6 +122,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 }
                 key={item.id}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
@@ -93,7 +131,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        <main className="flex-1 p-6">{children}</main>
+        {/* Overlay (mobile only) */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 bg-opacity-50 z-30 sm:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Main content */}
+        <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

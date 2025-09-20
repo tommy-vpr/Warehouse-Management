@@ -1,25 +1,24 @@
 "use client";
-
-import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  Plus,
+  Minus,
   Package,
-  ArrowLeft,
-  Weight,
-  CheckCircle,
-  User,
-  MapPin,
-  AlertTriangle,
-  Download,
-  Printer,
   Truck,
+  AlertCircle,
   Loader2,
+  X,
+  Check,
+  Split,
+  Copy,
+  Download,
+  Eye,
+  RefreshCw,
+  ArrowRight,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 
+// TypeScript interfaces
 interface OrderItem {
   id: string;
   productName: string;
@@ -27,83 +26,145 @@ interface OrderItem {
   quantity: number;
   unitPrice: string;
   totalPrice: string;
-  weight: number;
+  weight?: number;
   dimensions?: any;
 }
 
-interface OrderDetails {
+interface Order {
   id: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
   status: string;
   totalAmount: string;
-  shippingAddress: any;
   items: OrderItem[];
+  shippingAddress: {
+    address1: string;
+    city: string;
+    province: string;
+    province_code: string;
+    zip: string;
+    name?: string;
+    country?: string;
+    country_code?: string;
+  };
 }
 
-interface PackingInfo {
-  totalWeight: number;
-  totalVolume: number;
-  suggestedBox: string;
-  estimatedShippingCost: number;
+interface Carrier {
+  carrier_id: string;
+  carrier_code: string;
+  friendly_name: string;
+  services: Array<{
+    service_code: string;
+    name: string;
+  }>;
+  packages: Array<{
+    package_code: string;
+    name: string;
+  }>;
 }
 
-interface PackageInput {
-  packageCode: string;
-  weight: string;
-  length: string;
-  width: string;
-  height: string;
+interface ShipmentItem {
+  itemId: string;
+  productName: string;
+  sku: string;
+  unitPrice: number;
+  quantity: number;
+  weight?: number;
 }
 
-export default function PackingInterface() {
+interface Shipment {
+  id: string;
+  name: string;
+  items: ShipmentItem[];
+  shippingConfig: {
+    carrierId: string;
+    serviceCode: string;
+    packageCode: string;
+    weight: string;
+    dimensions: {
+      length: string;
+      width: string;
+      height: string;
+    };
+  };
+  notes: string;
+}
+
+interface CompletedShipment {
+  splitName: string;
+  trackingNumber: string;
+  labelUrl: string;
+  cost: string;
+  carrier: string;
+  items: ShipmentItem[];
+}
+
+const OrderSplitter: React.FC = () => {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [carriersLoading, setCarriersLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [completedShipments, setCompletedShipments] = useState<
+    CompletedShipment[]
+  >([]);
+  const [selectedItemForSplit, setSelectedItemForSplit] = useState<{
+    itemId: string;
+    availableQty: number;
+  } | null>(null);
+  const [splitQuantity, setSplitQuantity] = useState(1);
+
   const params = useParams<{ id: string }>();
   const id = params.id;
 
-  const [order, setOrder] = useState<OrderDetails | null>(null);
-  const [packingInfo, setPackingInfo] = useState<PackingInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPacking, setIsPacking] = useState(false);
-  const [isShipping, setIsShipping] = useState(false);
-  const [isCarriersLoading, setIsCarriersLoading] = useState(true);
+  // Generate unique ID
+  const generateId = useCallback(
+    () => Date.now().toString(36) + Math.random().toString(36).substr(2),
+    []
+  );
 
-  // Error states
-  const [error, setError] = useState<string>("");
-  const [validationErrors, setValidationErrors] = useState<
-    Record<string, string>
-  >({});
+  // Calculate remaining quantity for each original item
+  const getRemainingQuantity = useCallback(
+    (itemId: string): number => {
+      const originalItem = order?.items.find((item) => item.id === itemId);
+      if (!originalItem) return 0;
 
-  // Dynamic ShipEngine data
-  const [carriers, setCarriers] = useState<any[]>([]);
-  const [selectedCarrier, setSelectedCarrier] = useState("");
-  const [selectedCarrierCode, setSelectedCarrierCode] = useState("");
+      const totalAllocated = shipments.reduce((total, shipment) => {
+        return (
+          total +
+          shipment.items.reduce((shipmentTotal, item) => {
+            return item.itemId === itemId
+              ? shipmentTotal + item.quantity
+              : shipmentTotal;
+          }, 0)
+        );
+      }, 0);
 
-  const [services, setServices] = useState<any[]>([]);
-  const [selectedService, setSelectedService] = useState("");
-  const [packages, setPackages] = useState<any[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState("");
+      return originalItem.quantity - totalAllocated;
+    },
+    [order, shipments]
+  );
 
-  // Packing form state
-  const [actualWeight, setActualWeight] = useState("");
-  const [dimensions, setDimensions] = useState({
-    length: "10",
-    width: "8",
-    height: "6",
-  });
-  const [packingNotes, setPackingNotes] = useState("");
-  const [shippingLabel, setShippingLabel] = useState<any>(null);
+  // Get summary of allocated items
+  const getAllocationSummary = useMemo(() => {
+    if (!order) return [];
 
-  const [packagesList, setPackagesList] = useState<PackageInput[]>([
-    { packageCode: "", weight: "", length: "10", width: "8", height: "6" },
-  ]);
-
-  const [numPackages, setNumPackages] = useState(1);
+    return order.items.map((item) => ({
+      ...item,
+      remaining: getRemainingQuantity(item.id),
+      allocated: item.quantity - getRemainingQuantity(item.id),
+    }));
+  }, [order, getRemainingQuantity]);
 
   useEffect(() => {
-    loadOrderDetails();
-    loadCarriers();
-  }, []);
+    if (id) {
+      loadOrderDetails();
+      loadCarriers();
+    }
+  }, [id]);
 
   const loadOrderDetails = async () => {
     try {
@@ -111,201 +172,358 @@ export default function PackingInterface() {
       const response = await fetch(`/api/shipping/${id}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(`Failed to load order: ${response.status}`);
       }
 
       const data = await response.json();
       setOrder(data.order);
-      setPackingInfo(data.packingInfo);
 
-      if (data.packingInfo?.totalWeight) {
-        setActualWeight(data.packingInfo.totalWeight.toString());
-      }
-    } catch (error) {
-      console.error("Failed to load order:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load order details";
-      setError(errorMessage);
+      // Initialize with one empty shipment
+      const initialShipment: Shipment = {
+        id: generateId(),
+        name: "Shipment 1",
+        items: [],
+        shippingConfig: {
+          carrierId: "",
+          serviceCode: "",
+          packageCode: "",
+          weight: "",
+          dimensions: {
+            length: "10",
+            width: "8",
+            height: "6",
+          },
+        },
+        notes: "",
+      };
+
+      setShipments([initialShipment]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-    setIsLoading(false);
   };
 
   const loadCarriers = async () => {
     try {
-      const res = await fetch("/api/carriers");
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to load carriers");
+      const response = await fetch("/api/carriers");
+      if (!response.ok) {
+        throw new Error(`Failed to load carriers: ${response.status}`);
       }
-      const data = await res.json();
-      setCarriers(data);
+      const carriersData = await response.json();
+      setCarriers(carriersData);
     } catch (err) {
       console.error("Failed to load carriers:", err);
-      setError("Failed to load shipping carriers. Please refresh the page.");
+    } finally {
+      setCarriersLoading(false);
     }
-    setIsCarriersLoading(false);
   };
 
-  const handleCarrierChange = (carrierId: string) => {
-    setSelectedCarrier(carrierId);
-    const carrier = carriers.find((c) => c.carrier_id === carrierId);
-    setSelectedCarrierCode(carrier?.carrier_code || ""); // Store the actual carrier code
-    console.log("carrier changed:", selectedCarrier);
-    console.log("carrier code changed:", selectedCarrierCode);
+  // Create new shipment
+  const createNewShipment = () => {
+    const newShipment: Shipment = {
+      id: generateId(),
+      name: `Shipment ${shipments.length + 1}`,
+      items: [],
+      shippingConfig: {
+        carrierId: "",
+        serviceCode: "",
+        packageCode: "",
+        weight: "",
+        dimensions: {
+          length: "10",
+          width: "8",
+          height: "6",
+        },
+      },
+      notes: "",
+    };
+
+    setShipments([...shipments, newShipment]);
   };
 
-  // Update services and packages when carrier changes
-  useEffect(() => {
-    const carrier = carriers.find((c) => c.carrier_id === selectedCarrier);
-    setServices(carrier?.services || []);
-    setPackages(carrier?.packages || []);
-    setSelectedService("");
-    setSelectedPackage("");
-  }, [selectedCarrier, carriers]);
-
-  // Form validation
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!selectedCarrier) errors.carrier = "Please select a carrier";
-    if (!selectedService) errors.service = "Please select a shipping service";
-    if (!selectedPackage) errors.package = "Please select a package type";
-
-    const weight = parseFloat(actualWeight);
-    if (!actualWeight || isNaN(weight) || weight <= 0) {
-      errors.weight = "Please enter a valid weight greater than 0";
-    }
-
-    const length = parseFloat(dimensions.length);
-    const width = parseFloat(dimensions.width);
-    const height = parseFloat(dimensions.height);
-
-    if (isNaN(length) || length <= 0)
-      errors.length = "Length must be greater than 0";
-    if (isNaN(width) || width <= 0)
-      errors.width = "Width must be greater than 0";
-    if (isNaN(height) || height <= 0)
-      errors.height = "Height must be greater than 0";
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+  // Remove shipment
+  const removeShipment = (shipmentId: string) => {
+    if (shipments.length <= 1) return;
+    setShipments(shipments.filter((s) => s.id !== shipmentId));
   };
 
-  const completePacking = async () => {
-    if (!order || !validateForm()) return;
+  // Add item to shipment
+  const addItemToShipment = (
+    shipmentId: string,
+    itemId: string,
+    quantity: number
+  ) => {
+    const originalItem = order?.items.find((item) => item.id === itemId);
+    if (!originalItem) return;
 
-    setIsPacking(true);
-    setError("");
+    const remainingQty = getRemainingQuantity(itemId);
+    const validQuantity = Math.min(quantity, remainingQty);
 
-    try {
-      const response = await fetch("/api/packing/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          boxType: selectedPackage,
-          actualWeight: parseFloat(actualWeight),
-          shippingService: selectedService,
-          carrierCode: selectedCarrier,
-          notes: packingNotes,
-        }),
-      });
+    if (validQuantity <= 0) return;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to complete packing");
-      }
+    setShipments(
+      shipments.map((shipment) => {
+        if (shipment.id !== shipmentId) return shipment;
 
-      await createShippingLabel();
-    } catch (error) {
-      console.error("Failed to complete packing:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to complete packing";
-      setError(errorMessage);
-    }
-    setIsPacking(false);
+        // Check if item already exists in this shipment
+        const existingItemIndex = shipment.items.findIndex(
+          (item) => item.itemId === itemId
+        );
+
+        if (existingItemIndex >= 0) {
+          // Update existing item quantity
+          const updatedItems = [...shipment.items];
+          updatedItems[existingItemIndex] = {
+            ...updatedItems[existingItemIndex],
+            quantity: updatedItems[existingItemIndex].quantity + validQuantity,
+          };
+          return { ...shipment, items: updatedItems };
+        } else {
+          // Add new item to shipment
+          const newItem: ShipmentItem = {
+            itemId: originalItem.id,
+            productName: originalItem.productName,
+            sku: originalItem.sku,
+            unitPrice: parseFloat(originalItem.unitPrice),
+            quantity: validQuantity,
+            weight: originalItem.weight,
+          };
+          return { ...shipment, items: [...shipment.items, newItem] };
+        }
+      })
+    );
+
+    // Close split modal
+    setSelectedItemForSplit(null);
+    setSplitQuantity(1);
   };
 
-  const createShippingLabel = async () => {
-    if (!order || !validateForm()) return;
-
-    setIsShipping(true);
-    setError("");
-
-    try {
-      const payload = {
-        orderId: order.id,
-        carrierCode: selectedCarrierCode, // Use carrier_code instead of carrier_id
-        serviceCode: selectedService,
-        packages: [
-          {
-            packageCode: selectedPackage, // This should remain as selected
-            weight: parseFloat(actualWeight),
-            length: parseFloat(dimensions.length),
-            width: parseFloat(dimensions.width),
-            height: parseFloat(dimensions.height),
-          },
-        ],
-        shippingAddress: order.shippingAddress,
-        notes: packingNotes || `Packed with ${selectedPackage}`,
-      };
-
-      console.log("Label payload: ", payload);
-
-      const response = await fetch("/api/shipping/shipengine/create-label", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create shipping label");
-      }
-
-      const data = await response.json();
-      if (data.success && data.label) {
-        setShippingLabel(data.label);
-      } else {
-        throw new Error("Invalid response from shipping service");
-      }
-    } catch (error) {
-      console.error("Failed to create shipping label:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to create shipping label";
-      setError(errorMessage);
-    }
-    setIsShipping(false);
-  };
-
-  // Safe address rendering
-  const renderAddress = (address: any) => {
-    if (!address) return <p className="text-gray-500">No address provided</p>;
-
-    return (
-      <div className="text-sm">
-        <div>{address.address1 || "Address not available"}</div>
-        {address.address2 && <div>{address.address2}</div>}
-        <div>
-          {address.city || "City"},{" "}
-          {address.province || address.state || "State"}{" "}
-          {address.zip || address.postalCode || ""}
-        </div>
-        <div>{address.country || "Country"}</div>
-      </div>
+  // Remove item from shipment
+  const removeItemFromShipment = (shipmentId: string, itemId: string) => {
+    setShipments(
+      shipments.map((shipment) => {
+        if (shipment.id !== shipmentId) return shipment;
+        return {
+          ...shipment,
+          items: shipment.items.filter((item) => item.itemId !== itemId),
+        };
+      })
     );
   };
 
-  // --- UI States ---
-  if (isLoading) {
+  // Update item quantity in shipment
+  const updateItemQuantityInShipment = (
+    shipmentId: string,
+    itemId: string,
+    newQuantity: number
+  ) => {
+    const remainingQty = getRemainingQuantity(itemId);
+    const currentShipment = shipments.find((s) => s.id === shipmentId);
+    const currentItem = currentShipment?.items.find((i) => i.itemId === itemId);
+    const maxAllowed = remainingQty + (currentItem?.quantity || 0);
+
+    const validQuantity = Math.max(0, Math.min(newQuantity, maxAllowed));
+
+    if (validQuantity === 0) {
+      removeItemFromShipment(shipmentId, itemId);
+      return;
+    }
+
+    setShipments(
+      shipments.map((shipment) => {
+        if (shipment.id !== shipmentId) return shipment;
+        return {
+          ...shipment,
+          items: shipment.items.map((item) =>
+            item.itemId === itemId ? { ...item, quantity: validQuantity } : item
+          ),
+        };
+      })
+    );
+  };
+
+  // Update shipping configuration
+  const updateShippingConfig = (
+    shipmentId: string,
+    field: string,
+    value: string
+  ) => {
+    setShipments(
+      shipments.map((shipment) => {
+        if (shipment.id !== shipmentId) return shipment;
+
+        const newConfig = { ...shipment.shippingConfig };
+
+        if (field.includes(".")) {
+          const [parent, child] = field.split(".");
+          if (parent === "dimensions") {
+            newConfig.dimensions = { ...newConfig.dimensions, [child]: value };
+          }
+        } else {
+          (newConfig as any)[field] = value;
+          if (field === "carrierId") {
+            newConfig.serviceCode = "";
+            newConfig.packageCode = "";
+          }
+        }
+
+        return { ...shipment, shippingConfig: newConfig };
+      })
+    );
+  };
+
+  // Get carrier options
+  const getCarrierOptions = (carrierId: string) => {
+    const carrier = carriers.find((c) => c.carrier_id === carrierId);
+    return {
+      services: carrier?.services || [],
+      packages: carrier?.packages || [],
+    };
+  };
+
+  // Validation
+  const validateShipments = (): string[] => {
+    const errors: string[] = [];
+
+    if (!order) return ["Order not loaded"];
+
+    // Check that shipments have items
+    shipments.forEach((shipment) => {
+      if (shipment.items.length === 0) {
+        errors.push(`${shipment.name} must have at least one item`);
+      }
+
+      const { carrierId, serviceCode, packageCode, weight } =
+        shipment.shippingConfig;
+      if (shipment.items.length > 0) {
+        if (!carrierId || !serviceCode || !packageCode) {
+          errors.push(
+            `${shipment.name} needs carrier, service, and package selected`
+          );
+        }
+        if (!weight || parseFloat(weight) <= 0) {
+          errors.push(`${shipment.name} needs valid weight`);
+        }
+      }
+    });
+
+    // Check for unallocated items
+    const unallocatedItems = getAllocationSummary.filter(
+      (item) => item.remaining > 0
+    );
+    if (unallocatedItems.length > 0) {
+      errors.push(
+        `Unallocated items: ${unallocatedItems
+          .map((item) => `${item.sku} (${item.remaining})`)
+          .join(", ")}`
+      );
+    }
+
+    return errors;
+  };
+
+  // Process shipments
+  const processShipments = async () => {
+    const validationErrors = validateShipments();
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join("; "));
+      return;
+    }
+
+    if (!order) {
+      setError("Order not loaded");
+      return;
+    }
+
+    setProcessing(true);
+    setError("");
+
+    try {
+      const results = [];
+      const validShipments = shipments.filter((s) => s.items.length > 0);
+
+      for (const shipment of validShipments) {
+        const selectedCarrier = carriers.find(
+          (c) => c.carrier_id === shipment.shippingConfig.carrierId
+        );
+        if (!selectedCarrier) {
+          throw new Error(`Carrier not found for ${shipment.name}`);
+        }
+
+        const shipmentData = {
+          orderId: order.id,
+          carrierCode: selectedCarrier.carrier_code,
+          serviceCode: shipment.shippingConfig.serviceCode,
+          packages: [
+            {
+              packageCode: shipment.shippingConfig.packageCode,
+              weight: parseFloat(shipment.shippingConfig.weight),
+              length: parseFloat(shipment.shippingConfig.dimensions.length),
+              width: parseFloat(shipment.shippingConfig.dimensions.width),
+              height: parseFloat(shipment.shippingConfig.dimensions.height),
+            },
+          ],
+          shippingAddress: {
+            name: order.customerName,
+            address1: order.shippingAddress.address1,
+            city: order.shippingAddress.city,
+            zip: order.shippingAddress.zip,
+            province: order.shippingAddress.province,
+            province_code: order.shippingAddress.province_code,
+            country_code: order.shippingAddress.country_code || "US",
+          },
+          notes:
+            shipment.notes ||
+            `${shipment.name} - Items: ${shipment.items
+              .map((i) => `${i.sku}(${i.quantity})`)
+              .join(", ")}`,
+        };
+
+        const response = await fetch("/api/shipping/shipengine/create-label", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(shipmentData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            `Failed to create ${shipment.name}: ${
+              errorData.error || response.statusText
+            }`
+          );
+        }
+
+        const result = await response.json();
+        results.push({
+          splitName: shipment.name,
+          trackingNumber: result.label.trackingNumber,
+          labelUrl: result.label.labelUrl,
+          cost: result.label.cost,
+          carrier: selectedCarrier.friendly_name,
+          items: shipment.items,
+        });
+      }
+
+      setCompletedShipments(results);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Loading states
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading order details...</p>
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="text-blue-500 w-8 h-8 animate-spin mr-3" />
+          <span>Loading order details...</span>
         </div>
       </div>
     );
@@ -313,473 +531,617 @@ export default function PackingInterface() {
 
   if (error && !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button
-            variant="outline"
-            className="mr-2"
-            onClick={() => window.history.back()}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
-          <Button onClick={loadOrderDetails}>Try Again</Button>
+      <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center mb-2">
+          <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+          <span className="font-semibold text-red-800">
+            Error Loading Order
+          </span>
         </div>
+        <p className="text-red-700">{error}</p>
       </div>
     );
   }
 
-  if (!order) {
+  // Success state
+  if (completedShipments.length > 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-gray-600">
-            Order not found or not ready for packing
-          </p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => window.history.back()}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (shippingLabel) {
-    return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-800 mb-2">
-            Order Packed & Shipped!
-          </h2>
-          <p className="text-green-700 mb-6">
-            {order.orderNumber} has been shipped
-          </p>
-
-          <div className="bg-white p-4 rounded-lg mb-6 text-left">
-            <h3 className="font-semibold mb-2">Shipping Details:</h3>
-            <p className="text-sm">Tracking: {shippingLabel.trackingNumber}</p>
-            <p className="text-sm">Cost: ${shippingLabel.cost}</p>
-            <p className="text-sm">Service: {selectedService}</p>
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="p-6 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center mb-4">
+            <Check className="w-6 h-6 text-green-600 mr-2" />
+            <h2 className="text-xl font-semibold text-green-800">
+              Order Split Successfully!
+            </h2>
           </div>
 
-          <div className="space-y-3">
-            <Button
-              onClick={() => window.open(shippingLabel.labelUrl, "_blank")}
-              className="w-full"
-              disabled={!shippingLabel.labelUrl}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Label
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-              className="w-full"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print Label
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => (window.location.href = "/packing")}
-              className="w-full"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Pack Station
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- Main Packing UI ---
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => window.history.back()}
-            className="mr-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Pack Order</h1>
-            <p className="text-gray-600">{order.orderNumber}</p>
-          </div>
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Order Info */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="w-5 h-5 mr-2" />
-                  Customer Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+          <div className="space-y-4">
+            {completedShipments.map((shipment, index) => (
+              <div key={index} className="bg-white p-4 rounded border">
+                <h3 className="font-medium mb-2">{shipment.splitName}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">{order.customerName}</span>
+                    <p className="text-gray-600 mb-1">
+                      <strong>Tracking:</strong> {shipment.trackingNumber}
+                    </p>
+                    <p className="text-gray-600 mb-1">
+                      <strong>Cost:</strong> ${shipment.cost}
+                    </p>
+                    <p className="text-gray-600 mb-3">
+                      <strong>Carrier:</strong> {shipment.carrier}
+                    </p>
                   </div>
-                  <div className="text-sm text-gray-600">
-                    {order.customerEmail}
-                  </div>
-                  <div className="pt-2">
-                    <div className="flex items-start">
-                      <MapPin className="w-4 h-4 mr-2 mt-0.5 text-gray-500" />
-                      {renderAddress(order.shippingAddress)}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Package className="w-5 h-5 mr-2" />
-                  Items to Pack ({order.items?.length || 0})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {order.items?.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div>
-                        <div className="font-medium">{item.productName}</div>
-                        <div className="text-sm text-gray-600">
-                          SKU: {item.sku}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Weight: {item.weight} lbs each
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">×{item.quantity}</div>
-                        <div className="text-sm text-gray-600">
-                          ${item.totalPrice}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t pt-3 mt-3">
-                  <div className="flex justify-between font-semibold">
-                    <span>Total Value:</span>
-                    <span>${order.totalAmount}</span>
+                  <div>
+                    <p className="text-sm font-medium mb-1">Items:</p>
+                    <ul className="text-sm text-gray-600">
+                      {shipment.items.map((item) => (
+                        <li key={item.itemId}>
+                          {item.sku} - {item.productName} (Qty: {item.quantity})
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Packing Form */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Weight className="w-5 h-5 mr-2" />
-                  Packing Information
-                  {isCarriersLoading && (
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {packingInfo && (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Est. Weight:</span>
-                      <div className="font-medium">
-                        {packingInfo.totalWeight.toFixed(1)} lbs
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Est. Ship Cost:</span>
-                      <div className="font-medium">
-                        ${packingInfo.estimatedShippingCost.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Carrier */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Select Carrier:
-                  </label>
-                  <select
-                    value={selectedCarrier}
-                    onChange={(e) => handleCarrierChange(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md ${
-                      validationErrors.carrier ? "border-red-500" : ""
-                    }`}
-                    disabled={isCarriersLoading}
+                {shipment.labelUrl && (
+                  <button
+                    onClick={() => window.open(shipment.labelUrl, "_blank")}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 flex items-center"
                   >
-                    <option value="">
-                      {isCarriersLoading
-                        ? "Loading carriers..."
-                        : "Select Carrier"}
-                    </option>
-                    {carriers.map((c) => (
-                      <option key={c.carrier_id} value={c.carrier_id}>
-                        {c.friendly_name || c.carrier_code}
-                      </option>
-                    ))}
-                  </select>
-                  {validationErrors.carrier && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {validationErrors.carrier}
-                    </p>
-                  )}
-                </div>
-
-                {/* Service */}
-                {services.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Shipping Service:
-                    </label>
-                    <select
-                      value={selectedService}
-                      onChange={(e) => setSelectedService(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md ${
-                        validationErrors.service ? "border-red-500" : ""
-                      }`}
-                    >
-                      <option value="">Select Service</option>
-                      {services.map((s) => (
-                        <option key={s.service_code} value={s.service_code}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.service && (
-                      <p className="text-sm text-red-600 mt-1">
-                        {validationErrors.service}
-                      </p>
-                    )}
-                  </div>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Label
+                  </button>
                 )}
+              </div>
+            ))}
+          </div>
 
-                {/* Package */}
-                {packages.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Package Type:
-                    </label>
-                    <select
-                      value={selectedPackage}
-                      onChange={(e) => setSelectedPackage(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md ${
-                        validationErrors.package ? "border-red-500" : ""
-                      }`}
-                    >
-                      <option value="">Select Package</option>
-                      {packages.map((p) => (
-                        <option key={p.package_code} value={p.package_code}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.package && (
-                      <p className="text-sm text-red-600 mt-1">
-                        {validationErrors.package}
-                      </p>
-                    )}
-                  </div>
-                )}
+          <button
+            onClick={() => {
+              setCompletedShipments([]);
+              setShipments([
+                {
+                  id: generateId(),
+                  name: "Shipment 1",
+                  items: [],
+                  shippingConfig: {
+                    carrierId: "",
+                    serviceCode: "",
+                    packageCode: "",
+                    weight: "",
+                    dimensions: { length: "10", width: "8", height: "6" },
+                  },
+                  notes: "",
+                },
+              ]);
+            }}
+            className="mt-4 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Create New Split
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-                {/* Weight */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Actual Weight (lbs):
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    value={actualWeight}
-                    onChange={(e) => setActualWeight(e.target.value)}
-                    placeholder="Enter actual weight"
-                    className={validationErrors.weight ? "border-red-500" : ""}
-                  />
-                  {validationErrors.weight && (
-                    <p className="text-sm text-red-600 mt-1">
-                      {validationErrors.weight}
-                    </p>
-                  )}
-                </div>
+  if (!order) return null;
 
-                {/* Dimensions */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Package Dimensions (inches):
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={dimensions.length}
-                        onChange={(e) =>
-                          setDimensions({
-                            ...dimensions,
-                            length: e.target.value,
-                          })
-                        }
-                        placeholder="Length"
-                        className={
-                          validationErrors.length ? "border-red-500" : ""
-                        }
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Length</p>
-                    </div>
-                    <div>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={dimensions.width}
-                        onChange={(e) =>
-                          setDimensions({
-                            ...dimensions,
-                            width: e.target.value,
-                          })
-                        }
-                        placeholder="Width"
-                        className={
-                          validationErrors.width ? "border-red-500" : ""
-                        }
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Width</p>
-                    </div>
-                    <div>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={dimensions.height}
-                        onChange={(e) =>
-                          setDimensions({
-                            ...dimensions,
-                            height: e.target.value,
-                          })
-                        }
-                        placeholder="Height"
-                        className={
-                          validationErrors.height ? "border-red-500" : ""
-                        }
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Height</p>
-                    </div>
-                  </div>
-                </div>
+  return (
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Order {order.orderNumber}</h1>
+          <p className="text-gray-600">
+            {order.customerName} ({order.customerEmail})
+          </p>
+          <p className="text-gray-600">
+            {order.shippingAddress.address1}, {order.shippingAddress.city},{" "}
+            {order.shippingAddress.province} {order.shippingAddress.zip}
+          </p>
+        </div>
+        <button
+          onClick={createNewShipment}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Shipment
+        </button>
+      </div>
 
-                {/* Number of Packages */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Number of Packages:
-                  </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={numPackages}
-                    onChange={(e) =>
-                      setNumPackages(Math.max(1, parseInt(e.target.value) || 1))
-                    }
-                    placeholder="1"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    All packages will use the same weight and dimensions.
-                  </p>
-                </div>
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <span className="text-red-800">{error}</span>
+          </div>
+        </div>
+      )}
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Packing Notes (Optional):
-                  </label>
-                  <textarea
-                    value={packingNotes}
-                    onChange={(e) => setPackingNotes(e.target.value)}
-                    placeholder="Special instructions..."
-                    rows={3}
-                    className="w-full px-3 py-2 border rounded-md"
-                    maxLength={500}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {packingNotes.length}/500 characters
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Original Order Items */}
+        <div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Package className="w-5 h-5 mr-2" />
+              Order Items
+            </h3>
             <div className="space-y-3">
-              <Button
-                onClick={completePacking}
-                disabled={
-                  isPacking ||
-                  isShipping ||
-                  isCarriersLoading ||
-                  !selectedCarrier ||
-                  !selectedService ||
-                  !selectedPackage ||
-                  !actualWeight ||
-                  parseFloat(actualWeight) <= 0
-                }
-                className="w-full h-12 text-lg"
-              >
-                {isPacking ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Packing...
-                  </>
-                ) : isShipping ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Label...
-                  </>
-                ) : (
-                  "Pack & Ship Order"
-                )}
-              </Button>
-              <p className="text-sm text-gray-600 text-center">
-                This will mark the order as packed and create a shipping label
-              </p>
+              {getAllocationSummary.map((item) => (
+                <div key={item.id} className="bg-white p-3 rounded border">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">
+                        {item.productName}
+                      </div>
+                      <div className="text-xs text-gray-600 mb-2">
+                        SKU: {item.sku} • ${item.unitPrice} each
+                      </div>
+
+                      <div className="flex items-center text-xs space-x-4">
+                        <span className="text-gray-500">
+                          Qty: {item.quantity}
+                        </span>
+                        <span className="text-blue-600">
+                          Split: {item.allocated}
+                        </span>
+                        <span
+                          className={`font-medium ${
+                            item.remaining > 0
+                              ? "text-blue-600"
+                              : "text-green-600"
+                          }`}
+                        >
+                          Available: {item.remaining}
+                        </span>
+                      </div>
+
+                      {item.remaining > 0 && (
+                        <div className="mt-2">
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="bg-blue-500 h-1.5 rounded-full"
+                              style={{
+                                width: `${
+                                  (item.remaining / item.quantity) * 100
+                                }%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {item.remaining > 0 && (
+                      <button
+                        onClick={() =>
+                          setSelectedItemForSplit({
+                            itemId: item.id,
+                            availableQty: item.remaining,
+                          })
+                        }
+                        className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                      >
+                        Split
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+
+        {/* Shipments */}
+        <div>
+          <h3 className="font-semibold mb-3 flex items-center">
+            <Truck className="w-5 h-5 mr-2" />
+            Shipments ({shipments.length})
+          </h3>
+
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {shipments.map((shipment) => (
+              <div key={shipment.id} className="border rounded-lg p-4 bg-white">
+                {/* Shipment Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium text-sm">{shipment.name}</h4>
+                  {shipments.length > 1 && (
+                    <button
+                      onClick={() => removeShipment(shipment.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Items in shipment */}
+                <div className="mb-4">
+                  <h5 className="text-xs font-medium text-gray-700 mb-2">
+                    Items ({shipment.items.length})
+                  </h5>
+                  {shipment.items.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">
+                      No items added
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {shipment.items.map((item) => (
+                        <div
+                          key={item.itemId}
+                          className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs"
+                        >
+                          <div>
+                            <span className="font-medium">{item.sku}</span>
+                            <span className="text-gray-600 ml-2">
+                              Qty: {item.quantity}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() =>
+                                updateItemQuantityInShipment(
+                                  shipment.id,
+                                  item.itemId,
+                                  item.quantity - 1
+                                )
+                              }
+                              className="w-5 h-5 bg-white border rounded flex items-center justify-center hover:bg-gray-50"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-8 text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() =>
+                                updateItemQuantityInShipment(
+                                  shipment.id,
+                                  item.itemId,
+                                  item.quantity + 1
+                                )
+                              }
+                              className="w-5 h-5 bg-white border rounded flex items-center justify-center hover:bg-gray-50"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                removeItemFromShipment(shipment.id, item.itemId)
+                              }
+                              className="ml-2 text-red-600 hover:text-red-800"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Shipping Config - Only show if shipment has items */}
+                {shipment.items.length > 0 && (
+                  <div className="space-y-3">
+                    <h5 className="text-xs font-medium text-gray-700">
+                      Shipping Configuration
+                    </h5>
+
+                    {/* Carrier Selection */}
+                    <select
+                      value={shipment.shippingConfig.carrierId}
+                      onChange={(e) =>
+                        updateShippingConfig(
+                          shipment.id,
+                          "carrierId",
+                          e.target.value
+                        )
+                      }
+                      disabled={carriersLoading}
+                      className="w-full px-2 py-1 border rounded text-xs"
+                    >
+                      <option value="">
+                        {carriersLoading ? "Loading..." : "Select Carrier"}
+                      </option>
+                      {carriers.map((carrier) => (
+                        <option
+                          key={carrier.carrier_id}
+                          value={carrier.carrier_id}
+                        >
+                          {carrier.friendly_name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Service Selection */}
+                    {shipment.shippingConfig.carrierId && (
+                      <select
+                        value={shipment.shippingConfig.serviceCode}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "serviceCode",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-2 py-1 border rounded text-xs"
+                      >
+                        <option value="">Select Service</option>
+                        {getCarrierOptions(
+                          shipment.shippingConfig.carrierId
+                        ).services.map((service) => (
+                          <option
+                            key={service.service_code}
+                            value={service.service_code}
+                          >
+                            {service.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Package Selection */}
+                    {shipment.shippingConfig.carrierId && (
+                      <select
+                        value={shipment.shippingConfig.packageCode}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "packageCode",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-2 py-1 border rounded text-xs"
+                      >
+                        <option value="">Select Package</option>
+                        {getCarrierOptions(
+                          shipment.shippingConfig.carrierId
+                        ).packages.map((pkg) => (
+                          <option
+                            key={pkg.package_code}
+                            value={pkg.package_code}
+                          >
+                            {pkg.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Weight and Dimensions */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={shipment.shippingConfig.weight}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "weight",
+                            e.target.value
+                          )
+                        }
+                        className="px-2 py-1 border rounded text-xs"
+                        placeholder="Weight (lbs)"
+                      />
+                      <input
+                        type="text"
+                        value={shipment.notes}
+                        onChange={(e) =>
+                          setShipments(
+                            shipments.map((s) =>
+                              s.id === shipment.id
+                                ? { ...s, notes: e.target.value }
+                                : s
+                            )
+                          )
+                        }
+                        className="px-2 py-1 border rounded text-xs"
+                        placeholder="Notes (optional)"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={shipment.shippingConfig.dimensions.length}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "dimensions.length",
+                            e.target.value
+                          )
+                        }
+                        placeholder="L"
+                        className="px-2 py-1 border rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={shipment.shippingConfig.dimensions.width}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "dimensions.width",
+                            e.target.value
+                          )
+                        }
+                        placeholder="W"
+                        className="px-2 py-1 border rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={shipment.shippingConfig.dimensions.height}
+                        onChange={(e) =>
+                          updateShippingConfig(
+                            shipment.id,
+                            "dimensions.height",
+                            e.target.value
+                          )
+                        }
+                        placeholder="H"
+                        className="px-2 py-1 border rounded text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Process Button */}
+      <div className="flex justify-center pt-4">
+        <button
+          onClick={processShipments}
+          disabled={processing || shipments.every((s) => s.items.length === 0)}
+          className="flex items-center px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {processing ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Creating Shipments...
+            </>
+          ) : (
+            <>
+              {/* <Truck className="w-5 h-5 mr-2" /> */}
+              Create Shipments & Labels
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Split Modal */}
+      {selectedItemForSplit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Split Item</h3>
+
+            {(() => {
+              const item = order.items.find(
+                (i) => i.id === selectedItemForSplit.itemId
+              );
+              return item ? (
+                <div className="mb-4">
+                  <p className="font-medium">{item.productName}</p>
+                  <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                  <p className="text-sm text-gray-600">
+                    Available to split: {selectedItemForSplit.availableQty}{" "}
+                    units
+                  </p>
+                </div>
+              ) : null;
+            })()}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Quantity to add:
+              </label>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() =>
+                    setSplitQuantity(Math.max(1, splitQuantity - 1))
+                  }
+                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedItemForSplit.availableQty}
+                  value={splitQuantity}
+                  onChange={(e) =>
+                    setSplitQuantity(
+                      Math.min(
+                        selectedItemForSplit.availableQty,
+                        Math.max(1, parseInt(e.target.value) || 1)
+                      )
+                    )
+                  }
+                  className="w-20 text-center px-2 py-1 border rounded"
+                />
+                <button
+                  onClick={() =>
+                    setSplitQuantity(
+                      Math.min(
+                        selectedItemForSplit.availableQty,
+                        splitQuantity + 1
+                      )
+                    )
+                  }
+                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Add to shipment:
+              </label>
+              <select
+                className="w-full px-3 py-2 border rounded"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    addItemToShipment(
+                      e.target.value,
+                      selectedItemForSplit.itemId,
+                      splitQuantity
+                    );
+                  }
+                }}
+                defaultValue=""
+              >
+                <option value="">Select shipment...</option>
+                {shipments.map((shipment) => (
+                  <option key={shipment.id} value={shipment.id}>
+                    {shipment.name} ({shipment.items.length} items)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setSelectedItemForSplit(null);
+                  setSplitQuantity(1);
+                }}
+                className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Add to first shipment if none selected
+                  if (shipments.length > 0) {
+                    addItemToShipment(
+                      shipments[0].id,
+                      selectedItemForSplit.itemId,
+                      splitQuantity
+                    );
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Add to {shipments[0]?.name || "Shipment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default OrderSplitter;

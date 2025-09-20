@@ -100,6 +100,8 @@ export default function OrdersManagementDashboard() {
     return () => clearInterval(interval);
   }, [statusFilter, searchTerm, priorityFilter]);
 
+  console.log(orders);
+
   const loadOrders = async () => {
     try {
       const params = new URLSearchParams();
@@ -490,11 +492,11 @@ export default function OrdersManagementDashboard() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
+                      Qty
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Value
@@ -549,23 +551,27 @@ export default function OrdersManagementDashboard() {
                             {order.status.replace("_", " ")}
                           </Badge>
                         </td>
-                        <td className="px-4 py-4">
+                        {/* <td className="px-4 py-4">
                           <Badge className={getPriorityColor(order.priority)}>
                             {order.priority}
                           </Badge>
-                        </td>
+                        </td> */}
                         <td className="px-4 py-4">
                           <div>
-                            <div className="font-medium">{order.itemCount}</div>
-                            <div className="text-sm text-gray-500">
-                              {order.totalWeight.toFixed(1)} lbs
+                            <div className="text-sm">
+                              {/* {order.itemCount} */}
+                              {order.items.reduce(
+                                (sum, item) => sum + item.quantity,
+                                0
+                              )}
                             </div>
+                            {/* <div className="text-sm text-gray-500">
+                              {order.totalWeight.toFixed(1)} lbs
+                            </div> */}
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="font-medium">
-                            ${order.totalAmount}
-                          </div>
+                          <div className="text-sm">${order.totalAmount}</div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm">

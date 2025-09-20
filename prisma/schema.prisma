@@ -129,6 +129,7 @@ model Location {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   pickListItems     PickListItem[]
+  barcode       String?
 
   @@map("locations")
   countTasks         CycleCountTask[]
