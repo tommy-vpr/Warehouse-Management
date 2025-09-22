@@ -28,6 +28,7 @@ import ScannerModal from "@/components/ScannerModal";
 import InventoryView from "@/components/InventoryView";
 import OrdersView from "@/components/OrdersView";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 // Mock data for demonstration
 const mockStats = {
@@ -266,14 +267,17 @@ export default function Dashboard() {
                 <Package className="w-6 h-6 mb-2" />
                 <span className="text-sm">Add Product</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col">
-                <Scan className="w-6 h-6 mb-2" />
-                <span className="text-sm">Receive Items</span>
-              </Button>
+              <Link href={`/dashboard/inventory/receive`} className="">
+                <Button variant="outline" className="h-20 flex-col w-full">
+                  <Scan className="w-6 h-6 mb-2" />
+                  <span className="text-sm">Receive Items</span>
+                </Button>
+              </Link>
               <Button variant="outline" className="h-20 flex-col">
                 <ShoppingCart className="w-6 h-6 mb-2" />
                 <span className="text-sm">Process Orders</span>
               </Button>
+
               <Button variant="outline" className="h-20 flex-col">
                 <Truck className="w-6 h-6 mb-2" />
                 <span className="text-sm">Ship Orders</span>

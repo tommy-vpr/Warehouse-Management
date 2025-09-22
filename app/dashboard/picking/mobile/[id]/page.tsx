@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import {
   User,
   AlertTriangle,
   Home,
+  RefreshCw,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -62,112 +64,161 @@ interface PickListDetails {
   };
 }
 
-export default function MobilePickingInterface({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const [pickList, setPickList] = useState<PickListDetails | null>(null);
+interface PickActionRequest {
+  action: "PICK" | "SHORT_PICK" | "SKIP";
+  quantityPicked?: number;
+  reason?: string;
+  location: string;
+  notes?: string;
+}
+
+// API Functions
+const fetchPickList = async (id: string): Promise<PickListDetails> => {
+  const response = await fetch(`/api/picking/lists/${id}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load pick list: ${response.status}`);
+  }
+  return response.json();
+};
+
+const performPickAction = async ({
+  itemId,
+  ...request
+}: PickActionRequest & { itemId: string }) => {
+  const response = await fetch(`/api/picking/items/${itemId}/pick`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.error || `Failed to ${request.action.toLowerCase()}`
+    );
+  }
+  return response.json();
+};
+
+// Custom Hooks
+const usePickList = (id: string) => {
+  return useQuery({
+    queryKey: ["pickList", id],
+    queryFn: () => fetchPickList(id),
+    staleTime: 10 * 1000, // 10 seconds for picking operations
+    refetchInterval: 30 * 1000, // Auto-refresh every 30 seconds
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+};
+
+const usePickAction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: performPickAction,
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch the pick list to get updated status
+      queryClient.invalidateQueries({ queryKey: ["pickList"] });
+    },
+    onError: (error) => {
+      console.error("Pick action failed:", error);
+    },
+  });
+};
+
+// Removed useStartPickList - API auto-starts on first pick
+
+export default function MobilePickingInterface() {
+  const { id } = useParams<{ id: string }>();
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [showShortPickModal, setShowShortPickModal] = useState(false);
   const [shortPickQuantity, setShortPickQuantity] = useState("");
   const [shortPickReason, setShortPickReason] = useState("");
-  const { id } = useParams<{ id: string }>();
 
-  console.log("ID:", id);
+  // TanStack Query hooks
+  const {
+    data: pickList,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = usePickList(id);
 
-  useEffect(() => {
-    loadPickList();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadPickList, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const pickActionMutation = usePickAction();
 
-  const loadPickList = async () => {
-    try {
-      const response = await fetch(`/api/picking/lists/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setPickList(data);
+  // Memoized calculations
+  const { currentItem, pendingItems } = useMemo(() => {
+    if (!pickList) return { currentItem: null, pendingItems: [] };
 
-        // Find next pending item
-        const nextPendingIndex = data.items.findIndex(
-          (item: PickListItem) => item.status === "PENDING"
-        );
-        if (nextPendingIndex !== -1) {
-          setCurrentItemIndex(nextPendingIndex);
-        }
-      } else {
-        console.error("Failed to load pick list:", response.status);
-        setPickList(null);
+    const pending = pickList.items.filter((item) => item.status === "PENDING");
+    const current = pickList.items[currentItemIndex];
+
+    return {
+      currentItem: current,
+      pendingItems: pending,
+    };
+  }, [pickList, currentItemIndex]);
+
+  // Auto-advance to next pending item when data updates
+  React.useEffect(() => {
+    if (!pickList) return;
+
+    const nextPendingIndex = pickList.items.findIndex(
+      (item, index) => index >= currentItemIndex && item.status === "PENDING"
+    );
+
+    if (nextPendingIndex === -1) {
+      // No more pending items from current position, find first pending
+      const firstPendingIndex = pickList.items.findIndex(
+        (item) => item.status === "PENDING"
+      );
+      if (firstPendingIndex !== -1) {
+        setCurrentItemIndex(firstPendingIndex);
       }
-    } catch (error) {
-      console.error("Failed to load pick list:", error);
-      setPickList(null);
+    } else if (nextPendingIndex !== currentItemIndex) {
+      setCurrentItemIndex(nextPendingIndex);
     }
-    setIsLoading(false);
-  };
+  }, [pickList, currentItemIndex]);
 
   const processItem = async (
     action: "PICK" | "SHORT_PICK" | "SKIP",
     options: any = {}
   ) => {
-    if (!pickList) return;
-
-    const currentItem = pickList.items[currentItemIndex];
-    setIsProcessing(true);
+    if (!currentItem) return;
 
     try {
-      const response = await fetch(
-        `/api/picking/items/${currentItem.id}/pick`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action,
-            quantityPicked: options.quantity || currentItem.quantityToPick,
-            reason: options.reason,
-            location: currentItem.location.name,
-            notes: options.notes,
-          }),
-        }
-      );
+      await pickActionMutation.mutateAsync({
+        itemId: currentItem.id,
+        action,
+        quantityPicked: options.quantity || currentItem.quantityToPick,
+        reason: options.reason,
+        location: currentItem.location.name,
+        notes: options.notes,
+      });
 
-      if (response.ok) {
-        const result = await response.json();
-        await loadPickList();
-
-        // Check if pick list is completed
-        if (result.progress.completed) {
-          // The completion screen will show automatically after loadPickList()
-          return;
-        }
-
-        // Move to next pending item
-        moveToNextItem();
-
-        if (action === "SHORT_PICK") {
-          setShowShortPickModal(false);
-          setShortPickQuantity("");
-          setShortPickReason("");
-        }
-      } else {
-        const errorData = await response.json();
-        alert(`Failed to ${action.toLowerCase()}: ${errorData.error}`);
+      // Close modal if short pick
+      if (action === "SHORT_PICK") {
+        setShowShortPickModal(false);
+        setShortPickQuantity("");
+        setShortPickReason("");
       }
     } catch (error) {
-      console.error(`Failed to ${action.toLowerCase()} item:`, error);
-      alert(`Network error: Failed to ${action.toLowerCase()} item`);
+      // Error is already logged in the mutation
+      alert(
+        `Failed to ${action.toLowerCase()}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
-    setIsProcessing(false);
   };
 
   const moveToNextItem = () => {
     if (!pickList) return;
 
-    // Find next pending item after current index
     const nextIndex = pickList.items.findIndex(
       (item, index) => index > currentItemIndex && item.status === "PENDING"
     );
@@ -175,7 +226,6 @@ export default function MobilePickingInterface({
     if (nextIndex !== -1) {
       setCurrentItemIndex(nextIndex);
     } else {
-      // No more pending items, stay on current or go to first pending
       const firstPending = pickList.items.findIndex(
         (item) => item.status === "PENDING"
       );
@@ -184,29 +234,10 @@ export default function MobilePickingInterface({
       }
     }
   };
+
   const moveToPreviousItem = () => {
     if (currentItemIndex > 0) {
       setCurrentItemIndex(currentItemIndex - 1);
-    }
-  };
-
-  const moveToNextAvailableItem = () => {
-    if (!pickList) return;
-
-    const nextIndex = pickList.items.findIndex(
-      (item, index) => index > currentItemIndex && item.status === "PENDING"
-    );
-
-    if (nextIndex !== -1) {
-      setCurrentItemIndex(nextIndex);
-    } else {
-      // Find first pending item from the beginning
-      const firstPendingIndex = pickList.items.findIndex(
-        (item) => item.status === "PENDING"
-      );
-      if (firstPendingIndex !== -1) {
-        setCurrentItemIndex(firstPendingIndex);
-      }
     }
   };
 
@@ -218,6 +249,34 @@ export default function MobilePickingInterface({
     });
   };
 
+  // Error state
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Error Loading Pick List
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {error instanceof Error ? error.message : "An error occurred"}
+          </p>
+          <div className="space-y-2">
+            <Button onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+            <Button variant="outline" onClick={() => window.history.back()}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -248,11 +307,6 @@ export default function MobilePickingInterface({
     );
   }
 
-  const currentItem = pickList.items[currentItemIndex];
-  const pendingItems = pickList.items.filter(
-    (item) => item.status === "PENDING"
-  );
-
   // Check if all items are completed
   if (pendingItems.length === 0) {
     return (
@@ -267,7 +321,7 @@ export default function MobilePickingInterface({
           </p>
           <div className="space-y-2">
             <Link
-              href={"/dashboard"}
+              href="/dashboard"
               className="m-auto rounded w-fit px-4 py-2 flex gap-2 items-center justify-center bg-zinc-900 text-white"
             >
               <Home className="w-4 h-4 mr-2" />
@@ -279,26 +333,32 @@ export default function MobilePickingInterface({
     );
   }
 
+  if (!currentItem) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">No current item available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-md mx-auto px-4 py-3">
-          <div className="flex items-center justify-center">
-            {/* <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button> */}
-            <div className="text-center">
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
               <h1 className="font-semibold text-lg">
                 {pickList.pickList.batchNumber}
               </h1>
               <p className="text-sm text-gray-600">Picking</p>
             </div>
-            {/* <div className="w-8"></div> */}
+            {isFetching && (
+              <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+            )}
           </div>
         </div>
       </div>
@@ -429,18 +489,27 @@ export default function MobilePickingInterface({
             {/* Pick Button */}
             <Button
               onClick={() => processItem("PICK")}
-              disabled={isProcessing}
+              disabled={pickActionMutation.isPending}
               className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
             >
-              <CheckCircle className="w-6 h-6 mr-3" />
-              Pick {currentItem.quantityToPick} Units
+              {pickActionMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-6 h-6 mr-3 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-6 h-6 mr-3" />
+                  Pick {currentItem.quantityToPick} Units
+                </>
+              )}
             </Button>
 
             {/* Secondary Actions */}
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => setShowShortPickModal(true)}
-                disabled={isProcessing}
+                disabled={pickActionMutation.isPending}
                 variant="outline"
                 className="h-12"
               >
@@ -450,7 +519,7 @@ export default function MobilePickingInterface({
 
               <Button
                 onClick={() => processItem("SKIP")}
-                disabled={isProcessing}
+                disabled={pickActionMutation.isPending}
                 variant="outline"
                 className="h-12"
               >
@@ -473,7 +542,7 @@ export default function MobilePickingInterface({
             Previous
           </Button>
 
-          <Button onClick={moveToNextAvailableItem} variant="outline" size="sm">
+          <Button onClick={moveToNextItem} variant="outline" size="sm">
             Next
             <ArrowRight className="w-4 h-4 ml-1" />
           </Button>
@@ -526,10 +595,12 @@ export default function MobilePickingInterface({
                 </Button>
                 <Button
                   onClick={handleShortPick}
-                  disabled={!shortPickReason.trim()}
+                  disabled={
+                    !shortPickReason.trim() || pickActionMutation.isPending
+                  }
                   className="flex-1"
                 >
-                  Confirm
+                  {pickActionMutation.isPending ? "Processing..." : "Confirm"}
                 </Button>
               </div>
             </div>

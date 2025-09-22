@@ -27,6 +27,7 @@ import UserMenu from "@/components/UserMenu";
 import ScannerModal from "@/components/ScannerModal";
 import InventoryView from "@/components/InventoryView";
 import OrdersView from "@/components/OrdersView";
+import Link from "next/link";
 
 // Mock data for demonstration
 const mockStats = {
@@ -265,10 +266,12 @@ export default function Dashboard() {
                 <Package className="w-6 h-6 mb-2" />
                 <span className="text-sm">Add Product</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col">
-                <Scan className="w-6 h-6 mb-2" />
-                <span className="text-sm">Receive Items</span>
-              </Button>
+              <Link href={"/inventory/receive"}>
+                <Button variant="outline" className="h-20 flex-col">
+                  <Scan className="w-6 h-6 mb-2" />
+                  <span className="text-sm">Receive Items</span>
+                </Button>
+              </Link>
               <Button variant="outline" className="h-20 flex-col">
                 <ShoppingCart className="w-6 h-6 mb-2" />
                 <span className="text-sm">Process Orders</span>

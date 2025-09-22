@@ -45,7 +45,6 @@ export async function POST(
         productVariant: {
           include: {
             inventory: {
-              //   where: { locationId: { not: null } },
               include: { location: true },
             },
           },
@@ -55,21 +54,32 @@ export async function POST(
       },
     });
 
-    if (!pickListItem)
+    if (!pickListItem) {
       return NextResponse.json(
         { error: "Pick list item not found" },
         { status: 404 }
       );
-    if (pickListItem.pickList.status !== "IN_PROGRESS")
+    }
+
+    // ✅ FIXED: Allow picking from multiple statuses, not just IN_PROGRESS
+    const currentStatus = pickListItem.pickList.status;
+    const canPick = ["PENDING", "ASSIGNED", "IN_PROGRESS"].includes(
+      currentStatus
+    );
+
+    if (!canPick) {
       return NextResponse.json(
-        { error: "Pick list is not in progress" },
+        { error: `Cannot pick from pick list with status: ${currentStatus}` },
         { status: 400 }
       );
-    if (pickListItem.status !== "PENDING")
+    }
+
+    if (pickListItem.status !== "PENDING") {
       return NextResponse.json(
         { error: "Item already processed" },
         { status: 400 }
       );
+    }
 
     const reqQty = Number.isFinite(quantityPicked)
       ? Math.max(0, Math.floor(quantityPicked!))
@@ -163,18 +173,25 @@ export async function POST(
       const isFirstAction =
         pickedCount === 1 && wasPendingCount === totalItems - 1;
 
+      // ✅ FIXED: Auto-transition to IN_PROGRESS on first pick
+      const newPickListStatus = allDone
+        ? "COMPLETED"
+        : isFirstAction || currentStatus !== "IN_PROGRESS"
+        ? "IN_PROGRESS"
+        : undefined;
+
+      const shouldSetStartTime =
+        (isFirstAction || !pickListItem.pickList.startTime) && !allDone;
+
       await tx.pickList.update({
         where: { id: pickListItem.pickListId },
         data: {
           pickedItems: pickedCount,
-          totalItems, // keep in sync if you want
-          status: allDone
-            ? "COMPLETED"
-            : isFirstAction
-            ? "IN_PROGRESS"
-            : undefined,
-          startTime: isFirstAction ? new Date() : undefined,
+          totalItems,
+          status: newPickListStatus,
+          startTime: shouldSetStartTime ? new Date() : undefined,
           endTime: allDone ? new Date() : undefined,
+          assignedTo: pickListItem.pickList.assignedTo || session.user.id, // Auto-assign if not assigned
         },
       });
 
@@ -188,10 +205,24 @@ export async function POST(
           },
         });
 
-        // ✅ Update the order status to PICKED (or FULFILLED, PACKED, etc.)
+        // Update the order status to PICKED
         await tx.order.update({
           where: { id: pickListItem.orderId },
-          data: { status: "PICKED" }, // or "FULFILLED", "PACKED", etc.
+          data: { status: "PICKED" },
+        });
+      }
+
+      // ✅ FIXED: Log pick list started event on first action
+      if (isFirstAction) {
+        await tx.pickEvent.create({
+          data: {
+            pickListId: pickListItem.pickListId,
+            eventType: "PICK_STARTED",
+            userId: session.user.id,
+            notes: `Pick list started by ${
+              session.user.name || session.user.email
+            }`,
+          },
         });
       }
 
@@ -221,12 +252,8 @@ export async function POST(
           percentage: totalItems
             ? Math.round((pickedCount / totalItems) * 100)
             : 0,
-          completed: allDone, // 👈 boolean flag
-          status: allDone
-            ? "COMPLETED"
-            : isFirstAction
-            ? "IN_PROGRESS"
-            : pickListItem.pickList.status, // 👈 current list status
+          completed: allDone,
+          status: newPickListStatus || currentStatus,
         },
       };
     });

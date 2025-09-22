@@ -32,19 +32,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // TODO: Create packing record in database
-    // await prisma.packingRecord.create({
-    //   data: {
-    //     orderId,
-    //     packedBy: session.user.id,
-    //     boxType,
-    //     actualWeight,
-    //     dimensions,
-    //     packedAt: new Date(),
-    //     notes
-    //   }
-    // });
-
     return NextResponse.json({
       success: true,
       message: "Order packed successfully",

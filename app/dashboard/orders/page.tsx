@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,20 +9,25 @@ import { Badge } from "@/components/ui/badge";
 import {
   Package,
   Search,
-  Filter,
-  Download,
   RefreshCw,
-  Clock,
-  User,
-  MapPin,
   CheckCircle,
   AlertTriangle,
-  TrendingUp,
   Truck,
-  Eye,
   ShoppingCart,
-  BarChart3,
 } from "lucide-react";
+// Types - inline until you create the types file
+export enum OrderStatus {
+  PENDING = "PENDING",
+  ALLOCATED = "ALLOCATED",
+  PICKING = "PICKING",
+  PICKED = "PICKED",
+  PACKED = "PACKED",
+  SHIPPED = "SHIPPED",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
+  RETURNED = "RETURNED",
+  FULFILLED = "FULFILLED",
+}
 
 interface OrderItem {
   id: string;
@@ -80,161 +86,194 @@ interface OrderStats {
   high: number;
 }
 
+interface OrdersResponse {
+  orders: ManagementOrder[];
+  stats: OrderStats;
+}
+
+interface OrderFilters {
+  status?: OrderStatus | "ALL";
+  search?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "ALL";
+}
+
+interface OrderActionRequest {
+  action: string;
+  orderId?: string;
+  orderIds?: string[];
+}
+
+// API Functions
+const fetchOrders = async (params: OrderFilters): Promise<OrdersResponse> => {
+  const searchParams = new URLSearchParams();
+  if (params.status && params.status !== "ALL")
+    searchParams.set("status", params.status);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.priority && params.priority !== "ALL")
+    searchParams.set("priority", params.priority);
+
+  const response = await fetch(`/api/orders/management?${searchParams}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch orders: ${response.status}`);
+  }
+  return response.json();
+};
+
+const performOrderAction = async (request: OrderActionRequest) => {
+  const response = await fetch("/api/orders/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to perform action: ${response.status}`);
+  }
+  return response.json();
+};
+
+// Custom hook for orders data
+const useOrders = (filters: OrderFilters) => {
+  return useQuery({
+    queryKey: ["orders", filters],
+    queryFn: () => fetchOrders(filters),
+    staleTime: 30 * 1000, // Data is fresh for 30 seconds
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchIntervalInBackground: true, // Continue refetching when tab is not active
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+};
+
+// Custom hook for order actions
+const useOrderAction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: performOrderAction,
+    onSuccess: () => {
+      // Invalidate and refetch orders data after successful action
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: (error) => {
+      console.error("Order action failed:", error);
+    },
+  });
+};
+
 export default function OrdersManagementDashboard() {
-  const [orders, setOrders] = useState<ManagementOrder[]>([]);
-  const [stats, setStats] = useState<OrderStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Filter states
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] =
+    useState<OrderFilters["status"]>("ALL");
+  const [priorityFilter, setPriorityFilter] =
+    useState<OrderFilters["priority"]>("ALL");
+
+  // UI states
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [isPerformingAction, setIsPerformingAction] = useState(false);
 
-  console.log(orders);
+  // TanStack Query hooks
+  const { data, isLoading, isError, error, isFetching, refetch } = useOrders({
+    status: statusFilter,
+    search: searchTerm,
+    priority: priorityFilter,
+  });
 
-  useEffect(() => {
-    loadOrders();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadOrders, 30000);
-    return () => clearInterval(interval);
-  }, [statusFilter, searchTerm, priorityFilter]);
+  const orderActionMutation = useOrderAction();
 
-  console.log(orders);
+  // Extract data with defaults
+  const orders = data?.orders ?? [];
+  const stats = data?.stats;
 
-  const loadOrders = async () => {
+  const handleOrderAction = async (action: string, orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+
     try {
-      const params = new URLSearchParams();
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (searchTerm) params.set("search", searchTerm);
-      if (priorityFilter !== "ALL") params.set("priority", priorityFilter);
+      switch (action) {
+        case "ALLOCATE":
+        case "GENERATE_SINGLE_PICK":
+        case "MARK_FULFILLED":
+          await orderActionMutation.mutateAsync({ action, orderId });
+          break;
 
-      const response = await fetch(`/api/orders/management?${params}`);
-      if (response.ok) {
-        const data = await response.json();
+        case "VIEW_PICK_PROGRESS":
+          window.location.href = `/dashboard/picking`;
+          break;
 
-        console.log("DATA: ", data);
-        setOrders(data.orders);
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error("Failed to load orders:", error);
-    }
-    setIsLoading(false);
-  };
+        case "MOBILE_PICK":
+          if (order?.pickListInfo) {
+            window.open(
+              `/dashboard/picking/mobile/${order.pickListInfo.pickListId}`,
+              "_blank"
+            );
+          }
+          break;
 
-  const performAction = async (
-    action: string,
-    orderId?: string,
-    orderIds?: string[]
-  ) => {
-    setIsPerformingAction(true);
-    try {
-      const response = await fetch("/api/orders/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          orderId,
-          orderIds,
-        }),
-      });
+        case "START_PICKING":
+          if (order?.pickListInfo?.pickListId) {
+            await fetch(`/api/picking/${order.pickListInfo.pickListId}/start`, {
+              method: "POST",
+            });
+            refetch(); // Manual refetch for external API calls
+          }
+          break;
 
-      if (response.ok) {
-        await loadOrders(); // Refresh data
-        if (orderIds) {
-          setSelectedOrders(new Set()); // Clear selection after bulk action
-        }
+        case "PAUSE_PICKING":
+          if (order?.pickListInfo?.pickListId) {
+            const reason = prompt("Reason for pausing?");
+            if (reason) {
+              await fetch(
+                `/api/picking/list/${order.pickListInfo.pickListId}/pause`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ reason }),
+                }
+              );
+              refetch();
+            }
+          }
+          break;
+
+        case "COMPLETE_PICKING":
+          if (order?.pickListInfo?.pickListId) {
+            await fetch(
+              `/api/picking/list/${order.pickListInfo.pickListId}/complete`,
+              {
+                method: "POST",
+              }
+            );
+            refetch();
+          }
+          break;
+
+        case "PACK_ORDER":
+          window.location.href = `/dashboard/packing/pack/${orderId}`;
+          break;
+
+        case "CREATE_LABEL":
+          window.location.href = `/dashboard/shipping/create-label/${orderId}`;
+          break;
+
+        case "SPLIT_ORDER":
+          window.location.href = `/dashboard/shipping/split/${orderId}`;
+          break;
+
+        case "VIEW_TRACKING":
+          window.location.href = `/dashboard/shipping/tracking/${orderId}`;
+          break;
+
+        case "VIEW_DETAILS":
+          setExpandedOrder(expandedOrder === orderId ? null : orderId);
+          break;
+
+        default:
+          console.log(`Action ${action} not implemented yet`);
       }
     } catch (error) {
       console.error(`Failed to perform ${action}:`, error);
-    }
-    setIsPerformingAction(false);
-  };
-
-  const handleOrderAction = async (action: string, orderId: string) => {
-    const order = orders.find((o) => o.id === orderId); // ✅ Declare here
-
-    switch (action) {
-      case "ALLOCATE":
-        await performAction("ALLOCATE", orderId);
-        break;
-
-      case "GENERATE_SINGLE_PICK":
-        console.log(orderId);
-        await performAction("GENERATE_SINGLE_PICK", orderId);
-
-        break;
-
-      case "VIEW_PICK_PROGRESS":
-        window.location.href = `/dashboard/picking`;
-        break;
-
-      case "MOBILE_PICK":
-        if (order?.pickListInfo) {
-          window.open(
-            `/dashboard/picking/mobile/${order.pickListInfo.pickListId}`,
-            "_blank"
-          );
-        }
-        break;
-
-      case "START_PICKING":
-        if (order?.pickListInfo?.pickListId) {
-          await fetch(`/api/picking/${order.pickListInfo.pickListId}/start`, {
-            method: "POST",
-          });
-          await loadOrders();
-        }
-        break;
-
-      case "PAUSE_PICKING":
-        if (order?.pickListInfo?.pickListId) {
-          const reason = prompt("Reason for pausing?");
-          if (reason) {
-            await fetch(
-              `/api/picking/list/${order.pickListInfo.pickListId}/pause`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reason }),
-              }
-            );
-            await loadOrders();
-          }
-        }
-        break;
-
-      case "COMPLETE_PICKING":
-        if (order?.pickListInfo?.pickListId) {
-          await fetch(
-            `/api/picking/list/${order.pickListInfo.pickListId}/complete`,
-            {
-              method: "POST",
-            }
-          );
-          await loadOrders();
-        }
-        break;
-
-      case "PACK_ORDER":
-        window.location.href = `/dashboard/packing/pack/${orderId}`;
-        break;
-
-      case "CREATE_LABEL":
-        window.location.href = `/dashboard/shipping/create-label/${orderId}`;
-        break;
-
-      case "MARK_FULFILLED":
-        await performAction("MARK_FULFILLED", orderId);
-        break;
-
-      case "VIEW_DETAILS":
-        setExpandedOrder(expandedOrder === orderId ? null : orderId);
-        break;
-
-      default:
-        console.log(`Action ${action} not implemented yet`);
     }
   };
 
@@ -248,30 +287,34 @@ export default function OrdersManagementDashboard() {
     setSelectedOrders(newSelection);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: OrderStatus) => {
     switch (status) {
-      case "PENDING":
+      case OrderStatus.PENDING:
         return "bg-gray-100 text-gray-800";
-      case "ALLOCATED":
+      case OrderStatus.ALLOCATED:
         return "bg-blue-100 text-blue-800";
-      case "PICKING":
+      case OrderStatus.PICKING:
         return "bg-yellow-100 text-yellow-800";
-      case "PICKED":
+      case OrderStatus.PICKED:
         return "bg-purple-100 text-purple-800";
-      case "PACKED":
+      case OrderStatus.PACKED:
         return "bg-orange-100 text-orange-800";
-      case "SHIPPED":
+      case OrderStatus.SHIPPED:
         return "bg-green-100 text-green-800";
-      case "FULFILLED":
+      case OrderStatus.FULFILLED:
         return "bg-green-100 text-green-800";
-      case "DELIVERED":
+      case OrderStatus.DELIVERED:
         return "bg-green-100 text-green-800";
+      case OrderStatus.CANCELLED:
+        return "bg-red-100 text-red-800";
+      case OrderStatus.RETURNED:
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: ManagementOrder["priority"]) => {
     switch (priority) {
       case "URGENT":
         return "bg-red-100 text-red-800";
@@ -286,6 +329,42 @@ export default function OrdersManagementDashboard() {
     }
   };
 
+  const handleBulkAction = async (action: string) => {
+    if (selectedOrders.size === 0) return;
+
+    try {
+      await orderActionMutation.mutateAsync({
+        action,
+        orderIds: Array.from(selectedOrders),
+      });
+      setSelectedOrders(new Set());
+    } catch (error) {
+      console.error(`Failed to perform bulk ${action}:`, error);
+    }
+  };
+
+  // Error state
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Error Loading Orders
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {error instanceof Error ? error.message : "An error occurred"}
+          </p>
+          <Button onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -314,26 +393,14 @@ export default function OrdersManagementDashboard() {
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={loadOrders}
-                disabled={isLoading}
+                onClick={() => refetch()}
+                disabled={isFetching}
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+                />
+                {isFetching ? "Refreshing..." : "Refresh"}
               </Button>
-              {/* {selectedOrders.size > 0 && (
-                <Button
-                  onClick={() =>
-                    performAction(
-                      "BULK_GENERATE_PICKS",
-                      undefined,
-                      Array.from(selectedOrders)
-                    )
-                  }
-                  disabled={isPerformingAction}
-                >
-                  Generate Pick Lists ({selectedOrders.size})
-                </Button>
-              )} */}
             </div>
           </div>
 
@@ -427,21 +494,27 @@ export default function OrdersManagementDashboard() {
             </div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as OrderFilters["status"])
+              }
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="ALLOCATED">Allocated</option>
-              <option value="PICKING">Picking</option>
-              <option value="PICKED">Picked</option>
-              <option value="PACKED">Packed</option>
-              <option value="SHIPPED">Shipped</option>
-              <option value="FULFILLED">Fulfilled</option>
+              <option value={OrderStatus.PENDING}>Pending</option>
+              <option value={OrderStatus.ALLOCATED}>Allocated</option>
+              <option value={OrderStatus.PICKING}>Picking</option>
+              <option value={OrderStatus.PICKED}>Picked</option>
+              <option value={OrderStatus.PACKED}>Packed</option>
+              <option value={OrderStatus.SHIPPED}>Shipped</option>
+              <option value={OrderStatus.FULFILLED}>Fulfilled</option>
+              <option value={OrderStatus.CANCELLED}>Cancelled</option>
+              <option value={OrderStatus.RETURNED}>Returned</option>
             </select>
             <select
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
+              onChange={(e) =>
+                setPriorityFilter(e.target.value as OrderFilters["priority"])
+              }
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Priorities</option>
@@ -451,6 +524,41 @@ export default function OrdersManagementDashboard() {
               <option value="LOW">Low</option>
             </select>
           </div>
+
+          {/* Bulk Actions */}
+          {selectedOrders.size > 0 && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedOrders.size} orders selected
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => handleBulkAction("BULK_ALLOCATE")}
+                    disabled={orderActionMutation.isPending}
+                  >
+                    Allocate Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleBulkAction("BULK_GENERATE_PICKS")}
+                    disabled={orderActionMutation.isPending}
+                  >
+                    Generate Pick Lists
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedOrders(new Set())}
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Orders Table */}
@@ -458,11 +566,19 @@ export default function OrdersManagementDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Orders ({orders.length})</span>
-              {selectedOrders.size > 0 && (
-                <span className="text-sm font-normal text-blue-600">
-                  {selectedOrders.size} selected
-                </span>
-              )}
+              <div className="flex items-center gap-4">
+                {isFetching && (
+                  <span className="text-sm text-gray-500 flex items-center">
+                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                    Updating...
+                  </span>
+                )}
+                {selectedOrders.size > 0 && (
+                  <span className="text-sm font-normal text-blue-600">
+                    {selectedOrders.size} selected
+                  </span>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -474,6 +590,10 @@ export default function OrdersManagementDashboard() {
                       <input
                         type="checkbox"
                         className="rounded"
+                        checked={
+                          selectedOrders.size === orders.length &&
+                          orders.length > 0
+                        }
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedOrders(new Set(orders.map((o) => o.id)));
@@ -492,9 +612,9 @@ export default function OrdersManagementDashboard() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
-                    </th> */}
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Qty
                     </th>
@@ -547,27 +667,30 @@ export default function OrdersManagementDashboard() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge className={getStatusColor(order.status)}>
+                          <Badge
+                            className={getStatusColor(
+                              order.status as OrderStatus
+                            )}
+                          >
                             {order.status.replace("_", " ")}
                           </Badge>
                         </td>
-                        {/* <td className="px-4 py-4">
+                        <td className="px-4 py-4">
                           <Badge className={getPriorityColor(order.priority)}>
                             {order.priority}
                           </Badge>
-                        </td> */}
+                        </td>
                         <td className="px-4 py-4">
                           <div>
                             <div className="text-sm">
-                              {/* {order.itemCount} */}
                               {order.items.reduce(
                                 (sum, item) => sum + item.quantity,
                                 0
                               )}
                             </div>
-                            {/* <div className="text-sm text-gray-500">
+                            <div className="text-xs text-gray-500">
                               {order.totalWeight.toFixed(1)} lbs
-                            </div> */}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -582,22 +705,35 @@ export default function OrdersManagementDashboard() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-1 flex-wrap">
                             {order.nextActions
                               .slice(0, 2)
                               .map((action, index) => (
                                 <Button
                                   key={index}
-                                  variant={action.variant as any}
+                                  variant={action.variant}
                                   size="sm"
                                   onClick={() =>
                                     handleOrderAction(action.action, order.id)
                                   }
-                                  disabled={isPerformingAction}
+                                  disabled={orderActionMutation.isPending}
+                                  className="text-xs px-2 py-1"
                                 >
                                   {action.label}
                                 </Button>
                               ))}
+                            {order.nextActions.length > 2 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleOrderAction("VIEW_DETAILS", order.id)
+                                }
+                                className="text-xs px-2 py-1"
+                              >
+                                +{order.nextActions.length - 2}
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -607,53 +743,96 @@ export default function OrdersManagementDashboard() {
                         <tr>
                           <td colSpan={9} className="px-4 py-4 bg-gray-50">
                             <div className="space-y-4">
-                              <h4 className="font-medium">Order Items:</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {order.items.map((item) => (
-                                  <div
-                                    key={item.id}
-                                    className="bg-white p-3 rounded border"
-                                  >
-                                    <div className="font-medium">
-                                      {item.productName}
-                                    </div>
-                                    <div className="text-sm text-gray-600">
-                                      SKU: {item.sku}
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span>Qty: {item.quantity}</span>
-                                      <span>${item.totalPrice}</span>
-                                    </div>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="font-medium mb-2">
+                                    Order Items:
+                                  </h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {order.items.map((item) => (
+                                      <div
+                                        key={item.id}
+                                        className="bg-white p-3 rounded border"
+                                      >
+                                        <div className="font-medium text-sm">
+                                          {item.productName}
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                          SKU: {item.sku}
+                                        </div>
+                                        <div className="flex justify-between text-xs mt-1">
+                                          <span>Qty: {item.quantity}</span>
+                                          <span>${item.totalPrice}</span>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
+
+                                <div className="ml-6">
+                                  <h4 className="font-medium mb-2">
+                                    All Actions:
+                                  </h4>
+                                  <div className="flex flex-col gap-1">
+                                    {order.nextActions.map((action, index) => (
+                                      <Button
+                                        key={index}
+                                        variant={action.variant}
+                                        size="sm"
+                                        onClick={() =>
+                                          handleOrderAction(
+                                            action.action,
+                                            order.id
+                                          )
+                                        }
+                                        disabled={orderActionMutation.isPending}
+                                        className="text-xs justify-start"
+                                      >
+                                        {action.label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
 
                               {order.pickListInfo && (
                                 <div>
-                                  <h4 className="font-medium">
+                                  <h4 className="font-medium mb-2">
                                     Pick List Info:
                                   </h4>
                                   <div className="bg-white p-3 rounded border">
-                                    <div>
-                                      Batch: {order.pickListInfo.batchNumber}
-                                    </div>
-                                    <div>
-                                      Status: {order.pickListInfo.pickStatus}
-                                    </div>
-                                    {order.pickListInfo.assignedTo && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                       <div>
-                                        Assigned:{" "}
-                                        {order.pickListInfo.assignedTo}
+                                        <span className="font-medium">
+                                          Batch:
+                                        </span>{" "}
+                                        {order.pickListInfo.batchNumber}
                                       </div>
-                                    )}
-                                    {order.pickListInfo.startTime && (
                                       <div>
-                                        Started:{" "}
-                                        {new Date(
-                                          order.pickListInfo.startTime
-                                        ).toLocaleString()}
+                                        <span className="font-medium">
+                                          Status:
+                                        </span>{" "}
+                                        {order.pickListInfo.pickStatus}
                                       </div>
-                                    )}
+                                      {order.pickListInfo.assignedTo && (
+                                        <div>
+                                          <span className="font-medium">
+                                            Assigned:
+                                          </span>{" "}
+                                          {order.pickListInfo.assignedTo}
+                                        </div>
+                                      )}
+                                      {order.pickListInfo.startTime && (
+                                        <div>
+                                          <span className="font-medium">
+                                            Started:
+                                          </span>{" "}
+                                          {new Date(
+                                            order.pickListInfo.startTime
+                                          ).toLocaleString()}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               )}

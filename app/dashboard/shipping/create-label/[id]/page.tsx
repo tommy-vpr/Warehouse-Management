@@ -715,17 +715,34 @@ const OrderSplitter: React.FC = () => {
                     </div>
 
                     {item.remaining > 0 && (
-                      <button
-                        onClick={() =>
-                          setSelectedItemForSplit({
-                            itemId: item.id,
-                            availableQty: item.remaining,
-                          })
-                        }
-                        className="ml-3 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                      >
-                        Split
-                      </button>
+                      <div className="ml-3 flex gap-1">
+                        <button
+                          onClick={() =>
+                            setSelectedItemForSplit({
+                              itemId: item.id,
+                              availableQty: item.remaining,
+                            })
+                          }
+                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                        >
+                          Split
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Add all remaining quantity to first shipment
+                            if (shipments.length > 0) {
+                              addItemToShipment(
+                                shipments[0].id,
+                                item.id,
+                                item.remaining
+                              );
+                            }
+                          }}
+                          className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                        >
+                          Add All
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1041,47 +1058,104 @@ const OrderSplitter: React.FC = () => {
               ) : null;
             })()}
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Quantity to add:
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() =>
-                    setSplitQuantity(Math.max(1, splitQuantity - 1))
-                  }
-                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedItemForSplit.availableQty}
-                  value={splitQuantity}
-                  onChange={(e) =>
-                    setSplitQuantity(
-                      Math.min(
-                        selectedItemForSplit.availableQty,
-                        Math.max(1, parseInt(e.target.value) || 1)
-                      )
-                    )
-                  }
-                  className="w-20 text-center px-2 py-1 border rounded"
-                />
-                <button
-                  onClick={() =>
-                    setSplitQuantity(
-                      Math.min(
-                        selectedItemForSplit.availableQty,
-                        splitQuantity + 1
-                      )
-                    )
-                  }
-                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+            <div className="flex items-center space-x-2">
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  Quantity to add:
+                </label>
+
+                {/* Quick Add All Button */}
+                <div className="mb-3">
+                  <button
+                    onClick={() =>
+                      setSplitQuantity(selectedItemForSplit.availableQty)
+                    }
+                    className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 text-sm font-medium"
+                  >
+                    Add All ({selectedItemForSplit.availableQty} units)
+                  </button>
+                </div>
+
+                {/* Manual Quantity Input */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() =>
+                        setSplitQuantity(Math.max(1, splitQuantity - 1))
+                      }
+                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedItemForSplit.availableQty}
+                      value={splitQuantity}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 1;
+                        setSplitQuantity(
+                          Math.min(
+                            selectedItemForSplit.availableQty,
+                            Math.max(1, value)
+                          )
+                        );
+                      }}
+                      className="flex-1 text-center px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter quantity"
+                    />
+                    <button
+                      onClick={() =>
+                        setSplitQuantity(
+                          Math.min(
+                            selectedItemForSplit.availableQty,
+                            splitQuantity + 1
+                          )
+                        )
+                      }
+                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Quick quantity buttons */}
+                  <div className="flex gap-2">
+                    {[1, 5, 10]
+                      .filter((qty) => qty <= selectedItemForSplit.availableQty)
+                      .map((qty) => (
+                        <button
+                          key={qty}
+                          onClick={() => setSplitQuantity(qty)}
+                          className={`px-3 py-1 text-xs border rounded hover:bg-gray-50 ${
+                            splitQuantity === qty
+                              ? "bg-blue-100 border-blue-300"
+                              : ""
+                          }`}
+                        >
+                          {qty}
+                        </button>
+                      ))}
+                    {selectedItemForSplit.availableQty > 10 && (
+                      <button
+                        onClick={() =>
+                          setSplitQuantity(
+                            Math.floor(selectedItemForSplit.availableQty / 2)
+                          )
+                        }
+                        className={`px-3 py-1 text-xs border rounded hover:bg-gray-50 ${
+                          splitQuantity ===
+                          Math.floor(selectedItemForSplit.availableQty / 2)
+                            ? "bg-blue-100 border-blue-300"
+                            : ""
+                        }`}
+                      >
+                        Half (
+                        {Math.floor(selectedItemForSplit.availableQty / 2)})
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
