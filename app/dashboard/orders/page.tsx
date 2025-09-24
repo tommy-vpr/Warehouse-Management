@@ -290,42 +290,42 @@ export default function OrdersManagementDashboard() {
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.PENDING:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-500 dark:text-gray-900";
       case OrderStatus.ALLOCATED:
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-600 dark:text-gray-900";
       case OrderStatus.PICKING:
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-gray-900";
       case OrderStatus.PICKED:
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-600 dark:text-gray-900";
       case OrderStatus.PACKED:
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-600 dark:text-gray-900";
       case OrderStatus.SHIPPED:
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
       case OrderStatus.FULFILLED:
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
       case OrderStatus.DELIVERED:
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
       case OrderStatus.CANCELLED:
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-600 dark:text-gray-900";
       case OrderStatus.RETURNED:
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-600 dark:text-gray-900";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-900";
     }
   };
 
   const getPriorityColor = (priority: ManagementOrder["priority"]) => {
     switch (priority) {
       case "URGENT":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-400 dark:text-red-900";
       case "HIGH":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-400 dark:text-red-900";
       case "MEDIUM":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-400 dark:text-yellow-900";
       case "LOW":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-400 dark:text-green-900";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-400 dark:text-gray-900";
     }
   };
 
@@ -346,7 +346,7 @@ export default function OrdersManagementDashboard() {
   // Error state
   if (isError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
@@ -367,26 +367,26 @@ export default function OrdersManagementDashboard() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading orders...</p>
+          <p className="text-gray-600 dark:text-gray-200">Loading orders...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Orders Management
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-500">
                 Central operations dashboard for all orders
               </p>
             </div>
@@ -489,7 +489,7 @@ export default function OrdersManagementDashboard() {
                 placeholder="Search orders, customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 dark:border-gray-600"
               />
             </div>
             <select
@@ -497,7 +497,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setStatusFilter(e.target.value as OrderFilters["status"])
               }
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
               <option value={OrderStatus.PENDING}>Pending</option>
@@ -515,7 +515,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setPriorityFilter(e.target.value as OrderFilters["priority"])
               }
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Priorities</option>
               <option value="URGENT">Urgent</option>
@@ -584,7 +584,7 @@ export default function OrdersManagementDashboard() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-background border-b">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <input
@@ -629,10 +629,10 @@ export default function OrdersManagementDashboard() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-600">
                   {orders.map((order) => (
                     <React.Fragment key={order.id}>
-                      <tr className="hover:bg-gray-50">
+                      <tr className="hover:bg-background">
                         <td className="px-4 py-4">
                           <input
                             type="checkbox"
@@ -650,7 +650,7 @@ export default function OrdersManagementDashboard() {
                               {new Date(order.createdAt).toLocaleDateString()}
                             </div>
                             {order.pickListInfo && (
-                              <div className="text-xs text-blue-600">
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
                                 Pick: {order.pickListInfo.batchNumber}
                               </div>
                             )}
@@ -741,7 +741,7 @@ export default function OrdersManagementDashboard() {
                       {/* Expanded Order Details */}
                       {expandedOrder === order.id && (
                         <tr>
-                          <td colSpan={9} className="px-4 py-4 bg-gray-50">
+                          <td colSpan={9} className="px-4 py-4 bg-background">
                             <div className="space-y-4">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -752,7 +752,7 @@ export default function OrdersManagementDashboard() {
                                     {order.items.map((item) => (
                                       <div
                                         key={item.id}
-                                        className="bg-white p-3 rounded border"
+                                        className="bg-background p-3 rounded border"
                                       >
                                         <div className="font-medium text-sm">
                                           {item.productName}
@@ -791,6 +791,19 @@ export default function OrdersManagementDashboard() {
                                         {action.label}
                                       </Button>
                                     ))}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleOrderAction(
+                                          "VIEW_TRACKING",
+                                          order.id
+                                        )
+                                      }
+                                      className="text-xs px-2 py-1"
+                                    >
+                                      View Tracking
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -800,7 +813,7 @@ export default function OrdersManagementDashboard() {
                                   <h4 className="font-medium mb-2">
                                     Pick List Info:
                                   </h4>
-                                  <div className="bg-white p-3 rounded border">
+                                  <div className="bg-background p-3 rounded border">
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                       <div>
                                         <span className="font-medium">

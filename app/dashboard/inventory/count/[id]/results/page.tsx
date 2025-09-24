@@ -44,8 +44,8 @@ interface CampaignResults {
     };
     systemQuantity: number;
     countedQuantity?: number;
-    variance?: number;
-    variancePercentage?: number;
+    variance: number | null;
+    variancePercentage: number | null;
     status: string;
     completedAt?: string;
     notes?: string;
@@ -72,7 +72,7 @@ export default function CampaignResults() {
   const loadResults = async () => {
     try {
       const response = await fetch(
-        `/api/inventory/cycle-counts/campaigns/${campaignId}`
+        `/api/inventory/cycle-counts/campaigns/${campaignId}?includeCompleted=true`
       );
       if (response.ok) {
         const data = await response.json();
@@ -110,10 +110,12 @@ export default function CampaignResults() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading campaign results...</p>
+          <p className="text-gray-600 dark:text-gray-200">
+            Loading campaign results...
+          </p>
         </div>
       </div>
     );
@@ -121,10 +123,10 @@ export default function CampaignResults() {
 
   if (!results) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-gray-600">Campaign not found</p>
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Campaign not found</p>
           <Button
             onClick={() => router.push("/dashboard/inventory/count")}
             className="mt-4"
@@ -139,7 +141,11 @@ export default function CampaignResults() {
   const filteredTasks = results.tasks.filter((task) => {
     switch (viewFilter) {
       case "VARIANCES":
-        return task.variance !== null && task.variance !== 0;
+        return (
+          task.variance !== null &&
+          task.variance !== undefined &&
+          task.variance !== 0
+        );
       case "COMPLETED":
         return task.status === "COMPLETED";
       default:
@@ -150,15 +156,15 @@ export default function CampaignResults() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-500 dark:text-green-900";
       case "VARIANCE_REVIEW":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-500 dark:text-orange-900";
       case "RECOUNT_REQUIRED":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-500 dark:text-red-900";
       case "SKIPPED":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-500 dark:text-purple-900";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-500 dark:text-gray-900";
     }
   };
 
@@ -166,8 +172,37 @@ export default function CampaignResults() {
     return variance > 0 ? `+${variance}` : variance.toString();
   };
 
+  const generateReport = async () => {
+    try {
+      const response = await fetch(
+        `/api/inventory/cycle-counts/campaigns/${campaignId}/report`
+      );
+      console.log("Status:", response.status);
+
+      if (response.ok) {
+        // Read body once as ArrayBuffer for binary PDF
+        const arrayBuffer = await response.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cycle-count-report-${results?.name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        const errorText = await response.text(); // only read if needed
+        console.error("Failed to generate report:", errorText);
+      }
+    } catch (error) {
+      console.error("Error generating report:", error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -180,10 +215,10 @@ export default function CampaignResults() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-200">
                 {results.name} - Results
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Campaign completion summary and analysis
               </p>
             </div>
@@ -193,7 +228,11 @@ export default function CampaignResults() {
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </Button>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={generateReport}
+              className="cursor-pointer"
+            >
               <FileText className="w-4 h-4 mr-2" />
               Generate Report
             </Button>
@@ -208,28 +247,36 @@ export default function CampaignResults() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-3xl font-bold text-gray-700 dark:text-gray-200">
                   {results.totalTasks}
                 </div>
-                <div className="text-sm text-gray-600">Total Tasks</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Total Tasks
+                </div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-green-600">
                   {results.completedTasks}
                 </div>
-                <div className="text-sm text-gray-600">Completed</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Completed
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-red-600">
+                <div className="text-3xl font-bold text-red-400">
                   {results.variancesFound}
                 </div>
-                <div className="text-sm text-gray-600">Variances</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Variances
+                </div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-3xl font-bold text-gray-700 dark:text-gray-200">
                   {results.accuracy.toFixed(1)}%
                 </div>
-                <div className="text-sm text-gray-600">Accuracy</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Accuracy
+                </div>
               </div>
             </div>
 
@@ -268,9 +315,9 @@ export default function CampaignResults() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {results.tasks.filter((t) => (t.variance || 0) > 0).length}
+                {results.tasks.filter((t) => (t.variance ?? 0) > 0).length}
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Items over system quantity
               </div>
             </CardContent>
@@ -278,16 +325,16 @@ export default function CampaignResults() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center text-red-600">
+              <CardTitle className="flex items-center text-red-400">
                 <TrendingDown className="w-5 h-5 mr-2" />
                 Negative Variances
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {results.tasks.filter((t) => (t.variance || 0) < 0).length}
+              <div className="text-2xl font-bold text-red-400">
+                {results.tasks.filter((t) => (t.variance ?? 0) < 0).length}
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Items under system quantity
               </div>
             </CardContent>
@@ -307,7 +354,9 @@ export default function CampaignResults() {
                     .length
                 }
               </div>
-              <div className="text-sm text-gray-600">Over 10% variance</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Over 10% variance
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -354,7 +403,7 @@ export default function CampaignResults() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border-b dark:text-gray-500">
                     <th className="text-left py-2">Task</th>
                     <th className="text-left py-2">Location</th>
                     <th className="text-left py-2">Product</th>
@@ -367,7 +416,7 @@ export default function CampaignResults() {
                 </thead>
                 <tbody>
                   {filteredTasks.map((task) => (
-                    <tr key={task.id} className="border-b hover:bg-gray-50">
+                    <tr key={task.id} className="border-b hover:bg-background">
                       <td className="py-2 font-medium">{task.taskNumber}</td>
                       <td className="py-2">
                         <div className="flex items-center">
@@ -386,8 +435,8 @@ export default function CampaignResults() {
                             <div className="font-medium">
                               {task.productVariant.product.name}
                             </div>
-                            <div className="text-gray-500">
-                              {task.productVariant.sku}
+                            <div className="text-gray-500 text-xs">
+                              SKU: {task.productVariant.sku}
                             </div>
                           </div>
                         ) : (
@@ -403,13 +452,14 @@ export default function CampaignResults() {
                           : "-"}
                       </td>
                       <td className="py-2 text-right">
-                        {task.variance !== null ? (
+                        {task.variance !== null &&
+                        task.variance !== undefined ? (
                           <span
                             className={`font-medium ${
                               task.variance > 0
                                 ? "text-green-600"
                                 : task.variance < 0
-                                ? "text-red-600"
+                                ? "text-red-400"
                                 : "text-gray-600"
                             }`}
                           >
@@ -425,10 +475,7 @@ export default function CampaignResults() {
                         )}
                       </td>
                       <td className="py-2 text-center">
-                        <Badge
-                          className={getStatusColor(task.status)}
-                          size="sm"
-                        >
+                        <Badge className={getStatusColor(task.status)}>
                           {task.status.replace("_", " ")}
                         </Badge>
                       </td>

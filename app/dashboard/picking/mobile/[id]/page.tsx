@@ -28,6 +28,7 @@ interface PickListItem {
   sequence: number;
   status: string;
   order: {
+    id: string;
     orderNumber: string;
     customerName: string;
     totalAmount: string;
@@ -252,7 +253,7 @@ export default function MobilePickingInterface() {
   // Error state
   if (isError) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
@@ -279,7 +280,7 @@ export default function MobilePickingInterface() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-600">Loading pick list...</p>
@@ -310,10 +311,10 @@ export default function MobilePickingInterface() {
   // Check if all items are completed
   if (pendingItems.length === 0) {
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-800 mb-2">
+          <h2 className="text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
             Pick List Complete!
           </h2>
           <p className="text-green-700 mb-6">
@@ -327,6 +328,9 @@ export default function MobilePickingInterface() {
               <Home className="w-4 h-4 mr-2" />
               Return to Dashboard
             </Link>
+            <Link href={`/dashboard/packing/pack/${currentItem?.order.id}`}>
+              Pack Order
+            </Link>
           </div>
         </div>
       </div>
@@ -335,7 +339,7 @@ export default function MobilePickingInterface() {
 
   if (!currentItem) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-600">No current item available</p>
@@ -345,9 +349,9 @@ export default function MobilePickingInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-background shadow-sm border-b">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="text-center flex-1">
@@ -364,7 +368,7 @@ export default function MobilePickingInterface() {
       </div>
 
       {/* Progress Bar */}
-      <div className="bg-white border-b">
+      <div className="bg-background border-b">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex justify-between text-sm mb-2">
             <span>Progress</span>
@@ -418,15 +422,17 @@ export default function MobilePickingInterface() {
 
           <CardContent className="space-y-4">
             {/* Location */}
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-background p-4 rounded-lg">
               <div className="flex items-center mb-2">
-                <MapPin className="w-5 h-5 text-blue-600 mr-2" />
-                <span className="font-semibold text-blue-800">Location</span>
+                <MapPin className="w-5 h-5 text-blue-600 dark:text-gray-200 mr-2" />
+                <span className="font-semibold text-blue-800 dark:text-gray-200">
+                  Location
+                </span>
               </div>
-              <div className="text-2xl font-bold text-blue-900">
+              <div className="text-2xl font-bold text-blue-900 dark:text-gray-200">
                 {currentItem.location.name}
               </div>
-              <div className="text-sm text-blue-700">
+              <div className="text-sm text-blue-700 dark:text-gray-200">
                 Zone {currentItem.location.zone} • Aisle{" "}
                 {currentItem.location.aisle} • Shelf{" "}
                 {currentItem.location.shelf}
@@ -455,16 +461,20 @@ export default function MobilePickingInterface() {
             </div>
 
             {/* Quantity */}
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-background p-4 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Quantity to Pick:</span>
-                <span className="text-2xl font-bold text-gray-900">
+                <span className="text-gray-600 dark:text-gray-200">
+                  Quantity to Pick:
+                </span>
+                <span className="text-2xl font-bold text-gray-900 dark:text-gray-200">
                   {currentItem.quantityToPick}
                 </span>
               </div>
               {currentItem.quantityPicked > 0 && (
                 <div className="flex items-center justify-between mt-2 text-sm">
-                  <span className="text-gray-500">Already Picked:</span>
+                  <span className="text-gray-500 dark:text-gray-200">
+                    Already Picked:
+                  </span>
                   <span className="text-green-600 font-medium">
                     {currentItem.quantityPicked}
                   </span>
@@ -473,7 +483,7 @@ export default function MobilePickingInterface() {
             </div>
 
             {/* Order Info */}
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-200">
               <div className="flex items-center mb-1">
                 <User className="w-4 h-4 mr-1" />
                 Order: {currentItem.order.orderNumber}
@@ -552,7 +562,7 @@ export default function MobilePickingInterface() {
       {/* Short Pick Modal */}
       {showShortPickModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-sm w-full">
+          <div className="bg-background rounded-lg max-w-sm w-full">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Short Pick</h3>
 

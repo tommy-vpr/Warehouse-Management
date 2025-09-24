@@ -27,6 +27,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 interface CycleCountCampaign {
   id: string;
@@ -65,6 +66,8 @@ export default function CycleCountDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -85,7 +88,11 @@ export default function CycleCountDashboard() {
     setIsLoading(false);
   };
 
-  const handleStartCampaign = async (campaignId: string) => {
+  const handleConfirmStart = async (
+    campaignId: string,
+    campaignName: string
+  ) => {
+    setActionLoading(campaignId);
     try {
       const response = await fetch(
         `/api/inventory/cycle-counts/campaigns/${campaignId}`,
@@ -104,13 +111,105 @@ export default function CycleCountDashboard() {
               : campaign
           )
         );
+
+        toast({
+          title: "Campaign Started",
+          description: `${campaignName} is now active and ready for counting.`,
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to start campaign",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start campaign. Please try again.",
+        variant: "destructive",
+      });
+    }
+    setActionLoading(null);
+  };
+
+  const handleStartCampaign = async (
+    campaignId: string,
+    campaignName: string
+  ) => {
+    // const confirmed = window.confirm(
+    //   `Start campaign "${campaignName}"? This will activate all pending tasks and make them available for counting.`
+    // );
+    toast({
+      title: "Confirm Action",
+      description: `Start campaign "${campaignName}"?`,
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleConfirmStart(campaignId, campaignName)}
+        >
+          Yes, Start
+        </Button>
+      ),
+    });
+
+    setActionLoading(campaignId);
+    try {
+      const response = await fetch(
+        `/api/inventory/cycle-counts/campaigns/${campaignId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "ACTIVE" }),
+        }
+      );
+
+      if (response.ok) {
+        setCampaigns((prev) =>
+          prev.map((campaign) =>
+            campaign.id === campaignId
+              ? { ...campaign, status: "ACTIVE" as const }
+              : campaign
+          )
+        );
+
+        // Show success notification
+        toast({
+          title: "Campaign Started",
+          description: `${campaignName} is now active and ready for counting.`,
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to start campaign",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Failed to start campaign:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start campaign. Please try again.",
+        variant: "destructive",
+      });
     }
+    setActionLoading(null);
   };
 
-  const handlePauseCampaign = async (campaignId: string) => {
+  const handlePauseCampaign = async (
+    campaignId: string,
+    campaignName: string
+  ) => {
+    const confirmed = window.confirm(
+      `Pause campaign "${campaignName}"? In-progress tasks will be paused and can be resumed later.`
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading(campaignId);
     try {
       const response = await fetch(
         `/api/inventory/cycle-counts/campaigns/${campaignId}`,
@@ -129,10 +228,28 @@ export default function CycleCountDashboard() {
               : campaign
           )
         );
+
+        toast({
+          title: "Campaign Paused",
+          description: `${campaignName} has been paused. You can resume it later.`,
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to pause campaign",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Failed to pause campaign:", error);
+      toast({
+        title: "Error",
+        description: "Failed to pause campaign. Please try again.",
+        variant: "destructive",
+      });
     }
+    setActionLoading(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -183,31 +300,44 @@ export default function CycleCountDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 dark:text-gray-200">
+            Loading campaign...
+          </p>
         </div>
       </div>
     );
+    // return (
+    //   <div className="min-h-screen bg-background p-6">
+    //     <div className="max-w-7xl mx-auto">
+    //       <div className="animate-pulse space-y-6">
+    //         <div className="h-8 bg-gray-200 dark:bg-zinc-800 rounded w-1/4"></div>
+    //         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    //           {[...Array(4)].map((_, i) => (
+    //             <div
+    //               key={i}
+    //               className="h-32 bg-gray-200 dark:bg-zinc-800  rounded"
+    //             ></div>
+    //           ))}
+    //         </div>
+    //       </div>
+    //     </div>
+    //   </div>
+    // );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Cycle Count Campaigns
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Manage inventory cycle counting campaigns and tasks
             </p>
           </div>
@@ -221,6 +351,7 @@ export default function CycleCountDashboard() {
               Settings
             </Button>
             <Button
+              className="cursor-pointer transition"
               onClick={() => router.push("/dashboard/inventory/count/create")}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -235,10 +366,10 @@ export default function CycleCountDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Total Campaigns
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-400">
                     {displayStats.totalCampaigns}
                   </p>
                 </div>
@@ -246,7 +377,7 @@ export default function CycleCountDashboard() {
                   <Archive className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 All time campaigns
               </div>
             </CardContent>
@@ -256,7 +387,7 @@ export default function CycleCountDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Active Campaigns
                   </p>
                   <p className="text-2xl font-bold text-green-600">
@@ -267,7 +398,7 @@ export default function CycleCountDashboard() {
                   <Clock className="w-6 h-6 text-green-600" />
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Currently running
               </div>
             </CardContent>
@@ -277,7 +408,7 @@ export default function CycleCountDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Average Accuracy
                   </p>
                   <p className="text-2xl font-bold text-blue-600">
@@ -288,7 +419,9 @@ export default function CycleCountDashboard() {
                   <TrendingUp className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-600">Last 30 days</div>
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Last 30 days
+              </div>
             </CardContent>
           </Card>
 
@@ -296,7 +429,7 @@ export default function CycleCountDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                     Pending Reviews
                   </p>
                   <p className="text-2xl font-bold text-yellow-600">
@@ -307,7 +440,7 @@ export default function CycleCountDashboard() {
                   <AlertTriangle className="w-6 h-6 text-yellow-600" />
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-600">
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Requiring attention
               </div>
             </CardContent>
@@ -320,8 +453,10 @@ export default function CycleCountDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Completed This Week</p>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Completed This Week
+                  </p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-gray-400">
                     {displayStats.completedThisWeek}
                   </p>
                 </div>
@@ -334,8 +469,10 @@ export default function CycleCountDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Tasks This Month</p>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Tasks This Month
+                  </p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-gray-400">
                     {displayStats.tasksCompletedThisMonth}/
                     {displayStats.totalTasksThisMonth}
                   </p>
@@ -349,12 +486,14 @@ export default function CycleCountDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Variances</p>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Total Variances
+                  </p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-gray-400">
                     {displayStats.totalVariances}
                   </p>
                 </div>
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <AlertTriangle className="w-5 h-5 text-red-400" />
               </div>
             </CardContent>
           </Card>
@@ -370,14 +509,15 @@ export default function CycleCountDashboard() {
                   placeholder="Search campaigns..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 dark:border-gray-600"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
+                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-400"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="PLANNED">Planned</option>
@@ -390,7 +530,8 @@ export default function CycleCountDashboard() {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 
+                dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Types</option>
                 <option value="FULL">Full Count</option>
@@ -437,12 +578,12 @@ export default function CycleCountDashboard() {
                 filteredCampaigns.map((campaign) => (
                   <div
                     key={campaign.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                    className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-medium text-gray-900">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200">
                             {campaign.name}
                           </h3>
                           <Badge className={getStatusColor(campaign.status)}>
@@ -454,12 +595,12 @@ export default function CycleCountDashboard() {
                         </div>
 
                         {campaign.description && (
-                          <p className="text-sm text-gray-600 mb-2">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                             {campaign.description}
                           </p>
                         )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm text-gray-600">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
                           <div className="flex items-center">
                             <Calendar className="w-4 h-4 mr-1" />
                             <span>
@@ -505,7 +646,7 @@ export default function CycleCountDashboard() {
                           </div>
 
                           {campaign.variancesFound > 0 && (
-                            <div className="flex items-center text-red-600">
+                            <div className="flex items-center text-red-400">
                               <AlertTriangle className="w-4 h-4 mr-1" />
                               <span>{campaign.variancesFound} variances</span>
                             </div>
@@ -547,8 +688,29 @@ export default function CycleCountDashboard() {
                       <div className="flex items-center gap-2 ml-4">
                         {campaign.status === "PLANNED" && (
                           <Button
+                            className="cursor-pointer transition"
                             size="sm"
-                            onClick={() => handleStartCampaign(campaign.id)}
+                            onClick={() =>
+                              toast({
+                                title: "Confirm Action",
+                                description: `Start campaign "${campaign.name}"?`,
+                                action: (
+                                  <Button
+                                    className="cursor-pointer transition"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleConfirmStart(
+                                        campaign.id,
+                                        campaign.name
+                                      )
+                                    }
+                                  >
+                                    Yes, Start
+                                  </Button>
+                                ),
+                              })
+                            }
                           >
                             <Play className="w-4 h-4 mr-1" />
                             Start
@@ -570,7 +732,9 @@ export default function CycleCountDashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handlePauseCampaign(campaign.id)}
+                              onClick={() =>
+                                handlePauseCampaign(campaign.id, campaign.name)
+                              }
                             >
                               <Pause className="w-4 h-4" />
                             </Button>
@@ -580,7 +744,9 @@ export default function CycleCountDashboard() {
                         {campaign.status === "PAUSED" && (
                           <Button
                             size="sm"
-                            onClick={() => handleStartCampaign(campaign.id)}
+                            onClick={() =>
+                              handleStartCampaign(campaign.id, campaign.name)
+                            }
                           >
                             <Play className="w-4 h-4 mr-1" />
                             Resume

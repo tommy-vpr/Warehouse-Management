@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { CarrierBadge } from "@/components/CarrierBadge";
 
 interface ShippingPackage {
   id: string;
@@ -119,10 +120,12 @@ export default function TrackingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading tracking information...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading tracking information...
+          </p>
         </div>
       </div>
     );
@@ -130,7 +133,7 @@ export default function TrackingPage() {
 
   if (error || !trackingInfo) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
@@ -157,7 +160,7 @@ export default function TrackingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -168,16 +171,16 @@ export default function TrackingPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Tracking Information
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Order {trackingInfo.order.orderNumber} -{" "}
                 {trackingInfo.order.customerName}
               </p>
             </div>
           </div>
-          <Badge className="bg-green-100 text-green-800">
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-500 dark:text-gray-800">
             {trackingInfo.packages.length} Package
             {trackingInfo.packages.length > 1 ? "s" : ""}
           </Badge>
@@ -235,9 +238,8 @@ export default function TrackingPage() {
                     <Package className="w-5 h-5 mr-2" />
                     Package {index + 1}
                   </span>
-                  <Badge variant="outline">
-                    {getCarrierName(pkg.carrierCode)}
-                  </Badge>
+                  {/* Carrier badge */}
+                  <CarrierBadge carrierCode={pkg.carrierCode} />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -246,7 +248,7 @@ export default function TrackingPage() {
                   <div>
                     <h4 className="font-medium mb-3">Tracking Details</h4>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                      <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-zinc-900 rounded-md">
                         <div>
                           <p className="text-xs text-gray-500">
                             Tracking Number
@@ -396,7 +398,7 @@ export default function TrackingPage() {
             <CardContent className="p-6">
               <div className="text-center">
                 <h3 className="font-medium mb-2">Download All Labels</h3>
-                <p className="text-xs text-gray-600 mb-4">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
                   Get all {trackingInfo.packages.length} shipping labels at once
                 </p>
                 <Button

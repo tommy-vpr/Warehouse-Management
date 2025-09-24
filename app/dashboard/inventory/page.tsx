@@ -136,15 +136,15 @@ export default function InventoryDashboard() {
   const getStockStatusColor = (status: string) => {
     switch (status) {
       case "OK":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 dark:bg-green-500 text-green-800 dark:text-green-900";
       case "LOW":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 dark:bg-yellow-500 text-yellow-800 dark:text-yellow-900";
       case "CRITICAL":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 dark:bg-red-500 text-red-800 dark:text-red-900";
       case "OVERSTOCK":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 dark:bg-blue-500 text-blue-800 dark:text-blue-900";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 dark:bg-gray-500 text-gray-800 dark:text-gray-900";
     }
   };
 
@@ -163,26 +163,28 @@ export default function InventoryDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Box className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading inventory...</p>
+          <Box className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 dark:text-gray-200">
+            Loading inventory...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Inventory Management
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-500">
                 Track stock levels, locations, and product details
               </p>
             </div>
@@ -210,7 +212,7 @@ export default function InventoryDashboard() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <Package className="w-6 h-6 text-blue-600" />
+                    <Package className="w-6 h-6 text-blue-500" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.totalProducts}</p>
                       <p className="text-xs text-gray-600">Products</p>
@@ -248,7 +250,7 @@ export default function InventoryDashboard() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.outOfStock}</p>
                       <p className="text-xs text-gray-600">Out of Stock</p>
@@ -260,7 +262,7 @@ export default function InventoryDashboard() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <TrendingUp className="w-6 h-6 text-blue-600" />
+                    <TrendingUp className="w-6 h-6 text-blue-500" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.overstock}</p>
                       <p className="text-xs text-gray-600">Overstock</p>
@@ -286,20 +288,20 @@ export default function InventoryDashboard() {
           )}
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6 text-sm">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
                 placeholder="Search by SKU, product name, or UPC..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 dark:border-gray-600"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
               <option value="OK">In Stock</option>
@@ -310,7 +312,7 @@ export default function InventoryDashboard() {
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Locations</option>
               <option value="A">Zone A</option>
@@ -322,7 +324,7 @@ export default function InventoryDashboard() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Categories</option>
               <option value="ELECTRONICS">Electronics</option>
@@ -351,7 +353,7 @@ export default function InventoryDashboard() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-background border-b dark:border-gray-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Product
@@ -376,10 +378,10 @@ export default function InventoryDashboard() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-700">
                   {inventory.map((item) => (
                     <React.Fragment key={item.id}>
-                      <tr className="hover:bg-gray-50 cursor-pointer">
+                      <tr className="hover:bg-background cursor-pointer">
                         <td
                           className="px-4 py-4"
                           onClick={() =>
@@ -387,7 +389,7 @@ export default function InventoryDashboard() {
                           }
                         >
                           <div>
-                            <div className="font-medium text-blue-600 hover:text-blue-800">
+                            <div className="font-medium text-blue-500 hover:text-blue-800 dark:text-gray-200 dark:hover:text-gray-300 transition">
                               {item.productName}
                             </div>
                             <div className="text-sm text-gray-500">
@@ -445,7 +447,7 @@ export default function InventoryDashboard() {
                             ))}
                             {item.locations.length > 2 && (
                               <div
-                                className="text-xs text-blue-600 cursor-pointer"
+                                className="text-xs text-blue-500 cursor-pointer"
                                 onClick={() =>
                                   setExpandedItem(
                                     expandedItem === item.id ? null : item.id
@@ -533,7 +535,7 @@ export default function InventoryDashboard() {
                       {/* Expanded Location Details */}
                       {expandedItem === item.id && (
                         <tr>
-                          <td colSpan={7} className="px-4 py-4 bg-gray-50">
+                          <td colSpan={7} className="px-4 py-4 bg-background">
                             <div className="space-y-2">
                               <h4 className="font-medium">All Locations:</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

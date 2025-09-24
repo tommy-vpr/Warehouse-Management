@@ -108,7 +108,7 @@ export default function InventoryView() {
               </thead>
               <tbody>
                 {filteredInventory.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <tr key={item.id} className="border-b hover:bg-background">
                     <td className="py-3 px-4 font-medium">{item.sku}</td>
                     <td className="py-3 px-4">{item.name}</td>
                     <td className="py-3 px-4 text-gray-600">{item.upc}</td>

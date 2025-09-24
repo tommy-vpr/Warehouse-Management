@@ -554,7 +554,7 @@ export default function SchemaEnhancedReceiving() {
 
                 {/* Summary of what's being added */}
                 {currentProduct && currentLocation && quantity && (
-                  <div className="p-3 bg-gray-50 rounded border">
+                  <div className="p-3 bg-background rounded border">
                     <p className="text-sm">
                       <strong>Adding:</strong> {quantity} units of{" "}
                       {currentProduct.sku} to {currentLocation.name}

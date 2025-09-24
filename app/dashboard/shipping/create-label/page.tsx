@@ -317,7 +317,7 @@ export default function ShippingLabelInterface() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-600">Loading order details...</p>
@@ -328,7 +328,7 @@ export default function ShippingLabelInterface() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <p className="text-gray-600">Order not found</p>
@@ -346,7 +346,7 @@ export default function ShippingLabelInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -771,7 +771,7 @@ export default function ShippingLabelInterface() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-background p-4 rounded-lg">
                     <h3 className="font-medium mb-3">Selected Service</h3>
                     <div className="flex justify-between items-center">
                       <div>
@@ -791,7 +791,7 @@ export default function ShippingLabelInterface() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-background p-4 rounded-lg">
                     <h3 className="font-medium mb-3">Package Details</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>

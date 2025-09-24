@@ -34,26 +34,52 @@ export async function GET(request: NextRequest) {
       where.countType = typeFilter;
     }
 
-    // Get campaigns with basic task counts
+    // Get campaigns with task statistics
     const campaigns = await prisma.cycleCountCampaign.findMany({
       where,
       include: {
-        _count: {
+        tasks: {
           select: {
-            tasks: true,
+            status: true,
+            variance: true,
           },
         },
       },
-      orderBy: [
-        { status: "asc" }, // Active campaigns first
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     });
 
-    // Calculate dashboard statistics
-    const stats = await calculateDashboardStats();
+    // Transform campaigns to include computed fields
+    const campaignsWithStats = campaigns.map((campaign) => {
+      const completedTasks = campaign.tasks.filter((task) =>
+        // ["COMPLETED", "SKIPPED"].includes(task.status)
+        // Don't include SKIPPED in accuracy
+        ["COMPLETED"].includes(task.status)
+      ).length;
 
-    return NextResponse.json({ campaigns, stats });
+      const variancesFound = campaign.tasks.filter(
+        (task) => task.variance !== null && task.variance !== 0
+      ).length;
+
+      return {
+        id: campaign.id,
+        name: campaign.name,
+        description: campaign.description,
+        countType: campaign.countType,
+        status: campaign.status,
+        startDate: campaign.startDate.toISOString(),
+        endDate: campaign.endDate?.toISOString(),
+        totalTasks: campaign.tasks.length,
+        completedTasks,
+        variancesFound,
+        createdAt: campaign.createdAt.toISOString(),
+        updatedAt: campaign.updatedAt.toISOString(),
+        createdBy: campaign.createdBy,
+        assignedTo: campaign.assignedTo,
+      };
+    });
+
+    const stats = await calculateDashboardStats();
+    return NextResponse.json({ campaigns: campaignsWithStats, stats });
   } catch (error) {
     console.error("Error fetching campaigns:", error);
     return NextResponse.json(
@@ -80,6 +106,7 @@ export async function POST(request: NextRequest) {
       zoneFilter,
       lastCountedBefore,
       abcClass,
+      tolerancePercentage,
     } = await request.json();
 
     // Validate required fields
@@ -106,27 +133,313 @@ export async function POST(request: NextRequest) {
           : null,
         abcClass,
         createdBy: session.user.id,
-        assignedTo: [], // Will be populated when tasks are created
+        assignedTo: [],
       },
     });
 
-    // Create tasks based on criteria (you can call the utility function here)
-    // const taskIds = await CycleCountUtils.createTasksFromCriteria({
-    //   countType,
-    //   locationIds,
-    //   zoneFilter,
-    //   lastCountedBefore: lastCountedBefore ? new Date(lastCountedBefore) : undefined,
-    //   abcClass,
-    //   campaignId: campaign.id
-    // });
+    let taskCount = 0;
 
-    // Update campaign with task count
-    // await prisma.cycleCountCampaign.update({
-    //   where: { id: campaign.id },
-    //   data: { totalTasks: taskIds.length }
-    // });
+    try {
+      // Create tasks in a transaction for data consistency
+      await prisma.$transaction(async (tx) => {
+        const tolerance = tolerancePercentage
+          ? parseFloat(tolerancePercentage)
+          : 5.0;
 
-    return NextResponse.json(campaign, { status: 201 });
+        if (countType === "PARTIAL" && locationIds && locationIds.length > 0) {
+          // Get all inventory items in selected locations
+          const inventoryItems = await tx.inventory.findMany({
+            where: {
+              locationId: { in: locationIds },
+              quantityOnHand: { gt: 0 },
+            },
+            include: { location: true, productVariant: true },
+          });
+
+          for (let i = 0; i < inventoryItems.length; i++) {
+            const item = inventoryItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "FULL") {
+          // Get all inventory items
+          const allInventory = await tx.inventory.findMany({
+            where: { quantityOnHand: { gt: 0 } },
+            include: { location: true, productVariant: true },
+            take: 1000, // Reasonable limit for full counts
+          });
+
+          for (let i = 0; i < allInventory.length; i++) {
+            const item = allInventory[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "ZERO_STOCK") {
+          // Find inventory with zero quantity
+          const zeroStockItems = await tx.inventory.findMany({
+            where: { quantityOnHand: 0 },
+            include: { location: true, productVariant: true },
+            take: 200,
+          });
+
+          for (let i = 0; i < zeroStockItems.length; i++) {
+            const item = zeroStockItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "NEGATIVE_STOCK") {
+          // Find inventory with negative quantity
+          const negativeItems = await tx.inventory.findMany({
+            where: { quantityOnHand: { lt: 0 } },
+            include: { location: true, productVariant: true },
+            take: 100,
+          });
+
+          for (let i = 0; i < negativeItems.length; i++) {
+            const item = negativeItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "ABC_ANALYSIS") {
+          // Get high-value items (you can adjust criteria based on your business logic)
+          const highValueItems = await tx.inventory.findMany({
+            where: {
+              quantityOnHand: { gt: 0 },
+              productVariant: {
+                sellingPrice: { gte: 100 }, // Items worth $100 or more
+              },
+            },
+            include: { location: true, productVariant: true },
+            take: 300,
+          });
+
+          for (let i = 0; i < highValueItems.length; i++) {
+            const item = highValueItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "FAST_MOVING") {
+          // Find items with recent sales activity (last 30 days)
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+          const fastMovingItems = await tx.inventory.findMany({
+            where: {
+              quantityOnHand: { gt: 0 },
+              productVariant: {
+                inventoryTransactions: {
+                  some: {
+                    transactionType: "SALE",
+                    createdAt: { gte: thirtyDaysAgo },
+                  },
+                },
+              },
+            },
+            include: { location: true, productVariant: true },
+            take: 200,
+          });
+
+          for (let i = 0; i < fastMovingItems.length; i++) {
+            const item = fastMovingItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "SLOW_MOVING") {
+          // Find items not counted recently or with no recent sales
+          const dateFilter = lastCountedBefore
+            ? new Date(lastCountedBefore)
+            : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+          const slowMovingItems = await tx.inventory.findMany({
+            where: {
+              quantityOnHand: { gt: 0 },
+              OR: [{ lastCounted: { lt: dateFilter } }, { lastCounted: null }],
+            },
+            include: { location: true, productVariant: true },
+            take: 200,
+          });
+
+          for (let i = 0; i < slowMovingItems.length; i++) {
+            const item = slowMovingItems[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+              },
+            });
+            taskCount++;
+          }
+        } else if (countType === "HIGH_VALUE") {
+          // High value items based on total value (quantity * price)
+          const highValueItems = await tx.inventory.findMany({
+            where: {
+              quantityOnHand: { gt: 0 },
+              productVariant: {
+                sellingPrice: { not: null },
+              },
+            },
+            include: { location: true, productVariant: true },
+            take: 500,
+          });
+
+          // Filter by total value and sort
+          const itemsWithValue = highValueItems
+            .map((item) => ({
+              ...item,
+              totalValue:
+                item.quantityOnHand *
+                Number(item.productVariant.sellingPrice || 0),
+            }))
+            .filter((item) => item.totalValue >= 500) // $500+ total value
+            .sort((a, b) => b.totalValue - a.totalValue)
+            .slice(0, 100); // Top 100 high-value items
+
+          for (let i = 0; i < itemsWithValue.length; i++) {
+            const item = itemsWithValue[i];
+            await tx.cycleCountTask.create({
+              data: {
+                campaignId: campaign.id,
+                locationId: item.locationId,
+                productVariantId: item.productVariantId,
+                taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                  -3
+                )}-${String(i + 1).padStart(3, "0")}`,
+                countType: campaign.countType,
+                systemQuantity: item.quantityOnHand,
+                tolerancePercentage: tolerance,
+                notes: `High value item: $${item.totalValue.toFixed(
+                  2
+                )} total value`,
+              },
+            });
+            taskCount++;
+          }
+        } else {
+          // For unimplemented count types, create a placeholder task
+          const firstLocation = await tx.location.findFirst();
+          if (!firstLocation) {
+            throw new Error(
+              "No locations found. Cannot create cycle count tasks."
+            );
+          }
+
+          await tx.cycleCountTask.create({
+            data: {
+              campaignId: campaign.id,
+              locationId: firstLocation.id,
+              taskNumber: `CC-${new Date().getFullYear()}-${campaign.id.slice(
+                -3
+              )}-001`,
+              countType: campaign.countType,
+              systemQuantity: 0,
+              tolerancePercentage: tolerance,
+              notes: `${countType} count type - manual task creation required`,
+            },
+          });
+          taskCount = 1;
+        }
+
+        // Update campaign with actual task count
+        await tx.cycleCountCampaign.update({
+          where: { id: campaign.id },
+          data: { totalTasks: taskCount },
+        });
+      });
+
+      return NextResponse.json(
+        {
+          ...campaign,
+          totalTasks: taskCount,
+          message: `Campaign created successfully with ${taskCount} tasks`,
+        },
+        { status: 201 }
+      );
+    } catch (taskError) {
+      // Clean up campaign if task creation fails
+      await prisma.cycleCountCampaign.delete({
+        where: { id: campaign.id },
+      });
+      console.error("Error creating tasks:", taskError);
+      throw new Error("Failed to create cycle count tasks");
+    }
   } catch (error) {
     console.error("Error creating campaign:", error);
     return NextResponse.json(
@@ -139,115 +452,108 @@ export async function POST(request: NextRequest) {
 // Dashboard statistics calculation function
 async function calculateDashboardStats() {
   try {
-    // Calculate date ranges
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get basic campaign counts
-    const [totalCampaigns, activeCampaigns, completedThisWeek, pendingReviews] =
-      await Promise.all([
-        // Total campaigns ever created
-        prisma.cycleCountCampaign.count(),
+    // Use Promise.all for better performance
+    const [
+      totalCampaigns,
+      activeCampaigns,
+      completedThisWeek,
+      pendingReviews,
+      totalVariances,
+      completedTasks,
+    ] = await Promise.all([
+      prisma.cycleCountCampaign.count(),
 
-        // Currently active campaigns
-        prisma.cycleCountCampaign.count({
-          where: { status: "ACTIVE" },
-        }),
+      prisma.cycleCountCampaign.count({
+        where: { status: "ACTIVE" },
+      }),
 
-        // Campaigns completed this week
-        prisma.cycleCountCampaign.count({
-          where: {
-            status: "COMPLETED",
-            endDate: { gte: weekAgo },
-          },
-        }),
+      prisma.cycleCountCampaign.count({
+        where: {
+          status: "COMPLETED",
+          endDate: { gte: weekAgo },
+        },
+      }),
 
-        // Tasks requiring review (variance or recount)
-        prisma.cycleCountTask.count({
-          where: {
-            OR: [{ status: "VARIANCE_REVIEW" }, { status: "RECOUNT_REQUIRED" }],
-          },
-        }),
-      ]);
+      prisma.cycleCountTask.count({
+        where: {
+          OR: [{ status: "VARIANCE_REVIEW" }, { status: "RECOUNT_REQUIRED" }],
+        },
+      }),
 
-    // Calculate total variances in last 30 days
-    const totalVariances = await prisma.cycleCountTask.count({
-      where: {
-        AND: [
-          { variance: { not: null } },
-          { variance: { not: 0 } },
-          { completedAt: { gte: monthAgo } },
-        ],
-      },
-    });
+      prisma.cycleCountTask.count({
+        where: {
+          AND: [
+            { variance: { not: null } },
+            { variance: { not: 0 } },
+            { completedAt: { gte: monthAgo } },
+          ],
+        },
+      }),
 
-    // Calculate average accuracy for completed tasks in last 30 days
-    const completedTasks = await prisma.cycleCountTask.findMany({
-      where: {
-        status: "COMPLETED",
-        completedAt: { gte: monthAgo },
-        variance: { not: null },
-      },
-      select: {
-        systemQuantity: true,
-        variance: true,
-      },
-    });
+      prisma.cycleCountTask.findMany({
+        where: {
+          status: "COMPLETED",
+          completedAt: { gte: monthAgo },
+          variance: { not: null },
+        },
+        select: {
+          systemQuantity: true,
+          variance: true,
+        },
+      }),
+    ]);
 
-    let averageAccuracy = 100; // Default if no completed tasks
-
+    // Calculate accuracy
+    let averageAccuracy = 100;
     if (completedTasks.length > 0) {
       const totalAccuracy = completedTasks.reduce((sum, task) => {
-        if (task.systemQuantity === 0) {
-          // If system quantity is 0, accuracy is 100% if variance is 0, otherwise 0%
-          return sum + (task.variance === 0 ? 100 : 0);
-        }
-
-        // Calculate accuracy as percentage
-        const variancePercentage =
-          (Math.abs(task.variance || 0) / task.systemQuantity) * 100;
-        const accuracy = Math.max(0, 100 - variancePercentage);
+        const accuracy =
+          task.systemQuantity > 0
+            ? Math.max(
+                0,
+                100 - (Math.abs(task.variance || 0) / task.systemQuantity) * 100
+              )
+            : 100;
         return sum + accuracy;
       }, 0);
-
       averageAccuracy = totalAccuracy / completedTasks.length;
     }
 
-    // Additional useful stats
-    const campaignStats = await prisma.cycleCountCampaign.aggregate({
+    // Get monthly task counts
+    const monthlyTaskStats = await prisma.cycleCountTask.groupBy({
+      by: ["status"],
       where: {
-        status: "COMPLETED",
-        endDate: { gte: monthAgo },
+        createdAt: { gte: monthAgo },
       },
-      _avg: {
-        completedTasks: true,
-        variancesFound: true,
-      },
-      _sum: {
-        totalTasks: true,
-        completedTasks: true,
-      },
+      _count: true,
     });
+
+    const tasksThisMonth = monthlyTaskStats.reduce(
+      (sum, stat) => sum + stat._count,
+      0
+    );
+    const completedThisMonth = monthlyTaskStats
+      .filter((stat) => ["COMPLETED", "SKIPPED"].includes(stat.status))
+      .reduce((sum, stat) => sum + stat._count, 0);
 
     return {
       totalCampaigns,
       activeCampaigns,
       completedThisWeek,
-      averageAccuracy: Math.round(averageAccuracy * 10) / 10, // Round to 1 decimal
+      averageAccuracy: Math.round(averageAccuracy * 10) / 10,
       totalVariances,
       pendingReviews,
-
-      // Additional insights
-      tasksCompletedThisMonth: campaignStats._sum.completedTasks || 0,
-      totalTasksThisMonth: campaignStats._sum.totalTasks || 0,
+      tasksCompletedThisMonth: completedThisMonth,
+      totalTasksThisMonth: tasksThisMonth,
       averageVariancesPerCampaign:
-        Math.round((campaignStats._avg.variancesFound || 0) * 10) / 10,
+        totalCampaigns > 0 ? totalVariances / totalCampaigns : 0,
     };
   } catch (error) {
     console.error("Error calculating dashboard stats:", error);
-
-    // Return default stats if calculation fails
     return {
       totalCampaigns: 0,
       activeCampaigns: 0,

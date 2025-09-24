@@ -112,7 +112,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top Navigation */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -154,7 +154,7 @@ export default function Dashboard() {
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
                   activeTab === item.id
                     ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "text-gray-700 hover:bg-gray-50"
+                    : "text-gray-700 hover:bg-background"
                 }`}
               >
                 <item.icon className="w-5 h-5" />
@@ -483,7 +483,7 @@ function InventoryView() {
               </thead>
               <tbody>
                 {filteredInventory.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <tr key={item.id} className="border-b hover:bg-background">
                     <td className="py-3 px-4 font-medium">{item.sku}</td>
                     <td className="py-3 px-4">{item.name}</td>
                     <td className="py-3 px-4 text-gray-600">{item.upc}</td>
@@ -592,7 +592,7 @@ function OrdersView() {
               </thead>
               <tbody>
                 {mockOrders.map((order) => (
-                  <tr key={order.id} className="border-b hover:bg-gray-50">
+                  <tr key={order.id} className="border-b hover:bg-background">
                     <td className="py-3 px-4 font-medium">
                       {order.orderNumber}
                     </td>

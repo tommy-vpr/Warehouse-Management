@@ -98,10 +98,12 @@ export default function PackingInterface() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading order details...</p>
+          <p className="text-gray-600 dark:text-gray-200">
+            Loading order details...
+          </p>
         </div>
       </div>
     );
@@ -110,7 +112,7 @@ export default function PackingInterface() {
   // Error state
   if (!order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <p className="text-gray-600">
@@ -132,7 +134,7 @@ export default function PackingInterface() {
   // Success state
   if (isPackingComplete || order.status === "PACKED") {
     return (
-      <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-green-800 mb-2">
@@ -168,7 +170,7 @@ export default function PackingInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-background p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -181,8 +183,12 @@ export default function PackingInterface() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Pack Order</h1>
-              <p className="text-gray-600">{order.orderNumber}</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Pack Order
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                {order.orderNumber}
+              </p>
             </div>
           </div>
         </div>
@@ -201,7 +207,7 @@ export default function PackingInterface() {
                 <div>
                   <span className="font-medium">{order.customerName}</span>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   {order.customerEmail}
                 </div>
                 <div className="pt-2">
@@ -238,22 +244,22 @@ export default function PackingInterface() {
                 {order.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                    className="flex justify-between items-center p-3 bg-background rounded-lg"
                   >
                     <div>
                       <div className="font-medium">{item.productName}</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         SKU: {item.sku}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         Weight: {item.weight} lbs each
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="font-semibold">×{item.quantity}</div>
-                      <div className="text-sm text-gray-600">
+                      {/* <div className="text-sm text-gray-600 dark:text-gray-400">
                         ${item.totalPrice}
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 ))}

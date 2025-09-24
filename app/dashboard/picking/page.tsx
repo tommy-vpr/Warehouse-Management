@@ -329,7 +329,7 @@ export default function PickManagementDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -606,7 +606,7 @@ export default function PickManagementDashboard() {
 
                 <CardContent className="p-0">
                   {/* Statistics */}
-                  <div className="p-6 border-b bg-gray-50">
+                  <div className="p-6 border-b bg-background">
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-600">

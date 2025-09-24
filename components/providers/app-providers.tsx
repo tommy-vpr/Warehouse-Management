@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import type { ThemeProviderProps as NextThemesProviderProps } from "next-themes";
+
 interface Props {
   children: React.ReactNode;
 }
@@ -41,24 +44,20 @@ export function AppProviders({ children }: Props) {
   return (
     <NextAuthSessionProvider>
       <QueryClientProvider client={queryClient}>
-        {children}
-        {/* Only show devtools in development */}
-        {process.env.NODE_ENV === "development" && (
-          <ReactQueryDevtools initialIsOpen={false} />
-        )}
+        <NextThemesProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="wms-theme"
+        >
+          {children}
+          {/* Only show devtools in development */}
+          {process.env.NODE_ENV === "development" && (
+            <ReactQueryDevtools initialIsOpen={false} />
+          )}
+        </NextThemesProvider>
       </QueryClientProvider>
     </NextAuthSessionProvider>
   );
 }
-
-// "use client";
-
-// import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
-
-// interface Props {
-//   children: React.ReactNode;
-// }
-
-// export function SessionProvider({ children }: Props) {
-//   return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>;
-// }

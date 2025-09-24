@@ -25,6 +25,7 @@ export async function GET(
           include: {
             order: {
               select: {
+                id: true,
                 orderNumber: true,
                 customerName: true,
                 totalAmount: true,

@@ -520,10 +520,12 @@ const OrderSplitter: React.FC = () => {
   // Loading states
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="flex items-center justify-center p-8">
-          <Loader2 className="text-blue-500 w-8 h-8 animate-spin mr-3" />
-          <span>Loading order details...</span>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 dark:text-gray-200">
+            Loading order details...
+          </p>
         </div>
       </div>
     );
@@ -547,33 +549,33 @@ const OrderSplitter: React.FC = () => {
   if (completedShipments.length > 0) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="p-6 bg-green-50 border border-green-200 rounded-lg">
+        <div className="p-6 bg-green-50 border border-green-200 dark:border-green-500 dark:bg-background rounded-lg">
           <div className="flex items-center mb-4">
             <Check className="w-6 h-6 text-green-600 mr-2" />
-            <h2 className="text-xl font-semibold text-green-800">
-              Order Split Successfully!
+            <h2 className="text-xl font-semibold text-green-800 dark:text-green-400">
+              Order Shipment Created Successfully!
             </h2>
           </div>
 
           <div className="space-y-4">
             {completedShipments.map((shipment, index) => (
-              <div key={index} className="bg-white p-4 rounded border">
+              <div key={index} className="bg-background p-4 rounded border">
                 <h3 className="font-medium mb-2">{shipment.splitName}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-600 mb-1">
+                    <p className="text-gray-600 dark:text-gray-400 mb-1">
                       <strong>Tracking:</strong> {shipment.trackingNumber}
                     </p>
-                    <p className="text-gray-600 mb-1">
+                    <p className="text-gray-600 dark:text-gray-400 mb-1">
                       <strong>Cost:</strong> ${shipment.cost}
                     </p>
-                    <p className="text-gray-600 mb-3">
+                    <p className="text-gray-600 dark:text-gray-400 mb-3">
                       <strong>Carrier:</strong> {shipment.carrier}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium mb-1">Items:</p>
-                    <ul className="text-sm text-gray-600">
+                    <ul className="text-sm text-gray-600 dark:text-gray-400">
                       {shipment.items.map((item) => (
                         <li key={item.itemId}>
                           {item.sku} - {item.productName} (Qty: {item.quantity})
@@ -596,7 +598,7 @@ const OrderSplitter: React.FC = () => {
             ))}
           </div>
 
-          <button
+          {/* <button
             onClick={() => {
               setCompletedShipments([]);
               setShipments([
@@ -619,7 +621,7 @@ const OrderSplitter: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Create New Split
-          </button>
+          </button> */}
         </div>
       </div>
     );
@@ -633,10 +635,10 @@ const OrderSplitter: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Order {order.orderNumber}</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             {order.customerName} ({order.customerEmail})
           </p>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             {order.shippingAddress.address1}, {order.shippingAddress.city},{" "}
             {order.shippingAddress.province} {order.shippingAddress.zip}
           </p>
@@ -663,25 +665,25 @@ const OrderSplitter: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Original Order Items */}
         <div>
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-background p-4 rounded-lg">
             <h3 className="font-semibold mb-3 flex items-center">
               <Package className="w-5 h-5 mr-2" />
               Order Items
             </h3>
             <div className="space-y-3">
               {getAllocationSummary.map((item) => (
-                <div key={item.id} className="bg-white p-3 rounded border">
+                <div key={item.id} className="bg-background p-3 rounded border">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="font-medium text-sm">
                         {item.productName}
                       </div>
-                      <div className="text-xs text-gray-600 mb-2">
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                         SKU: {item.sku} • ${item.unitPrice} each
                       </div>
 
                       <div className="flex items-center text-xs space-x-4">
-                        <span className="text-gray-500">
+                        <span className="text-gray-500 dark:text-gray-400">
                           Qty: {item.quantity}
                         </span>
                         <span className="text-blue-600">
@@ -700,7 +702,7 @@ const OrderSplitter: React.FC = () => {
 
                       {item.remaining > 0 && (
                         <div className="mt-2">
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                             <div
                               className="bg-blue-500 h-1.5 rounded-full"
                               style={{
@@ -760,7 +762,10 @@ const OrderSplitter: React.FC = () => {
 
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {shipments.map((shipment) => (
-              <div key={shipment.id} className="border rounded-lg p-4 bg-white">
+              <div
+                key={shipment.id}
+                className="border rounded-lg p-4 bg-background"
+              >
                 {/* Shipment Header */}
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-sm">{shipment.name}</h4>
@@ -776,7 +781,7 @@ const OrderSplitter: React.FC = () => {
 
                 {/* Items in shipment */}
                 <div className="mb-4">
-                  <h5 className="text-xs font-medium text-gray-700 mb-2">
+                  <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Items ({shipment.items.length})
                   </h5>
                   {shipment.items.length === 0 ? (
@@ -788,11 +793,11 @@ const OrderSplitter: React.FC = () => {
                       {shipment.items.map((item) => (
                         <div
                           key={item.itemId}
-                          className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs"
+                          className="flex items-center justify-between bg-background p-2 rounded text-xs"
                         >
                           <div>
                             <span className="font-medium">{item.sku}</span>
-                            <span className="text-gray-600 ml-2">
+                            <span className="text-gray-600 dark:text-gray-400 ml-2">
                               Qty: {item.quantity}
                             </span>
                           </div>
@@ -805,7 +810,7 @@ const OrderSplitter: React.FC = () => {
                                   item.quantity - 1
                                 )
                               }
-                              className="w-5 h-5 bg-white border rounded flex items-center justify-center hover:bg-gray-50"
+                              className="w-5 h-5 bg-background border rounded flex items-center justify-center hover:bg-background"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
@@ -820,7 +825,7 @@ const OrderSplitter: React.FC = () => {
                                   item.quantity + 1
                                 )
                               }
-                              className="w-5 h-5 bg-white border rounded flex items-center justify-center hover:bg-gray-50"
+                              className="w-5 h-5 bg-background border rounded flex items-center justify-center hover:bg-background"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
@@ -842,7 +847,7 @@ const OrderSplitter: React.FC = () => {
                 {/* Shipping Config - Only show if shipment has items */}
                 {shipment.items.length > 0 && (
                   <div className="space-y-3">
-                    <h5 className="text-xs font-medium text-gray-700">
+                    <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400">
                       Shipping Configuration
                     </h5>
 
@@ -857,7 +862,7 @@ const OrderSplitter: React.FC = () => {
                         )
                       }
                       disabled={carriersLoading}
-                      className="w-full px-2 py-1 border rounded text-xs"
+                      className="w-full px-2 py-1 border rounded text-xs dark:text-gray-400"
                     >
                       <option value="">
                         {carriersLoading ? "Loading..." : "Select Carrier"}
@@ -883,7 +888,7 @@ const OrderSplitter: React.FC = () => {
                             e.target.value
                           )
                         }
-                        className="w-full px-2 py-1 border rounded text-xs"
+                        className="w-full px-2 py-1 border rounded text-xs dark:text-gray-400"
                       >
                         <option value="">Select Service</option>
                         {getCarrierOptions(
@@ -910,7 +915,7 @@ const OrderSplitter: React.FC = () => {
                             e.target.value
                           )
                         }
-                        className="w-full px-2 py-1 border rounded text-xs"
+                        className="w-full px-2 py-1 border rounded text-xs dark:text-gray-400"
                       >
                         <option value="">Select Package</option>
                         {getCarrierOptions(
@@ -1039,7 +1044,7 @@ const OrderSplitter: React.FC = () => {
       {/* Split Modal */}
       {selectedItemForSplit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+          <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">Split Item</h3>
 
             {(() => {
@@ -1049,8 +1054,10 @@ const OrderSplitter: React.FC = () => {
               return item ? (
                 <div className="mb-4">
                   <p className="font-medium">{item.productName}</p>
-                  <p className="text-sm text-gray-600">SKU: {item.sku}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    SKU: {item.sku}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Available to split: {selectedItemForSplit.availableQty}{" "}
                     units
                   </p>
@@ -1070,7 +1077,7 @@ const OrderSplitter: React.FC = () => {
                     onClick={() =>
                       setSplitQuantity(selectedItemForSplit.availableQty)
                     }
-                    className="w-full px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 text-sm font-medium"
+                    className="w-full px-3 py-2 bg-blue-50 dark:bg-blue-600 text-blue-700 dark:text-blue-200 border rounded hover:bg-blue-100 text-sm font-medium"
                   >
                     Add All ({selectedItemForSplit.availableQty} units)
                   </button>
@@ -1083,7 +1090,7 @@ const OrderSplitter: React.FC = () => {
                       onClick={() =>
                         setSplitQuantity(Math.max(1, splitQuantity - 1))
                       }
-                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-background"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
@@ -1113,7 +1120,7 @@ const OrderSplitter: React.FC = () => {
                           )
                         )
                       }
-                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-50"
+                      className="w-8 h-8 border rounded flex items-center justify-center hover:bg-background"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -1127,9 +1134,9 @@ const OrderSplitter: React.FC = () => {
                         <button
                           key={qty}
                           onClick={() => setSplitQuantity(qty)}
-                          className={`px-3 py-1 text-xs border rounded hover:bg-gray-50 ${
+                          className={`px-3 py-1 text-xs border rounded hover:bg-background ${
                             splitQuantity === qty
-                              ? "bg-blue-100 border-blue-300"
+                              ? "bg-blue-100 dark:bg-blue-600 border-blue-300 dark:border-blue-500"
                               : ""
                           }`}
                         >
@@ -1143,7 +1150,7 @@ const OrderSplitter: React.FC = () => {
                             Math.floor(selectedItemForSplit.availableQty / 2)
                           )
                         }
-                        className={`px-3 py-1 text-xs border rounded hover:bg-gray-50 ${
+                        className={`px-3 py-1 text-xs border rounded hover:bg-background ${
                           splitQuantity ===
                           Math.floor(selectedItemForSplit.availableQty / 2)
                             ? "bg-blue-100 border-blue-300"
@@ -1164,7 +1171,7 @@ const OrderSplitter: React.FC = () => {
                 Add to shipment:
               </label>
               <select
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border rounded dark:text-gray-400"
                 onChange={(e) => {
                   if (e.target.value) {
                     addItemToShipment(
@@ -1191,7 +1198,7 @@ const OrderSplitter: React.FC = () => {
                   setSelectedItemForSplit(null);
                   setSplitQuantity(1);
                 }}
-                className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-50"
+                className="px-4 py-2 text-gray-600 border rounded hover:bg-background dark:hover:text-white transition"
               >
                 Cancel
               </button>

@@ -87,7 +87,7 @@ export default function OrdersView() {
               </thead>
               <tbody>
                 {mockOrders.map((order) => (
-                  <tr key={order.id} className="border-b hover:bg-gray-50">
+                  <tr key={order.id} className="border-b hover:bg-background">
                     <td className="py-3 px-4 font-medium">
                       {order.orderNumber}
                     </td>

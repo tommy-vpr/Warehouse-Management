@@ -31,6 +31,9 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
+import { ProductAnalyticsCard } from "@/components/ProductAnalyticsCard";
+import { RecentTransactionsCard } from "@/components/RecentTransactionsCard";
+
 interface ProductDetails {
   id: string;
   productId: string;
@@ -224,7 +227,7 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-600">Loading product details...</p>
@@ -235,7 +238,7 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <p className="text-gray-600">Product not found</p>
@@ -251,7 +254,7 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center mb-6">
@@ -263,8 +266,12 @@ export default function ProductDetailPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-gray-600">SKU: {product.sku}</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {product.name}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              SKU: {product.sku}
+            </p>
           </div>
           <div className="flex gap-3">
             <Button
@@ -323,7 +330,7 @@ export default function ProductDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       Product Name
                     </label>
                     {isEditing ? (
@@ -334,17 +341,21 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">{product.name}</p>
+                      <p className="text-gray-900 dark:text-gray-200">
+                        {product.name}
+                      </p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       SKU
                     </label>
-                    <p className="text-gray-900 font-mono">{product.sku}</p>
+                    <p className="text-gray-900 dark:text-gray-200 font-mono">
+                      {product.sku}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       UPC
                     </label>
                     {isEditing ? (
@@ -355,13 +366,13 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900 font-mono">
+                      <p className="text-gray-900 dark:text-gray-200 font-mono">
                         {product.upc || "Not set"}
                       </p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       Category
                     </label>
                     {isEditing ? (
@@ -372,7 +383,7 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-200">
                         {product.category || "Uncategorized"}
                       </p>
                     )}
@@ -381,7 +392,7 @@ export default function ProductDetailPage() {
 
                 {product.description && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       Description
                     </label>
                     {isEditing ? (
@@ -397,15 +408,17 @@ export default function ProductDetailPage() {
                         rows={3}
                       />
                     ) : (
-                      <p className="text-gray-600">{product.description}</p>
+                      <p className="text-gray-600 dark:text-gray-200 ">
+                        {product.description}
+                      </p>
                     )}
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <DollarSign className="w-4 h-4 inline mr-1" />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                      <DollarSign className="w-4 h-4 inline mr-1 dark:text-gray-400" />
                       Cost Price
                     </label>
                     {isEditing ? (
@@ -421,7 +434,7 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-200">
                         {product.costPrice
                           ? `${product.costPrice.toFixed(2)}`
                           : "Not set"}
@@ -429,7 +442,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       <DollarSign className="w-4 h-4 inline mr-1" />
                       Selling Price
                     </label>
@@ -446,7 +459,7 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-200">
                         {product.sellingPrice
                           ? `${product.sellingPrice.toFixed(2)}`
                           : "Not set"}
@@ -454,7 +467,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       <Weight className="w-4 h-4 inline mr-1" />
                       Weight (lbs)
                     </label>
@@ -471,7 +484,7 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-200">
                         {product.weight ? `${product.weight} lbs` : "Not set"}
                       </p>
                     )}
@@ -504,31 +517,39 @@ export default function ProductDetailPage() {
                     <div className="text-2xl font-bold text-blue-600">
                       {product.totalQuantity}
                     </div>
-                    <div className="text-sm text-gray-600">On Hand</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      On Hand
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
                       {product.totalReserved}
                     </div>
-                    <div className="text-sm text-gray-600">Reserved</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Reserved
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
                       {product.totalAvailable}
                     </div>
-                    <div className="text-sm text-gray-600">Available</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Available
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold">
                       ${product.analytics.totalValue.toFixed(2)}
                     </div>
-                    <div className="text-sm text-gray-600">Total Value</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Total Value
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       Reorder Point
                     </label>
                     {isEditing ? (
@@ -543,13 +564,13 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-400">
                         {product.reorderPoint || "Not set"}
                       </p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
                       Max Quantity
                     </label>
                     {isEditing ? (
@@ -564,7 +585,7 @@ export default function ProductDetailPage() {
                         }
                       />
                     ) : (
-                      <p className="text-gray-900">
+                      <p className="text-gray-900 dark:text-gray-400">
                         {product.maxQuantity || "Not set"}
                       </p>
                     )}
@@ -586,11 +607,11 @@ export default function ProductDetailPage() {
                   {product.locations.map((location) => (
                     <div
                       key={location.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-background rounded-lg"
                     >
                       <div className="flex-1">
                         <div className="font-medium">{location.name}</div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                           {location.zone && `Zone ${location.zone}`}
                           {location.aisle && ` - Aisle ${location.aisle}`}
                           {location.shelf && ` - Shelf ${location.shelf}`}
@@ -619,7 +640,9 @@ export default function ProductDetailPage() {
                         <div className="text-2xl font-bold">
                           {location.quantity}
                         </div>
-                        <div className="text-sm text-gray-600">units</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          units
+                        </div>
                         {location.lastCounted && (
                           <div className="text-xs text-gray-500">
                             Counted:{" "}
@@ -639,56 +662,7 @@ export default function ProductDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Analytics Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-2" />
-                  Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      Monthly Movement
-                    </span>
-                    <span className="font-medium">
-                      {product.analytics.monthlyMovement}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Turnover Rate</span>
-                    <span className="font-medium">
-                      {product.analytics.turnoverRate.toFixed(1)}x
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      Days Since Last Sale
-                    </span>
-                    <span className="font-medium">
-                      {product.analytics.daysSinceLastSale}
-                    </span>
-                  </div>
-                </div>
-                {product.analytics.profitMargin && (
-                  <div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">
-                        Profit Margin
-                      </span>
-                      <span className="font-medium">
-                        {product.analytics.profitMargin.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ProductAnalyticsCard productVariantId={productVariantId} />
 
             {/* Quick Actions Card */}
             <Card>
@@ -747,67 +721,7 @@ export default function ProductDetailPage() {
 
             {/* Recent Transactions */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <History className="w-5 h-5 mr-2" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {product.recentTransactions.slice(0, 5).map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center">
-                        {getTransactionIcon(transaction.type)}
-                        <div className="ml-2">
-                          <div className="text-sm font-medium">
-                            {transaction.type.replace("_", " ")}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(
-                              transaction.createdAt
-                            ).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={`text-sm font-medium ${
-                            transaction.quantityChange > 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {transaction.quantityChange > 0 ? "+" : ""}
-                          {transaction.quantityChange}
-                        </div>
-                        {transaction.userName && (
-                          <div className="text-xs text-gray-500">
-                            {transaction.userName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {product.recentTransactions.length > 5 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() =>
-                        router.push(
-                          `/dashboard/inventory/transactions?product=${productVariantId}`
-                        )
-                      }
-                    >
-                      View All Transactions
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
+              <RecentTransactionsCard productVariantId={productVariantId} />
             </Card>
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
   Info,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 interface Location {
   id: string;
@@ -80,12 +81,15 @@ export default function CreateCampaign() {
       newErrors.startDate = "Start date is required";
     }
 
-    if (
-      formData.endDate &&
-      new Date(formData.endDate) <= new Date(formData.startDate)
-    ) {
-      newErrors.endDate = "End date must be after start date";
-    }
+    // if (
+    //   formData.endDate &&
+    //   new Date(formData.endDate) <= new Date(formData.startDate)
+    // ) {
+    //   newErrors.endDate = "End date must be after start date";
+    // }
+    const start = new Date(formData.startDate).setHours(0, 0, 0, 0);
+    const end = new Date(formData.endDate).setHours(0, 0, 0, 0);
+    if (end <= start) newErrors.endDate = "End date must be after start date";
 
     if (
       formData.countType === "PARTIAL" &&
@@ -94,6 +98,12 @@ export default function CreateCampaign() {
     ) {
       newErrors.locations =
         "Select locations or specify a zone for partial counts";
+    }
+
+    // Added
+    if (formData.zoneFilter && formData.locationIds.length > 0) {
+      newErrors.locations =
+        "Choose either a zone filter OR specific locations, not both";
     }
 
     const tolerance = parseFloat(formData.tolerancePercentage);
@@ -129,6 +139,12 @@ export default function CreateCampaign() {
 
       if (response.ok) {
         const campaign = await response.json();
+
+        toast({
+          title: "Campaign Created",
+          description: `"${formData.name}" was created successfully.`,
+        });
+
         router.push(`/dashboard/inventory/count`);
       } else {
         const errorData = await response.json();
@@ -164,7 +180,7 @@ export default function CreateCampaign() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center mb-6">
@@ -176,10 +192,10 @@ export default function CreateCampaign() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Create Cycle Count Campaign
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Set up a new inventory counting campaign
             </p>
           </div>
@@ -197,7 +213,7 @@ export default function CreateCampaign() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Campaign Name *
                   </label>
                   <Input
@@ -214,7 +230,7 @@ export default function CreateCampaign() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Count Type *
                   </label>
                   <select
@@ -225,7 +241,7 @@ export default function CreateCampaign() {
                         countType: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="FULL">Full Count</option>
                     <option value="PARTIAL">Partial Count</option>
@@ -246,7 +262,7 @@ export default function CreateCampaign() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                   Description
                 </label>
                 <textarea
@@ -276,7 +292,7 @@ export default function CreateCampaign() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Start Date *
                   </label>
                   <Input
@@ -299,7 +315,7 @@ export default function CreateCampaign() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     End Date (Optional)
                   </label>
                   <Input
@@ -335,7 +351,7 @@ export default function CreateCampaign() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Zone Filter
                   </label>
                   <Input
@@ -354,7 +370,7 @@ export default function CreateCampaign() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Last Counted Before
                   </label>
                   <Input
@@ -375,7 +391,7 @@ export default function CreateCampaign() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     ABC Class
                   </label>
                   <select
@@ -386,7 +402,7 @@ export default function CreateCampaign() {
                         abcClass: e.target.value,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 dark:text-gray-400  border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Classes</option>
                     <option value="A">Class A (High Value)</option>
@@ -396,7 +412,7 @@ export default function CreateCampaign() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
                     Tolerance Percentage
                   </label>
                   <Input
@@ -408,7 +424,12 @@ export default function CreateCampaign() {
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        tolerancePercentage: e.target.value,
+                        tolerancePercentage: String(
+                          Math.max(
+                            0,
+                            Math.min(100, parseFloat(e.target.value) || 0)
+                          )
+                        ),
                       }))
                     }
                     className={
@@ -478,14 +499,14 @@ export default function CreateCampaign() {
                       key={location.id}
                       className={`p-3 border rounded-md cursor-pointer transition-colors ${
                         formData.locationIds.includes(location.id)
-                          ? "border-blue-500 bg-blue-50"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-800/30"
                           : "border-gray-200 hover:border-gray-300"
                       }`}
                       onClick={() => handleLocationToggle(location.id)}
                     >
                       <div className="text-sm font-medium">{location.name}</div>
                       {(location.zone || location.aisle) && (
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-gray-600 dark:text-blue-500">
                           {location.zone && `Zone: ${location.zone}`}
                           {location.zone && location.aisle && " • "}
                           {location.aisle && `Aisle: ${location.aisle}`}

@@ -434,7 +434,6 @@ model CycleCountCampaign {
   @@map("cycle_count_campaigns")
 }
 
-// Individual counting tasks within a campaign
 model CycleCountTask {
   id                String              @id @default(cuid())
   campaignId        String?             // Optional - for ad-hoc counts
@@ -475,7 +474,7 @@ model CycleCountTask {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   
-  @@unique([locationId, productVariantId]) // Prevent duplicate tasks
+  @@unique([campaignId, locationId, productVariantId]) // Prevent duplicate tasks
   @@map("cycle_count_tasks")
 }
 
