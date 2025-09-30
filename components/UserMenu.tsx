@@ -162,7 +162,7 @@ export default function UserMenu() {
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+          className="text-gray-200 focus:text-gray-800 focus:bg-red-50"
           onClick={handleSignOut}
         >
           <LogOut className="mr-2 h-4 w-4" />

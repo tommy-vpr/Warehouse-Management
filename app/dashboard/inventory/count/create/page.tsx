@@ -1,7 +1,6 @@
-// app/dashboard/inventory/count/create/page.tsx - Campaign Creation Form
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,13 +12,13 @@ import {
   Package,
   Settings,
   Save,
-  Plus,
-  Trash2,
   AlertCircle,
   Info,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import SpinningLoader from "@/components/SpinningLoader";
 
 interface Location {
   id: string;
@@ -32,6 +31,10 @@ interface Location {
 
 export default function CreateCampaign() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const productVariantId = searchParams.get("product");
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -45,26 +48,63 @@ export default function CreateCampaign() {
     tolerancePercentage: "5.0",
   });
 
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    loadLocations();
-  }, []);
-
-  const loadLocations = async () => {
-    try {
-      const response = await fetch("/api/inventory/locations");
-      if (response.ok) {
-        const data = await response.json();
-        setLocations(data);
+  // Fetch locations
+  const { data: locations = [], isLoading } = useQuery<Location[]>({
+    queryKey: ["cycle-count-locations", productVariantId],
+    queryFn: async () => {
+      let url = "/api/inventory/cycle-counts/locations";
+      if (productVariantId) {
+        url += `?productVariantId=${encodeURIComponent(productVariantId)}`;
       }
-    } catch (error) {
-      console.error("Failed to load locations:", error);
-    }
-  };
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Failed to load locations");
+      }
+      return response.json();
+    },
+    staleTime: 300000, // 5 minutes - locations don't change often
+  });
+
+  // Create campaign mutation
+  const createCampaignMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const response = await fetch("/api/inventory/cycle-counts/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          locationIds: data.locationIds.length > 0 ? data.locationIds : null,
+          lastCountedBefore: data.lastCountedBefore || null,
+          endDate: data.endDate || null,
+          tolerancePercentage: parseFloat(data.tolerancePercentage),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create campaign");
+      }
+
+      return response.json();
+    },
+    onSuccess: (campaign) => {
+      // Invalidate campaigns list
+      queryClient.invalidateQueries({ queryKey: ["cycle-count-campaigns"] });
+
+      toast({
+        title: "Campaign Created",
+        description: `"${formData.name}" was created successfully.`,
+      });
+
+      router.push(`/dashboard/inventory/count`);
+    },
+    onError: (error: Error) => {
+      setErrors({ submit: error.message });
+    },
+  });
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -81,15 +121,16 @@ export default function CreateCampaign() {
       newErrors.startDate = "Start date is required";
     }
 
-    // if (
-    //   formData.endDate &&
-    //   new Date(formData.endDate) <= new Date(formData.startDate)
-    // ) {
-    //   newErrors.endDate = "End date must be after start date";
-    // }
-    const start = new Date(formData.startDate).setHours(0, 0, 0, 0);
-    const end = new Date(formData.endDate).setHours(0, 0, 0, 0);
-    if (end <= start) newErrors.endDate = "End date must be after start date";
+    if (formData.endDate) {
+      const start = new Date(formData.startDate).setHours(0, 0, 0, 0);
+      const end = new Date(formData.endDate).setHours(0, 0, 0, 0);
+
+      if (isNaN(end)) {
+        newErrors.endDate = "Invalid end date";
+      } else if (end < start) {
+        newErrors.endDate = "End date must be after start date";
+      }
+    }
 
     if (
       formData.countType === "PARTIAL" &&
@@ -100,7 +141,6 @@ export default function CreateCampaign() {
         "Select locations or specify a zone for partial counts";
     }
 
-    // Added
     if (formData.zoneFilter && formData.locationIds.length > 0) {
       newErrors.locations =
         "Choose either a zone filter OR specific locations, not both";
@@ -122,38 +162,7 @@ export default function CreateCampaign() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/inventory/cycle-counts/campaigns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          locationIds:
-            formData.locationIds.length > 0 ? formData.locationIds : null,
-          lastCountedBefore: formData.lastCountedBefore || null,
-          endDate: formData.endDate || null,
-          tolerancePercentage: parseFloat(formData.tolerancePercentage),
-        }),
-      });
-
-      if (response.ok) {
-        const campaign = await response.json();
-
-        toast({
-          title: "Campaign Created",
-          description: `"${formData.name}" was created successfully.`,
-        });
-
-        router.push(`/dashboard/inventory/count`);
-      } else {
-        const errorData = await response.json();
-        setErrors({ submit: errorData.error || "Failed to create campaign" });
-      }
-    } catch (error) {
-      setErrors({ submit: "Failed to create campaign" });
-    }
-    setIsSubmitting(false);
+    createCampaignMutation.mutate(formData);
   };
 
   const handleLocationToggle = (locationId: string) => {
@@ -493,28 +502,34 @@ export default function CreateCampaign() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                  {locations.map((location) => (
-                    <div
-                      key={location.id}
-                      className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                        formData.locationIds.includes(location.id)
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-800/30"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                      onClick={() => handleLocationToggle(location.id)}
-                    >
-                      <div className="text-sm font-medium">{location.name}</div>
-                      {(location.zone || location.aisle) && (
-                        <div className="text-xs text-gray-600 dark:text-blue-500">
-                          {location.zone && `Zone: ${location.zone}`}
-                          {location.zone && location.aisle && " • "}
-                          {location.aisle && `Aisle: ${location.aisle}`}
+                {isLoading ? (
+                  <SpinningLoader />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+                    {locations.map((location) => (
+                      <div
+                        key={location.id}
+                        className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                          formData.locationIds.includes(location.id)
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-800/30"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                        onClick={() => handleLocationToggle(location.id)}
+                      >
+                        <div className="text-sm font-medium">
+                          {location.name}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        {(location.zone || location.aisle) && (
+                          <div className="text-xs text-gray-600 dark:text-blue-500">
+                            {location.zone && `Zone: ${location.zone}`}
+                            {location.zone && location.aisle && " • "}
+                            {location.aisle && `Aisle: ${location.aisle}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {errors.locations && (
                   <p className="text-sm text-red-600 mt-2">
@@ -543,12 +558,12 @@ export default function CreateCampaign() {
               type="button"
               variant="outline"
               onClick={() => router.push("/dashboard/inventory/count")}
-              disabled={isSubmitting}
+              disabled={createCampaignMutation.isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
+            <Button type="submit" disabled={createCampaignMutation.isPending}>
+              {createCampaignMutation.isPending ? (
                 "Creating..."
               ) : (
                 <>

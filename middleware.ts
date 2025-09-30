@@ -8,19 +8,17 @@ export default withAuth(
     const pathname = nextUrl.pathname;
 
     const isAuthPage =
-      pathname === "/" ||
-      pathname.startsWith("/login") ||
-      pathname.startsWith("/signup");
+      pathname.startsWith("/auth/signin") ||
+      pathname.startsWith("/auth/signup");
 
     const isPublicReserveEndpoint =
       pathname.startsWith("/api/orders/") && pathname.endsWith("/reserve");
 
-    // ✅ Skip auth check for /api/orders/[id]/reserve
     if (isPublicReserveEndpoint) {
       return NextResponse.next();
     }
 
-    // ✅ Redirect logged-in users away from auth pages
+    // Redirect logged-in users away from auth pages
     if (isLoggedIn && isAuthPage) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
@@ -29,13 +27,29 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token, // Require login for other routes
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl;
+
+        // ✅ Always allow auth pages, even if not logged in
+        if (
+          pathname.startsWith("/auth/signin") ||
+          pathname.startsWith("/auth/signup")
+        ) {
+          return true;
+        }
+
+        // ✅ Protect everything else
+        return !!token;
+      },
     },
   }
 );
 
 export const config = {
   matcher: [
+    "/",
+    "/auth/signin",
+    "/auth/signup",
     "/dashboard/:path*",
     // "/api/orders/:path*",
     "/api/inventory/:path*",

@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   Truck,
   ShoppingCart,
+  Loader2,
 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 // Types - inline until you create the types file
 export enum OrderStatus {
   PENDING = "PENDING",
@@ -126,10 +128,15 @@ const performOrderAction = async (request: OrderActionRequest) => {
     body: JSON.stringify(request),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error(`Failed to perform action: ${response.status}`);
+    throw new Error(
+      data.error || `Failed to perform action: ${response.status}`
+    );
   }
-  return response.json();
+
+  return data;
 };
 
 // Custom hook for orders data
@@ -156,8 +163,15 @@ const useOrderAction = () => {
       // Invalidate and refetch orders data after successful action
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
-    onError: (error) => {
-      console.error("Order action failed:", error);
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Order action failed";
+      console.error("Order action failed:", message);
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
     },
   });
 };
@@ -290,7 +304,7 @@ export default function OrdersManagementDashboard() {
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.PENDING:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-500 dark:text-gray-900";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900";
       case OrderStatus.ALLOCATED:
         return "bg-blue-100 text-blue-800 dark:bg-blue-600 dark:text-gray-900";
       case OrderStatus.PICKING:
@@ -352,7 +366,7 @@ export default function OrdersManagementDashboard() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Error Loading Orders
           </h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
             {error instanceof Error ? error.message : "An error occurred"}
           </p>
           <Button onClick={() => refetch()}>
@@ -369,8 +383,8 @@ export default function OrdersManagementDashboard() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600 dark:text-gray-200">Loading orders...</p>
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">Loading orders...</p>
         </div>
       </div>
     );
@@ -386,7 +400,7 @@ export default function OrdersManagementDashboard() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Orders Management
               </h1>
-              <p className="text-gray-600 dark:text-gray-500">
+              <p className="text-gray-600 dark:text-gray-400">
                 Central operations dashboard for all orders
               </p>
             </div>
@@ -413,7 +427,9 @@ export default function OrdersManagementDashboard() {
                     <Package className="w-6 h-6 text-blue-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.total}</p>
-                      <p className="text-xs text-gray-600">Total</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Total
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -422,10 +438,12 @@ export default function OrdersManagementDashboard() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.urgent}</p>
-                      <p className="text-xs text-gray-600">Urgent</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Urgent
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -437,7 +455,9 @@ export default function OrdersManagementDashboard() {
                     <ShoppingCart className="w-6 h-6 text-yellow-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.picking}</p>
-                      <p className="text-xs text-gray-600">Picking</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Picking
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -449,7 +469,9 @@ export default function OrdersManagementDashboard() {
                     <Package className="w-6 h-6 text-purple-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.picked}</p>
-                      <p className="text-xs text-gray-600">Picked</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Picked
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -461,7 +483,9 @@ export default function OrdersManagementDashboard() {
                     <Truck className="w-6 h-6 text-green-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.shipped}</p>
-                      <p className="text-xs text-gray-600">Shipped</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Shipped
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -473,7 +497,9 @@ export default function OrdersManagementDashboard() {
                     <CheckCircle className="w-6 h-6 text-green-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.fulfilled}</p>
-                      <p className="text-xs text-gray-600">Fulfilled</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Fulfilled
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -489,7 +515,7 @@ export default function OrdersManagementDashboard() {
                 placeholder="Search orders, customers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 dark:border-gray-600"
+                className="pl-10 border-gray-200 dark:border-zinc-700"
               />
             </div>
             <select
@@ -527,7 +553,7 @@ export default function OrdersManagementDashboard() {
 
           {/* Bulk Actions */}
           {selectedOrders.size > 0 && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-400 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-blue-900">
                   {selectedOrders.size} orders selected
@@ -537,6 +563,7 @@ export default function OrdersManagementDashboard() {
                     size="sm"
                     onClick={() => handleBulkAction("BULK_ALLOCATE")}
                     disabled={orderActionMutation.isPending}
+                    className="cursor-pointer"
                   >
                     Allocate Selected
                   </Button>
@@ -545,6 +572,7 @@ export default function OrdersManagementDashboard() {
                     variant="outline"
                     onClick={() => handleBulkAction("BULK_GENERATE_PICKS")}
                     disabled={orderActionMutation.isPending}
+                    className="cursor-pointer"
                   >
                     Generate Pick Lists
                   </Button>
@@ -552,6 +580,7 @@ export default function OrdersManagementDashboard() {
                     size="sm"
                     variant="outline"
                     onClick={() => setSelectedOrders(new Set())}
+                    className="cursor-pointer"
                   >
                     Clear Selection
                   </Button>
@@ -584,7 +613,7 @@ export default function OrdersManagementDashboard() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-background border-b">
+                <thead className="bg-background border-b border-gray-200 dark:border-zinc-700">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <input
@@ -603,33 +632,33 @@ export default function OrdersManagementDashboard() {
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Order
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Customer
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Priority
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Qty
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Value
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Location
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-600">
+                <tbody className="bg-background divide-y divide-gray-200 dark:divide-zinc-700">
                   {orders.map((order) => (
                     <React.Fragment key={order.id}>
                       <tr className="hover:bg-background">
@@ -688,9 +717,9 @@ export default function OrdersManagementDashboard() {
                                 0
                               )}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            {/* <div className="text-xs text-gray-500">
                               {order.totalWeight.toFixed(1)} lbs
-                            </div>
+                            </div> */}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -717,7 +746,7 @@ export default function OrdersManagementDashboard() {
                                     handleOrderAction(action.action, order.id)
                                   }
                                   disabled={orderActionMutation.isPending}
-                                  className="text-xs px-2 py-1"
+                                  className="text-xs px-2 py-1 cursor-pointer"
                                 >
                                   {action.label}
                                 </Button>
@@ -729,7 +758,7 @@ export default function OrdersManagementDashboard() {
                                 onClick={() =>
                                   handleOrderAction("VIEW_DETAILS", order.id)
                                 }
-                                className="text-xs px-2 py-1"
+                                className="text-xs px-2 py-1 cursor-pointer"
                               >
                                 +{order.nextActions.length - 2}
                               </Button>
@@ -757,7 +786,7 @@ export default function OrdersManagementDashboard() {
                                         <div className="font-medium text-sm">
                                           {item.productName}
                                         </div>
-                                        <div className="text-xs text-gray-600">
+                                        <div className="text-xs text-gray-600 dark:text-gray-400">
                                           SKU: {item.sku}
                                         </div>
                                         <div className="flex justify-between text-xs mt-1">
@@ -860,11 +889,11 @@ export default function OrdersManagementDashboard() {
 
               {orders.length === 0 && (
                 <div className="text-center py-12">
-                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <Package className="w-16 h-16 text-gray-400 dark:text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-400 mb-2">
                     No orders found
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 dark:text-gray-400">
                     Try adjusting your filters or search terms.
                   </p>
                 </div>

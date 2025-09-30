@@ -20,6 +20,8 @@ import {
   Box,
 } from "lucide-react";
 
+import { toast } from "@/hooks/use-toast";
+
 interface ProductVariant {
   id: string;
   sku: string;
@@ -224,15 +226,23 @@ export default function SchemaEnhancedReceiving() {
         const result = await response.json();
         setReceivedItems([]);
         setError("");
-        alert(`Successfully received ${result.results.length} items!`);
+        toast({
+          title: "✅ Success",
+          description: `Successfully received ${result.results.length} items!`,
+        });
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to receive inventory");
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to receive items",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Finalize receiving error:", error);
       setError("Error finalizing receiving");
     } finally {
+      resetCurrentReceiving();
       setLoading(false);
     }
   };

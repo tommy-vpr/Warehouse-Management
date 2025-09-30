@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-// app/api/inventory/cycle-counts/campaigns/[id]/route.ts
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -66,6 +65,27 @@ export async function GET(
       );
     }
 
+    // Calculate accuracy using variance percentage method
+    let accuracy = 100;
+    const completedTasksWithData = campaign.tasks.filter(
+      (task) =>
+        task.variance !== null &&
+        task.systemQuantity > 0 &&
+        ["COMPLETED"].includes(task.status)
+    );
+
+    if (completedTasksWithData.length > 0) {
+      const totalAccuracy = completedTasksWithData.reduce((sum, task) => {
+        const taskAccuracy = Math.max(
+          0,
+          100 - (Math.abs(task.variance || 0) / task.systemQuantity) * 100
+        );
+        return sum + taskAccuracy;
+      }, 0);
+      accuracy =
+        Math.round((totalAccuracy / completedTasksWithData.length) * 10) / 10;
+    }
+
     // Calculate enhanced statistics
     const stats = {
       totalTasks: campaign.totalTasks,
@@ -82,27 +102,10 @@ export async function GET(
       ).length,
       skipped: campaign.tasks.filter((t) => t.status === "SKIPPED").length,
       variances: campaign.variancesFound,
-
-      // Calculate accuracy metrics
-      accuracy:
-        campaign.completedTasks > 0
-          ? ((campaign.completedTasks - campaign.variancesFound) /
-              campaign.completedTasks) *
-            100
-          : 0,
-
-      // Estimate time remaining
+      accuracy, // Use new calculation
       avgTaskTime: calculateAverageTaskTime(campaign.tasks),
       estimatedCompletion: estimateCompletion(campaign.tasks),
     };
-
-    // Calculate accuracy before returning
-    const accuracy =
-      campaign.completedTasks > 0
-        ? ((campaign.completedTasks - campaign.variancesFound) /
-            campaign.completedTasks) *
-          100
-        : 100;
 
     // Convert Prisma Decimal fields to numbers before returning
     const campaignWithNumbers = {
@@ -120,7 +123,7 @@ export async function GET(
 
     return NextResponse.json({
       ...campaignWithNumbers,
-      accuracy,
+      accuracy, // Use same accuracy value
       stats,
     });
   } catch (error) {
@@ -194,6 +197,51 @@ function calculateAverageTaskTime(tasks: any[]) {
   }, 0);
 
   return Math.round(totalTime / completedTasks.length / 1000 / 60); // Average in minutes
+}
+
+// DELETE /api/inventory/cycle-counts/campaigns/[id]
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const campaign = await prisma.cycleCountCampaign.findUnique({
+      where: { id: params.id },
+    });
+
+    // Check if campaign exists
+    if (!campaign) {
+      return NextResponse.json(
+        { error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Only allow deletion of PLANNED or CANCELLED campaigns
+    if (!["PLANNED", "CANCELLED", "COMPLETED"].includes(campaign.status)) {
+      return NextResponse.json(
+        { error: "Can only delete planned or cancelled campaigns" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.cycleCountCampaign.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting campaign:", error);
+    return NextResponse.json(
+      { error: "Failed to delete campaign" },
+      { status: 500 }
+    );
+  }
 }
 
 function estimateCompletion(tasks: any[]) {

@@ -335,10 +335,10 @@ export default function PickManagementDashboard() {
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-200">
                 Pick Management
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400">
                 Manage warehouse picking operations
               </p>
             </div>
@@ -359,7 +359,9 @@ export default function PickManagementDashboard() {
                   <Package className="w-8 h-8 text-blue-600" />
                   <div className="ml-4">
                     <p className="text-2xl font-bold">{stats.activeLists}</p>
-                    <p className="text-gray-600">Active Lists</p>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Active Lists
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -371,7 +373,9 @@ export default function PickManagementDashboard() {
                   <Users className="w-8 h-8 text-orange-600" />
                   <div className="ml-4">
                     <p className="text-2xl font-bold">{stats.inProgress}</p>
-                    <p className="text-gray-600">In Progress</p>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      In Progress
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -383,7 +387,9 @@ export default function PickManagementDashboard() {
                   <CheckCircle className="w-8 h-8 text-green-600" />
                   <div className="ml-4">
                     <p className="text-2xl font-bold">{stats.completedToday}</p>
-                    <p className="text-gray-600">Completed Today</p>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Completed Today
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -397,7 +403,9 @@ export default function PickManagementDashboard() {
                     <p className="text-2xl font-bold">
                       {stats.averageProgress}%
                     </p>
-                    <p className="text-gray-600">Avg Progress</p>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Avg Progress
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -430,7 +438,9 @@ export default function PickManagementDashboard() {
             <div className="flex justify-center items-center py-12 gap-2 mt-4">
               {/* <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div> */}
               <Loader className="animate-spin text2xl" />
-              <p className="text-gray-600">Loading pick lists...</p>
+              <p className="text-gray-600 dark:text-gray-400">
+                Loading pick lists...
+              </p>
             </div>
           ) : filteredPickLists.length === 0 ? (
             <div className="text-center py-12">
@@ -492,7 +502,9 @@ export default function PickManagementDashboard() {
 
                     {/* Orders */}
                     <div className="mb-4">
-                      <div className="text-sm text-gray-600 mb-1">Orders:</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Orders:
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         {pickList.orders.slice(0, 3).map((order) => (
                           <Badge
@@ -615,25 +627,33 @@ export default function PickManagementDashboard() {
                             0
                           )}
                         </div>
-                        <div className="text-sm text-gray-600">Total Qty</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Total Qty
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
                           {details.stats.pickedItems}
                         </div>
-                        <div className="text-sm text-gray-600">Picked</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Picked
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-purple-600">
                           {details.stats.totalItems}
                         </div>
-                        <div className="text-sm text-gray-600">Products</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Products
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-orange-600">
                           {details.stats.uniqueOrders.length}
                         </div>
-                        <div className="text-sm text-gray-600">Orders</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Orders
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-gray-900">
@@ -642,7 +662,9 @@ export default function PickManagementDashboard() {
                             currency: "USD",
                           }).format(details.stats.totalValue)}
                         </div>
-                        <div className="text-sm text-gray-600">Value</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Value
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -694,7 +716,7 @@ export default function PickManagementDashboard() {
                                 <div className="font-medium">
                                   {item.product.name}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
                                   SKU: {item.product.sku} | Location:{" "}
                                   {item.location.name}
                                 </div>
@@ -729,7 +751,7 @@ export default function PickManagementDashboard() {
                                 <div className="font-medium text-sm">
                                   {event.type.replace("_", " ").toLowerCase()}
                                 </div>
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
                                   by {event.user}
                                   {event.location && ` at ${event.location}`}
                                 </div>
@@ -761,7 +783,7 @@ export default function PickManagementDashboard() {
                                 <div className="font-medium mb-2">
                                   {orderNumber}
                                 </div>
-                                <div className="text-sm text-gray-600 mb-2">
+                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                   Customer: {firstItem?.order.customerName}
                                 </div>
                                 <div className="text-sm">

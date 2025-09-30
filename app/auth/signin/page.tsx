@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Package, AlertCircle, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -87,14 +88,18 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-blue-50 dark:bg-zinc-900 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Package className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">WMS</span>
+          <div className="relative w-18 h-18 sm:w-14 sm:h-14 m-auto">
+            <Image
+              src="/images/headquarter-logo.webp"
+              alt="HQ warehouse management"
+              fill
+              className="object-contain dark:invert"
+              sizes="(max-width: 640px) 32px, 48px"
+            />
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>
             Sign in to your warehouse management system
           </CardDescription>
@@ -141,7 +146,9 @@ export default function SignIn() {
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Or</span>
+              <span className="bg-background px-2 text-muted-foreground">
+                Or
+              </span>
             </div>
           </div>
 

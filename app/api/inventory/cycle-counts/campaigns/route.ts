@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const statusFilter = searchParams.get("status");
     const typeFilter = searchParams.get("type");
+    const productVariantId = searchParams.get("productVariantId"); // NEW
 
     // Build where clause for filtering campaigns
     const where: any = {};
@@ -34,6 +35,15 @@ export async function GET(request: NextRequest) {
       where.countType = typeFilter;
     }
 
+    // NEW: Filter by product variant
+    if (productVariantId) {
+      where.tasks = {
+        some: {
+          productVariantId: productVariantId,
+        },
+      };
+    }
+
     // Get campaigns with task statistics
     const campaigns = await prisma.cycleCountCampaign.findMany({
       where,
@@ -42,6 +52,8 @@ export async function GET(request: NextRequest) {
           select: {
             status: true,
             variance: true,
+            systemQuantity: true,
+            productVariantId: true, // Include this if needed
           },
         },
       },
@@ -51,14 +63,34 @@ export async function GET(request: NextRequest) {
     // Transform campaigns to include computed fields
     const campaignsWithStats = campaigns.map((campaign) => {
       const completedTasks = campaign.tasks.filter((task) =>
-        // ["COMPLETED", "SKIPPED"].includes(task.status)
-        // Don't include SKIPPED in accuracy
         ["COMPLETED"].includes(task.status)
       ).length;
 
       const variancesFound = campaign.tasks.filter(
         (task) => task.variance !== null && task.variance !== 0
       ).length;
+
+      // Calculate accuracy the same way as dashboard stats
+      let accuracy = 100;
+      const tasksWithVariance = campaign.tasks.filter(
+        (task) => task.variance !== null && ["COMPLETED"].includes(task.status)
+      );
+
+      if (tasksWithVariance.length > 0) {
+        const totalAccuracy = tasksWithVariance.reduce((sum, task) => {
+          const taskAccuracy =
+            task.systemQuantity > 0
+              ? Math.max(
+                  0,
+                  100 -
+                    (Math.abs(task.variance || 0) / task.systemQuantity) * 100
+                )
+              : 100;
+          return sum + taskAccuracy;
+        }, 0);
+        accuracy =
+          Math.round((totalAccuracy / tasksWithVariance.length) * 10) / 10;
+      }
 
       return {
         id: campaign.id,
@@ -71,6 +103,7 @@ export async function GET(request: NextRequest) {
         totalTasks: campaign.tasks.length,
         completedTasks,
         variancesFound,
+        accuracy, // Add this field
         createdAt: campaign.createdAt.toISOString(),
         updatedAt: campaign.updatedAt.toISOString(),
         createdBy: campaign.createdBy,
@@ -78,7 +111,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const stats = await calculateDashboardStats();
+    const stats = await calculateDashboardStats(productVariantId);
     return NextResponse.json({ campaigns: campaignsWithStats, stats });
   } catch (error) {
     console.error("Error fetching campaigns:", error);
@@ -450,11 +483,26 @@ export async function POST(request: NextRequest) {
 }
 
 // Dashboard statistics calculation function
-async function calculateDashboardStats() {
+async function calculateDashboardStats(productVariantId?: string | null) {
   try {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Build where clause for product filtering
+    const productFilter = productVariantId
+      ? {
+          tasks: {
+            some: {
+              productVariantId: productVariantId,
+            },
+          },
+        }
+      : {};
+
+    const taskProductFilter = productVariantId
+      ? { productVariantId: productVariantId }
+      : {};
 
     // Use Promise.all for better performance
     const [
@@ -465,22 +513,29 @@ async function calculateDashboardStats() {
       totalVariances,
       completedTasks,
     ] = await Promise.all([
-      prisma.cycleCountCampaign.count(),
+      prisma.cycleCountCampaign.count({
+        where: productFilter,
+      }),
 
       prisma.cycleCountCampaign.count({
-        where: { status: "ACTIVE" },
+        where: {
+          status: "ACTIVE",
+          ...productFilter,
+        },
       }),
 
       prisma.cycleCountCampaign.count({
         where: {
           status: "COMPLETED",
           endDate: { gte: weekAgo },
+          ...productFilter,
         },
       }),
 
       prisma.cycleCountTask.count({
         where: {
           OR: [{ status: "VARIANCE_REVIEW" }, { status: "RECOUNT_REQUIRED" }],
+          ...taskProductFilter,
         },
       }),
 
@@ -491,6 +546,7 @@ async function calculateDashboardStats() {
             { variance: { not: 0 } },
             { completedAt: { gte: monthAgo } },
           ],
+          ...taskProductFilter,
         },
       }),
 
@@ -499,6 +555,7 @@ async function calculateDashboardStats() {
           status: "COMPLETED",
           completedAt: { gte: monthAgo },
           variance: { not: null },
+          ...taskProductFilter,
         },
         select: {
           systemQuantity: true,
@@ -528,6 +585,7 @@ async function calculateDashboardStats() {
       by: ["status"],
       where: {
         createdAt: { gte: monthAgo },
+        ...taskProductFilter,
       },
       _count: true,
     });

@@ -122,7 +122,7 @@ export async function GET(
         order: item.order,
         product: {
           sku: item.productVariant.sku,
-          name: item.productVariant.product.name,
+          name: item.productVariant.name,
           costPrice: item.productVariant.costPrice,
           sellingPrice: item.productVariant.sellingPrice,
         },

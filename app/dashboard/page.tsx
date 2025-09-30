@@ -9,12 +9,10 @@ import {
   Settings,
   Scan,
   Plus,
-  Search,
   Bell,
-  User,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -30,6 +28,9 @@ import OrdersView from "@/components/OrdersView";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+
 // Mock data for demonstration
 const mockStats = {
   totalProducts: 1247,
@@ -38,68 +39,54 @@ const mockStats = {
   todayShipments: 89,
 };
 
-const mockRecentActivity = [
-  {
-    id: 1,
-    type: "order",
-    message: "Order #1001 received from Shopify",
-    time: "2 min ago",
-  },
-  {
-    id: 2,
-    type: "inventory",
-    message: "Stock adjusted for SKU-ABC123",
-    time: "5 min ago",
-  },
-  {
-    id: 3,
-    type: "shipment",
-    message: "Shipment #SH789 shipped via FedEx",
-    time: "12 min ago",
-  },
-  {
-    id: 4,
-    type: "scan",
-    message: "UPC 123456789012 scanned in location A1-B2",
-    time: "15 min ago",
-  },
-];
-
-const mockLowStockItems = [
-  {
-    sku: "ABC-123",
-    name: "Wireless Headphones",
-    current: 5,
-    minimum: 20,
-    location: "A1-B2",
-  },
-  {
-    sku: "DEF-456",
-    name: "Phone Case",
-    current: 2,
-    minimum: 15,
-    location: "B2-C1",
-  },
-  {
-    sku: "GHI-789",
-    name: "USB Cable",
-    current: 8,
-    minimum: 25,
-    location: "C1-A3",
-  },
-];
-
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showScanner, setShowScanner] = useState(false);
 
-  const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "inventory", label: "Inventory", icon: Package },
-    { id: "orders", label: "Orders", icon: ShoppingCart },
-    { id: "shipping", label: "Shipping", icon: Truck },
-    { id: "settings", label: "Settings", icon: Settings },
-  ];
+  const router = useRouter();
+
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/stats");
+      return res.json();
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: activity } = useQuery({
+    queryKey: ["dashboard-activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/activity");
+      return res.json();
+    },
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
+  const { data: lowStockItems } = useQuery({
+    queryKey: ["dashboard-low-stock"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard/low-stock");
+      return res.json();
+    },
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  // Replace mockStats with stats || defaultValues
+  const displayStats = stats || {
+    totalProducts: 0,
+    lowStock: 0,
+    pendingOrders: 0,
+    todayShipments: 0,
+  };
+
+  // Replace mockRecentActivity with activity || []
+  const displayActivity = activity || [];
+
+  // Replace mockLowStockItems with lowStockItems || []
+  const displayLowStockItems = lowStockItems || [];
+
+  console.log("Dashboard: ", displayLowStockItems);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -112,7 +99,7 @@ export default function Dashboard() {
       case "scan":
         return <Scan className="w-4 h-4 text-orange-500" />;
       default:
-        return <Bell className="w-4 h-4 text-gray-500" />;
+        return <Bell className="w-4 h-4 text-gray-500 dark:text-blue-500" />;
     }
   };
 
@@ -130,26 +117,24 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockStats.totalProducts.toLocaleString()}
+                {displayStats.totalProducts.toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground">
-                +12% from last month
-              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Low Stock Alerts
+              <CardTitle className="flex items-center justify-between">
+                Low Stock Items
+                <Badge variant="outline">{displayLowStockItems.length}</Badge>
               </CardTitle>
               <Badge variant="destructive" className="text-xs">
-                {mockStats.lowStock}
+                {displayStats.lowStock}
               </Badge>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {mockStats.lowStock}
+              <div className="text-2xl font-bold text-red-400">
+                {displayStats.lowStock}
               </div>
               <p className="text-xs text-muted-foreground">
                 Requires attention
@@ -166,7 +151,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockStats.pendingOrders}
+                {displayStats.pendingOrders}
               </div>
               <p className="text-xs text-muted-foreground">
                 Ready for fulfillment
@@ -183,11 +168,8 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockStats.todayShipments}
+                {displayStats.todayShipments}
               </div>
-              <p className="text-xs text-muted-foreground">
-                +5% from yesterday
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -200,19 +182,32 @@ export default function Dashboard() {
               <CardDescription>Latest warehouse operations</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {mockRecentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    {getActivityIcon(activity.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">
-                        {activity.message}
-                      </p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
+              {!activity ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+              ) : displayActivity.length > 0 ? (
+                <div className="space-y-4">
+                  {displayActivity.map((activity: any) => (
+                    <div
+                      key={activity.id}
+                      className="flex items-start space-x-3"
+                    >
+                      {getActivityIcon(activity.type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 dark:text-gray-200">
+                          {activity.message}
+                        </p>
+                        <p className="text-xs text-gray-500">{activity.time}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">No recent activity</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -221,36 +216,58 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Low Stock Items
-                <Badge variant="outline">{mockLowStockItems.length}</Badge>
+                <Badge variant="outline">{displayLowStockItems.length}</Badge>
               </CardTitle>
               <CardDescription>Items below minimum threshold</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {mockLowStockItems.map((item) => (
-                  <div
-                    key={item.sku}
-                    className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{item.name}</p>
-                      <p className="text-xs text-gray-600">
-                        SKU: {item.sku} • {item.location}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-red-600">
-                        {item.current}/{item.minimum}
-                      </p>
-                      <p className="text-xs text-gray-500">Current/Min</p>
-                    </div>
+              {!lowStockItems ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+              ) : displayLowStockItems.length > 0 ? (
+                <>
+                  <div className="space-y-3">
+                    {displayLowStockItems.map((item: any) => (
+                      <div
+                        key={item.sku}
+                        className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{item.name}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            SKU: {item.sku} • {item.location}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                            {item.current}/{item.minimum}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Current/Min
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <Button variant="outline" className="w-full mt-4">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Reorder List
-              </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() =>
+                      router.push(
+                        "/dashboard/purchasing/inventory?status=CRITICAL"
+                      )
+                    }
+                  >
+                    {/* <Plus className="w-4 h-4 mr-2" /> */}
+                    View All
+                  </Button>
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm">All items are well stocked</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

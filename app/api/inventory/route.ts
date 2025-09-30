@@ -17,7 +17,35 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const category = searchParams.get("category");
 
-    // Get inventory with all relations
+    // Pagination params
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const whereClause: any = {
+      ...(search && {
+        OR: [
+          {
+            productVariant: { sku: { contains: search, mode: "insensitive" } },
+          },
+          {
+            productVariant: { upc: { contains: search, mode: "insensitive" } },
+          },
+          {
+            productVariant: {
+              product: { name: { contains: search, mode: "insensitive" } },
+            },
+          },
+        ],
+      }),
+      ...(location !== "ALL" &&
+        location && {
+          location: { zone: location },
+        }),
+    };
+
+    // Fetch ALL matching inventory records (no skip/take yet)
     const inventoryRecords = await prisma.inventory.findMany({
       include: {
         productVariant: {
@@ -27,31 +55,7 @@ export async function GET(request: NextRequest) {
         },
         location: true,
       },
-      where: {
-        ...(search && {
-          OR: [
-            {
-              productVariant: {
-                sku: { contains: search, mode: "insensitive" },
-              },
-            },
-            {
-              productVariant: {
-                upc: { contains: search, mode: "insensitive" },
-              },
-            },
-            {
-              productVariant: {
-                product: { name: { contains: search, mode: "insensitive" } },
-              },
-            },
-          ],
-        }),
-        ...(location !== "ALL" &&
-          location && {
-            location: { zone: location },
-          }),
-      },
+      where: whereClause,
     });
 
     // Group by product variant and aggregate locations
@@ -60,9 +64,9 @@ export async function GET(request: NextRequest) {
 
       if (!acc[key]) {
         acc[key] = {
-          id: record.id,
+          inventoryId: record.id, // Use productVariantId as key
           productVariantId: record.productVariantId,
-          productName: record.productVariant.product.name,
+          productName: record.productVariant.name,
           sku: record.productVariant.sku,
           upc: record.productVariant.upc,
           costPrice: record.productVariant.costPrice?.toString(),
@@ -76,12 +80,12 @@ export async function GET(request: NextRequest) {
           locations: [],
           lastCounted: record.lastCounted,
           updatedAt: record.updatedAt,
-          category: "GENERAL", // You may want to add this to your schema
-          supplier: "Unknown", // You may want to add this to your schema
+          category: "GENERAL",
+          supplier: "Unknown",
         };
       }
 
-      // Aggregate quantities
+      // Aggregate quantities from ALL locations
       acc[key].quantityOnHand += record.quantityOnHand;
       acc[key].quantityReserved += record.quantityReserved;
       acc[key].quantityAvailable =
@@ -89,6 +93,7 @@ export async function GET(request: NextRequest) {
 
       // Add location info
       acc[key].locations.push({
+        inventoryId: record.id,
         locationId: record.locationId,
         locationName: record.location.name,
         quantity: record.quantityOnHand,
@@ -109,7 +114,7 @@ export async function GET(request: NextRequest) {
     }, {} as Record<string, any>);
 
     // Convert to array and calculate reorder status
-    const inventory = Object.values(groupedInventory).map((item: any) => {
+    let inventory = Object.values(groupedInventory).map((item: any) => {
       let reorderStatus = "OK";
 
       if (item.quantityAvailable <= 0) {
@@ -125,15 +130,62 @@ export async function GET(request: NextRequest) {
 
       return {
         ...item,
+        lastCounted: item.lastCounted?.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
         reorderStatus,
       };
     });
 
-    // Apply status filter
-    const filteredInventory = inventory.filter((item) => {
-      if (status === "ALL" || !status) return true;
-      return item.reorderStatus === status;
+    // Check for existing reorder requests
+    const variantIds = inventory.map((item) => item.productVariantId);
+
+    const reorderRequests = await prisma.inventoryTransaction.findMany({
+      where: {
+        productVariantId: { in: variantIds },
+        referenceType: "REORDER_REQUEST",
+      },
+      select: { productVariantId: true },
     });
+
+    const reorderRequestSet = new Set(
+      reorderRequests.map((req) => req.productVariantId)
+    );
+
+    // Apply status filter
+    if (status && status !== "ALL") {
+      inventory = inventory.filter((item) => item.reorderStatus === status);
+    }
+
+    inventory = inventory.map((item) => ({
+      ...item,
+      hasReorderRequest: reorderRequestSet.has(item.productVariantId),
+    }));
+
+    inventory.sort((a, b) => {
+      // Sort by stock status priority first (CRITICAL > LOW > OK > OVERSTOCK)
+      const statusPriority: Record<string, number> = {
+        OK: 0,
+        OVERSTOCK: 1,
+        LOW: 2,
+        CRITICAL: 3,
+      };
+
+      const statusDiff =
+        statusPriority[a.reorderStatus] - statusPriority[b.reorderStatus];
+      if (statusDiff !== 0) return statusDiff;
+
+      // Then sort by available quantity (lowest first)
+      const qtyDiff = a.quantityAvailable - b.quantityAvailable;
+      if (qtyDiff !== 0) return qtyDiff;
+
+      // Finally sort alphabetically by name
+      return a.productName.localeCompare(b.productName);
+    });
+
+    // NOW apply pagination to grouped results
+    const totalCount = inventory.length;
+    const totalPages = Math.ceil(totalCount / limit);
+    const paginatedInventory = inventory.slice(skip, skip + limit);
 
     // Calculate statistics
     const stats = {
@@ -150,15 +202,18 @@ export async function GET(request: NextRequest) {
       recentTransactions: await prisma.inventoryTransaction.count({
         where: {
           createdAt: {
-            gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
           },
         },
       }),
     };
 
     return NextResponse.json({
-      inventory: filteredInventory,
+      inventory: paginatedInventory,
       stats,
+      totalPages,
+      currentPage: page,
+      totalCount,
     });
   } catch (error) {
     console.error("Error fetching inventory:", error);

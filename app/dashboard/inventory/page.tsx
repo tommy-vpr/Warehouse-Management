@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,27 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import {
   Package,
   Search,
-  Filter,
-  Download,
   RefreshCw,
   AlertTriangle,
   TrendingDown,
   TrendingUp,
   Eye,
   BarChart3,
-  MapPin,
   Box,
-  Archive,
   ShoppingCart,
   Plus,
-  Minus,
   Edit,
   History,
+  Repeat2,
+  Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { InventorySkeleton } from "@/components/skeleton/Inventory";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
+import { CreateItemModal } from "@/components/modal/CreateItemModal";
 
 interface InventoryItem {
-  id: string;
+  inventoryId: string;
   productVariantId: string;
   productName: string;
   sku: string;
@@ -54,6 +56,7 @@ interface InventoryItem {
   category?: string;
   supplier?: string;
   updatedAt: string;
+  hasReorderRequest: boolean;
 }
 
 interface InventoryStats {
@@ -65,68 +68,107 @@ interface InventoryStats {
   recentTransactions: number;
 }
 
+interface InventoryResponse {
+  inventory: InventoryItem[];
+  stats: InventoryStats;
+  totalPages: number;
+  currentPage: number;
+  totalCount: number;
+}
+
 export default function InventoryDashboard() {
   const router = useRouter();
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [stats, setStats] = useState<InventoryStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [mounted, setMounted] = useState(false); // ✅ hydration guard
+  useEffect(() => setMounted(true), []);
+
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [locationFilter, setLocationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
-  const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
-    loadInventory();
-    const interval = setInterval(loadInventory, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, [searchTerm, locationFilter, statusFilter, categoryFilter]);
+    setCurrentPage(1);
+  }, [debouncedSearchTerm]);
 
-  const loadInventory = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (searchTerm) params.set("search", searchTerm);
-      if (locationFilter !== "ALL") params.set("location", locationFilter);
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-      if (categoryFilter !== "ALL") params.set("category", categoryFilter);
+  // Fetch inventory data with TanStack Query
+  const { data, isLoading, isFetching, isError, error } =
+    useQuery<InventoryResponse>({
+      queryKey: [
+        "inventory",
+        debouncedSearchTerm,
+        locationFilter,
+        statusFilter,
+        categoryFilter,
+        currentPage,
+      ],
+      queryFn: async () => {
+        const params = new URLSearchParams();
+        if (debouncedSearchTerm) params.set("search", debouncedSearchTerm);
+        if (locationFilter !== "ALL") params.set("location", locationFilter);
+        if (statusFilter !== "ALL") params.set("status", statusFilter);
+        if (categoryFilter !== "ALL") params.set("category", categoryFilter);
+        params.set("page", currentPage.toString());
+        params.set("limit", itemsPerPage.toString());
 
-      const response = await fetch(`/api/inventory?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setInventory(data.inventory);
-        setStats(data.stats);
+        const response = await fetch(`/api/inventory?${params}`);
+        if (!response.ok) throw new Error("Failed to fetch inventory");
+        return response.json();
+      },
+      staleTime: 30000,
+      refetchOnWindowFocus: false,
+      placeholderData: keepPreviousData,
+    });
+
+  const isFiltering = isFetching && data !== undefined;
+  const inventory = data?.inventory || [];
+  const stats = data?.stats;
+  const totalPages = data?.totalPages || 1;
+
+  // Mutation for inventory actions
+  const actionMutation = useMutation({
+    mutationFn: async ({
+      action,
+      itemId,
+      quantity,
+    }: {
+      action: string;
+      itemId: string;
+      quantity?: number;
+    }) => {
+      const response = await fetch("/api/inventory/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, itemId, quantity }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to perform action");
       }
-    } catch (error) {
-      console.error("Failed to load inventory:", error);
-    }
-    setIsLoading(false);
-  };
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+    onError: (error: Error) => {
+      alert(`Error: ${error.message}`);
+    },
+  });
 
   const handleQuickAction = async (
     action: string,
     itemId: string,
     quantity?: number
   ) => {
-    setIsPerformingAction(true);
-    try {
-      const response = await fetch("/api/inventory/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          itemId,
-          quantity,
-        }),
-      });
-
-      if (response.ok) {
-        await loadInventory();
-      }
-    } catch (error) {
-      console.error(`Failed to perform ${action}:`, error);
-    }
-    setIsPerformingAction(false);
+    actionMutation.mutate({ action, itemId, quantity });
   };
 
   const navigateToProduct = (productVariantId: string) => {
@@ -140,7 +182,7 @@ export default function InventoryDashboard() {
       case "LOW":
         return "bg-yellow-100 dark:bg-yellow-500 text-yellow-800 dark:text-yellow-900";
       case "CRITICAL":
-        return "bg-red-100 dark:bg-red-500 text-red-800 dark:text-red-900";
+        return "bg-red-100 dark:bg-red-400 text-red-800 dark:text-red-900";
       case "OVERSTOCK":
         return "bg-blue-100 dark:bg-blue-500 text-blue-800 dark:text-blue-900";
       default:
@@ -161,14 +203,41 @@ export default function InventoryDashboard() {
     }
   };
 
+  const handleFilterChange =
+    (setter: (value: string) => void) => (value: string) => {
+      setter(value);
+      setCurrentPage(1);
+    };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Box className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600 dark:text-gray-200">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">
             Loading inventory...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">
+            Error loading inventory: {error?.message}
+          </p>
+          <Button
+            onClick={() =>
+              queryClient.invalidateQueries({ queryKey: ["inventory"] })
+            }
+            className="mt-4"
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -184,24 +253,50 @@ export default function InventoryDashboard() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Inventory Management
               </h1>
-              <p className="text-gray-600 dark:text-gray-500">
+              <p className="text-gray-600 dark:text-gray-400">
                 Track stock levels, locations, and product details
               </p>
             </div>
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={loadInventory}
-                disabled={isLoading}
+                onClick={() =>
+                  queryClient.invalidateQueries({ queryKey: ["inventory"] })
+                }
+                disabled={mounted ? isLoading : false}
+                className="cursor-pointer transition"
+                // disabled={isFetching}
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    mounted && (isLoading || isFetching) ? "animate-spin" : ""
+                  }`}
+                />
                 Refresh
               </Button>
               <Button
+                className="cursor-pointer transition"
+                variant="outline"
                 onClick={() => router.push("/dashboard/inventory/receive")}
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4" />
                 Receive Stock
+              </Button>
+              <Button
+                className="cursor-pointer transition"
+                variant="outline"
+                onClick={() => router.push("/dashboard/inventory/count")}
+              >
+                <Repeat2 className="w-4 h-4" />
+                Cycle Count
+              </Button>
+              <Button
+                className="cursor-pointer transition"
+                variant="outline"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                New Item
               </Button>
             </div>
           </div>
@@ -209,68 +304,82 @@ export default function InventoryDashboard() {
           {/* Statistics Cards */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+              {/* totalProducts */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <Package className="w-6 h-6 text-blue-500" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.totalProducts}</p>
-                      <p className="text-xs text-gray-600">Products</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Products
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
+              {/* totalValue */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <BarChart3 className="w-6 h-6 text-green-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">
-                        ${stats.totalValue.toLocaleString()}
+                        $
+                        {mounted
+                          ? stats.totalValue.toLocaleString()
+                          : stats.totalValue}
                       </p>
-                      <p className="text-xs text-gray-600">Total Value</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Total Value
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
+              {/* lowStock */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <TrendingDown className="w-6 h-6 text-yellow-600" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.lowStock}</p>
-                      <p className="text-xs text-gray-600">Low Stock</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Low Stock
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
+              {/* outOfStock */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <AlertTriangle className="w-6 h-6 text-red-400" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.outOfStock}</p>
-                      <p className="text-xs text-gray-600">Out of Stock</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Out of Stock
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
+              {/* overstock */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <TrendingUp className="w-6 h-6 text-blue-500" />
                     <div className="ml-3">
                       <p className="text-lg font-bold">{stats.overstock}</p>
-                      <p className="text-xs text-gray-600">Overstock</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Overstock
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
+              {/* recentTransactions */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
@@ -279,7 +388,9 @@ export default function InventoryDashboard() {
                       <p className="text-lg font-bold">
                         {stats.recentTransactions}
                       </p>
-                      <p className="text-xs text-gray-600">Recent Moves</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Recent Moves
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -295,13 +406,15 @@ export default function InventoryDashboard() {
                 placeholder="Search by SKU, product name, or UPC..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 dark:border-gray-600"
+                className="pl-10 dark:border-zinc-700"
               />
             </div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) =>
+                handleFilterChange(setStatusFilter)(e.target.value)
+              }
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
               <option value="OK">In Stock</option>
@@ -311,8 +424,10 @@ export default function InventoryDashboard() {
             </select>
             <select
               value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) =>
+                handleFilterChange(setLocationFilter)(e.target.value)
+              }
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Locations</option>
               <option value="A">Zone A</option>
@@ -323,8 +438,10 @@ export default function InventoryDashboard() {
             </select>
             <select
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) =>
+                handleFilterChange(setCategoryFilter)(e.target.value)
+              }
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Categories</option>
               <option value="ELECTRONICS">Electronics</option>
@@ -338,246 +455,268 @@ export default function InventoryDashboard() {
         {/* Inventory Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Inventory Items ({inventory.length})</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/dashboard/inventory/count")}
-              >
-                <Archive className="w-4 h-4 mr-2" />
-                Cycle Count
-              </Button>
-            </CardTitle>
+            <CardTitle className="flex items-center">Inventory</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-background border-b dark:border-gray-700">
+                <thead className="bg-background border-b border-gray-200 dark:border-zinc-700">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Product
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Stock Level
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Location(s)
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Value
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Last Count
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-700">
-                  {inventory.map((item) => (
-                    <React.Fragment key={item.id}>
-                      <tr className="hover:bg-background cursor-pointer">
-                        <td
-                          className="px-4 py-4"
-                          onClick={() =>
-                            navigateToProduct(item.productVariantId)
-                          }
-                        >
-                          <div>
-                            <div className="font-medium text-blue-500 hover:text-blue-800 dark:text-gray-200 dark:hover:text-gray-300 transition">
-                              {item.productName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              SKU: {item.sku}
-                            </div>
-                            {item.upc && (
-                              <div className="text-xs text-gray-400">
-                                UPC: {item.upc}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div>
-                            <div className="font-medium">
-                              {item.quantityOnHand} on hand
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {item.quantityReserved} reserved
-                            </div>
-                            <div className="text-sm font-medium text-green-600">
-                              {item.quantityAvailable} available
-                            </div>
-                            {item.reorderPoint && (
-                              <div className="text-xs text-gray-400">
-                                Reorder at: {item.reorderPoint}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge
-                            className={getStockStatusColor(item.reorderStatus)}
+                {isFiltering ? (
+                  <InventorySkeleton />
+                ) : (
+                  <tbody className="bg-background divide-y divide-gray-200 dark:divide-zinc-700">
+                    {inventory.map((item) => (
+                      <React.Fragment key={item.inventoryId}>
+                        <tr className="hover:bg-background cursor-pointer">
+                          <td
+                            className="px-4 py-4"
+                            onClick={() =>
+                              navigateToProduct(item.productVariantId)
+                            }
                           >
-                            <span className="flex items-center">
-                              {getStockIcon(item.reorderStatus)}
-                              <span className="ml-1">{item.reorderStatus}</span>
-                            </span>
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="space-y-1">
-                            {item.locations.slice(0, 2).map((location) => (
-                              <div
-                                key={location.locationId}
-                                className="text-sm"
-                              >
-                                <span className="font-medium">
-                                  {location.locationName}
-                                </span>
-                                <span className="text-gray-500 ml-2">
-                                  ({location.quantity})
-                                </span>
+                            <div>
+                              <div className="font-medium text-blue-500 hover:text-blue-800 dark:text-gray-200 dark:hover:text-gray-300 transition">
+                                {item.productName}
                               </div>
-                            ))}
-                            {item.locations.length > 2 && (
-                              <div
-                                className="text-xs text-blue-500 cursor-pointer"
-                                onClick={() =>
-                                  setExpandedItem(
-                                    expandedItem === item.id ? null : item.id
-                                  )
-                                }
-                              >
-                                +{item.locations.length - 2} more locations
+                              <div className="text-sm text-gray-500">
+                                SKU: {item.sku}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div>
-                            {item.costPrice && (
-                              <div className="text-sm">
-                                Cost: ${item.costPrice}
+                              {item.upc && (
+                                <div className="text-xs text-gray-400">
+                                  UPC: {item.upc}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              <div className="font-medium">
+                                {item.quantityOnHand} on hand
                               </div>
-                            )}
-                            {item.sellingPrice && (
-                              <div className="text-sm font-medium">
-                                Sell: ${item.sellingPrice}
+                              <div className="text-sm text-gray-500">
+                                {item.quantityReserved} reserved
                               </div>
-                            )}
-                            {item.costPrice && (
-                              <div className="text-xs text-gray-500">
-                                Total: $
-                                {(
-                                  parseFloat(item.costPrice) *
-                                  item.quantityOnHand
-                                ).toFixed(2)}
+                              <div className="text-sm font-medium text-green-600">
+                                {item.quantityAvailable} available
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="text-sm">
-                            {item.lastCounted
-                              ? new Date(item.lastCounted).toLocaleDateString()
-                              : "Never"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                navigateToProduct(item.productVariantId)
-                              }
+                              {item.reorderPoint && (
+                                <div className="text-xs text-gray-400">
+                                  Reorder at: {item.reorderPoint}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <Badge
+                              className={getStockStatusColor(
+                                item.reorderStatus
+                              )}
                             >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const qty = prompt("Adjust quantity by:");
-                                if (qty)
-                                  handleQuickAction(
-                                    "ADJUST",
-                                    item.id,
-                                    parseInt(qty)
-                                  );
-                              }}
-                              disabled={isPerformingAction}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            {item.reorderStatus === "CRITICAL" && (
+                              <span className="flex items-center">
+                                {getStockIcon(item.reorderStatus)}
+                                <span className="ml-1">
+                                  {item.reorderStatus}
+                                </span>
+                              </span>
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="space-y-1">
+                              {item.locations.slice(0, 2).map((location) => (
+                                <div
+                                  key={location.locationId}
+                                  className="text-sm"
+                                >
+                                  <span className="font-medium">
+                                    {location.locationName}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">
+                                    ({location.quantity})
+                                  </span>
+                                </div>
+                              ))}
+                              {item.locations.length > 2 && (
+                                <div
+                                  className="text-xs text-blue-500 cursor-pointer"
+                                  onClick={() =>
+                                    setExpandedItem(
+                                      expandedItem === item.inventoryId
+                                        ? null
+                                        : item.inventoryId
+                                    )
+                                  }
+                                >
+                                  +{item.locations.length - 2} more locations
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              {item.costPrice ? (
+                                <div className="text-sm">
+                                  Cost: ${item.costPrice}
+                                </div>
+                              ) : (
+                                "---"
+                              )}
+                              {item.sellingPrice && (
+                                <div className="text-sm font-medium">
+                                  Sell: ${item.sellingPrice}
+                                </div>
+                              )}
+                              {item.costPrice && (
+                                <div className="text-xs text-gray-500">
+                                  Total: $
+                                  {(
+                                    parseFloat(item.costPrice) *
+                                    item.quantityOnHand
+                                  ).toFixed(2)}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="text-sm">
+                              {mounted && item.lastCounted ? (
+                                <>
+                                  <div>
+                                    {new Date(
+                                      item.lastCounted
+                                    ).toLocaleDateString()}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(
+                                      item.lastCounted
+                                    ).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                </>
+                              ) : (
+                                "Never"
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex gap-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() =>
-                                  handleQuickAction("REORDER", item.id)
+                                  navigateToProduct(item.productVariantId)
                                 }
-                                disabled={isPerformingAction}
                               >
-                                <ShoppingCart className="w-4 h-4" />
+                                <Eye className="w-4 h-4" />
                               </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Expanded Location Details */}
-                      {expandedItem === item.id && (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-4 bg-background">
-                            <div className="space-y-2">
-                              <h4 className="font-medium">All Locations:</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {item.locations.map((location) => (
-                                  <div
-                                    key={location.locationId}
-                                    className="bg-white p-3 rounded border"
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const qty = prompt("Adjust quantity by:");
+                                  if (qty)
+                                    handleQuickAction(
+                                      "ADJUST",
+                                      item.inventoryId,
+                                      parseInt(qty)
+                                    );
+                                }}
+                                disabled={actionMutation.isPending}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              {item.reorderStatus === "CRITICAL" &&
+                                !item.hasReorderRequest && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuickAction(
+                                        "REORDER",
+                                        item.inventoryId
+                                      )
+                                    }
+                                    disabled={actionMutation.isPending}
                                   >
-                                    <div className="font-medium">
-                                      {location.locationName}
-                                    </div>
-                                    <div className="text-sm text-gray-600">
-                                      Quantity: {location.quantity}
-                                    </div>
-                                    {location.zone && (
-                                      <div className="text-xs text-gray-500">
-                                        {location.zone}
-                                        {location.aisle &&
-                                          ` - ${location.aisle}`}
-                                        {location.shelf &&
-                                          ` - ${location.shelf}`}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                                    <ShoppingCart className="w-4 h-4" />
+                                  </Button>
+                                )}
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
+
+                        {/* Expanded Location Details */}
+                        {expandedItem === item.inventoryId && (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-4 bg-background">
+                              <div className="space-y-2">
+                                <h4 className="font-medium">All Locations:</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {item.locations.map((location) => (
+                                    <div
+                                      key={location.locationId}
+                                      className="bg-white p-3 rounded border"
+                                    >
+                                      <div className="font-medium">
+                                        {location.locationName}
+                                      </div>
+                                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                                        Quantity: {location.quantity}
+                                      </div>
+                                      {location.zone && (
+                                        <div className="text-xs text-gray-500">
+                                          {location.zone}
+                                          {location.aisle &&
+                                            ` - ${location.aisle}`}
+                                          {location.shelf &&
+                                            ` - ${location.shelf}`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                )}
               </table>
 
-              {inventory.length === 0 && (
+              {inventory.length === 0 && !isFiltering && (
                 <div className="text-center py-12">
                   <Box className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
                     No inventory found
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 dark:text-gray-400">
                     Try adjusting your filters or search terms.
                   </p>
                 </div>
@@ -585,7 +724,62 @@ export default function InventoryDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between py-3 mt-4">
+            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">
+              Showing page {currentPage} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || isFiltering}
+              >
+                Previous
+              </Button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum =
+                    currentPage <= 3
+                      ? i + 1
+                      : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="w-10"
+                      disabled={isFiltering}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage === totalPages || isFiltering}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
+      <CreateItemModal open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   Barcode,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface CycleCountTask {
   id: string;
@@ -84,119 +85,105 @@ interface CycleCountCampaign {
 export default function CycleCountInterface() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const campaignId = params.id;
 
-  const [campaign, setCampaign] = useState<CycleCountCampaign | null>(null);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [countInput, setCountInput] = useState("");
   const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [scanMode, setScanMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (campaignId) {
-      loadCampaign();
-    }
-  }, [campaignId]);
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [currentTaskIndex]);
-
-  const loadCampaign = async () => {
-    try {
+  // Fetch campaign data
+  const {
+    data: campaign,
+    isLoading,
+    isError,
+  } = useQuery<CycleCountCampaign>({
+    queryKey: ["cycle-count-campaign", campaignId],
+    queryFn: async () => {
       const response = await fetch(
         `/api/inventory/cycle-counts/campaigns/${campaignId}`
       );
-      if (response.ok) {
-        const data = await response.json();
-        setCampaign(data);
-
-        // Find first uncounted task
-        const firstUncounted = data.tasks.findIndex(
-          (task: CycleCountTask) =>
-            task.status === "PENDING" ||
-            task.status === "ASSIGNED" ||
-            task.status === "IN_PROGRESS"
-        );
-        if (firstUncounted !== -1) {
-          setCurrentTaskIndex(firstUncounted);
-        } else {
-          setCurrentTaskIndex(0);
-        }
-      } else {
-        router.push("/dashboard/inventory/count");
+      if (!response.ok) {
+        throw new Error("Campaign not found");
       }
-    } catch (error) {
-      console.error("Failed to load campaign:", error);
-      setError("Failed to load campaign data");
-      router.push("/dashboard/inventory/count");
-    }
-    setIsLoading(false);
-  };
+      return response.json();
+    },
+    enabled: !!campaignId,
+    staleTime: 10000, // 10 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+  });
 
-  const saveCount = async (
-    quantity: number | null,
-    taskNotes?: string,
-    skip = false
-  ) => {
-    if (!campaign) return;
-
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const currentTask = campaign.tasks[currentTaskIndex];
-      if (!currentTask) return;
-
+  // Submit count mutation
+  const countMutation = useMutation({
+    mutationFn: async (data: {
+      taskId: string;
+      countedQuantity: number | null;
+      notes: string;
+      skip: boolean;
+    }) => {
       const response = await fetch(
-        `/api/inventory/cycle-counts/tasks/${currentTask.id}/count`,
+        `/api/inventory/cycle-counts/tasks/${data.taskId}/count`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            countedQuantity: skip ? null : quantity,
-            notes: taskNotes || notes,
-            status: skip ? "SKIPPED" : undefined,
+            countedQuantity: data.skip ? null : data.countedQuantity,
+            notes: data.notes,
+            status: data.skip ? "SKIPPED" : undefined,
           }),
         }
       );
 
-      if (response.ok) {
-        const result = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save count");
+      }
 
-        // Update local state
-        setCampaign((prev) => {
-          if (!prev) return prev;
+      return response.json();
+    },
+    onSuccess: (result, variables) => {
+      // Update campaign cache with optimistic update
+      queryClient.setQueryData<CycleCountCampaign>(
+        ["cycle-count-campaign", campaignId],
+        (old) => {
+          if (!old) return old;
 
-          const updatedTasks = [...prev.tasks];
-          updatedTasks[currentTaskIndex] = {
-            ...updatedTasks[currentTaskIndex],
-            countedQuantity: skip ? undefined : quantity ?? undefined,
-            variance: result.variance,
-            status: result.task.status,
-            notes: taskNotes || notes,
-            completedAt: result.task.completedAt,
-            requiresRecount: result.requiresRecount || false,
-          };
+          const updatedTasks = old.tasks.map((task) =>
+            task.id === variables.taskId
+              ? {
+                  ...task,
+                  countedQuantity: variables.skip
+                    ? undefined
+                    : variables.countedQuantity ?? undefined,
+                  variance: result.variance,
+                  status: result.task.status,
+                  notes: variables.notes,
+                  completedAt: result.task.completedAt,
+                  requiresRecount: result.requiresRecount || false,
+                }
+              : task
+          );
 
           return {
-            ...prev,
+            ...old,
             tasks: updatedTasks,
             completedTasks: updatedTasks.filter(
               (t) => t.status === "COMPLETED" || t.status === "SKIPPED"
             ).length,
+            variancesFound: updatedTasks.filter(
+              (t) => t.variance !== undefined && t.variance !== 0
+            ).length,
           };
-        });
+        }
+      );
 
-        // Move to next task
+      // Move to next task
+      if (campaign) {
         const nextIndex = campaign.tasks.findIndex(
           (task, index) =>
             index > currentTaskIndex &&
@@ -207,38 +194,64 @@ export default function CycleCountInterface() {
           setCurrentTaskIndex(nextIndex);
           resetForm();
         } else {
-          await completeCampaign();
+          completeCampaignMutation.mutate();
         }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to save count");
       }
-    } catch (error) {
-      console.error("Failed to save count:", error);
-      setError("Failed to save count. Please try again.");
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  // Complete campaign mutation
+  const completeCampaignMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(
+        `/api/inventory/cycle-counts/campaigns/${campaignId}/complete`,
+        { method: "POST" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to complete campaign");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate the campaigns list query so it refetches with updated data
+      queryClient.invalidateQueries({ queryKey: ["cycle-count-campaigns"] });
+
+      // Then redirect
+      router.push("/dashboard/inventory/count");
+    },
+    onError: (error: Error) => {
+      setError(`Failed to complete campaign: ${error.message}`);
+    },
+  });
+
+  // Find first uncounted task when campaign loads
+  useEffect(() => {
+    if (campaign) {
+      const firstUncounted = campaign.tasks.findIndex(
+        (task) =>
+          task.status === "PENDING" ||
+          task.status === "ASSIGNED" ||
+          task.status === "IN_PROGRESS"
+      );
+      if (firstUncounted !== -1) {
+        setCurrentTaskIndex(firstUncounted);
+      }
     }
-    setIsSaving(false);
-  };
+  }, [campaign?.id]); // Only run when campaign ID changes
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [currentTaskIndex]);
 
   const resetForm = () => {
     setCountInput("");
     setNotes("");
     setError(null);
-  };
-
-  const completeCampaign = async () => {
-    try {
-      await fetch(
-        `/api/inventory/cycle-counts/campaigns/${campaignId}/complete`,
-        {
-          method: "POST",
-        }
-      );
-      router.push("/dashboard/inventory/count");
-    } catch (error) {
-      console.error("Failed to complete campaign:", error);
-      setError("Failed to complete campaign.");
-    }
   };
 
   const handleSubmitCount = () => {
@@ -247,7 +260,6 @@ export default function CycleCountInterface() {
 
     setError(null);
 
-    // Validate input
     if (!countInput.trim()) {
       setError("Please enter a quantity or skip this task");
       inputRef.current?.focus();
@@ -267,8 +279,12 @@ export default function CycleCountInterface() {
       return;
     }
 
-    // Save the count
-    saveCount(quantity, notes, false);
+    countMutation.mutate({
+      taskId: currentTask.id,
+      countedQuantity: quantity,
+      notes: notes,
+      skip: false,
+    });
   };
 
   const handleSkipTask = () => {
@@ -280,14 +296,19 @@ export default function CycleCountInterface() {
     );
     if (!confirmed) return;
 
-    saveCount(null, notes || "Task skipped by user", true);
+    countMutation.mutate({
+      taskId: currentTask.id,
+      countedQuantity: null,
+      notes: notes || "Task skipped by user",
+      skip: true,
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !isSaving) {
+    if (e.key === "Enter" && !countMutation.isPending) {
       e.preventDefault();
       handleSubmitCount();
-    } else if (e.key === "Escape" && !isSaving) {
+    } else if (e.key === "Escape" && !countMutation.isPending) {
       e.preventDefault();
       handleSkipTask();
     }
@@ -299,7 +320,6 @@ export default function CycleCountInterface() {
     tolerance: number = 5
   ) => {
     if (variance === 0) return "text-green-600";
-
     const percentVariance = Math.abs((variance / systemQty) * 100);
     if (percentVariance <= tolerance) return "text-yellow-600";
     return "text-red-400";
@@ -339,7 +359,7 @@ export default function CycleCountInterface() {
     );
   }
 
-  if (!campaign) {
+  if (isError || !campaign) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
@@ -539,15 +559,15 @@ export default function CycleCountInterface() {
                         onKeyDown={handleKeyPress}
                         placeholder="Enter quantity found"
                         className="text-lg h-12"
-                        disabled={isSaving}
+                        disabled={countMutation.isPending}
                       />
                     </div>
                     <Button
                       onClick={handleSubmitCount}
-                      disabled={!countInput || isSaving}
+                      disabled={!countInput || countMutation.isPending}
                       className="h-12 px-6"
                     >
-                      {isSaving ? (
+                      {countMutation.isPending ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
@@ -568,12 +588,14 @@ export default function CycleCountInterface() {
                               (estimatedVariance / currentTask.systemQuantity) *
                                 100
                             ) <= (currentTask.tolerancePercentage || 5)
-                          ? "bg-yellow-50 border border-yellow-200"
+                          ? "bg-yellow-50 border border-yellow-200 dark:bg-yellow-800/30 dark:border-yellow-400"
                           : "bg-red-50 border border-red-200 dark:bg-red-800/30 dark:border-red-500"
                       }`}
                     >
-                      <div className="flex items-center justify-between text-gray-700">
-                        <span className="text-sm font-medium">Variance:</span>
+                      <div className="flex items-center justify-between text-gray-700 dark:text-gray-200">
+                        <span className="text-sm font-medium dark:text-gray-200">
+                          Variance:
+                        </span>
                         <span
                           className={`font-bold ${getVarianceColor(
                             estimatedVariance,
@@ -618,7 +640,7 @@ export default function CycleCountInterface() {
                   <Button
                     variant="outline"
                     onClick={handleSkipTask}
-                    disabled={isSaving}
+                    disabled={countMutation.isPending}
                     className="flex-1"
                   >
                     <SkipForward className="w-4 h-4 mr-2" />
@@ -633,7 +655,7 @@ export default function CycleCountInterface() {
                       }
                     }}
                     variant="outline"
-                    disabled={isSaving}
+                    disabled={countMutation.isPending}
                     className="flex-1"
                   >
                     <AlertCircle className="w-4 h-4 mr-2" />

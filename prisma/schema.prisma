@@ -52,17 +52,17 @@ model User {
   role                  UserRole               @default(STAFF)
   accounts              Account[]
   sessions              Session[]
-  inventoryTransactions InventoryTransaction[] // Added missing relation
+  inventoryTransactions InventoryTransaction[]
+  assignedPickLists     PickList[]
+  pickedItems           PickListItem[]
+  pickEvents            PickEvent[]
+  statusChanges         OrderStatusHistory[]
+  assignedCountTasks    CycleCountTask[]
+  countEvents           CycleCountEvent[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  assignedPickLists PickList[]     @relation()
-  pickedItems       PickListItem[] @relation()
-  pickEvents        PickEvent[]
 
   @@map("users")
-  statusChanges     OrderStatusHistory[]
-  assignedCountTasks CycleCountTask[]
-  countEvents        CycleCountEvent[]
 }
 
 enum UserRole {
@@ -79,13 +79,22 @@ model Product {
   name             String
   description      String?
   shopifyProductId String?          @unique
+  
+  // Enhanced product fields
+  brand            String?
+  category         String?
+  productLine      String?          // "Skwezed ICE", "Skwezed Salt", etc.
+  flavor           String?          // "Banana", "Blue Razz", etc.
+  
   variants         ProductVariant[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  @@index([brand])
+  @@index([category])
+  @@index([productLine])
+  @@index([flavor])
   @@map("products")
-  brand         String?
-  category      String?
 }
 
 model ProductVariant {
@@ -94,45 +103,92 @@ model ProductVariant {
   sku                   String                 @unique
   upc                   String?                @unique
   name                  String
+  
+  // Pricing
   costPrice             Decimal?               @db.Decimal(10, 2)
   sellingPrice          Decimal?               @db.Decimal(10, 2)
-  weight                Decimal?               @db.Decimal(8, 2)
-  dimensions            Json?
+  
+  // Physical characteristics (single unit)
+  weight                Decimal?               @db.Decimal(8, 2)  // Weight in grams
+  dimensions            Json?                  // Enhanced JSON with unit + master case data
+  
+  // Product specifications
+  volume                String?                // "100ml", "30ml"
+  strength              String?                // "00mg", "03mg", "06mg", "25mg", "50mg"
+  
+  // Master Case Information
+  masterCaseQty         Int?                   // Quantity per master case (usually 100)
+  masterCaseWeight      Decimal?               @db.Decimal(8, 2)  // MC weight in grams
+  masterCaseDimensions  Json?                  // MC dimensions object
+  
+  // Enhanced variant attributes
+  hasIce                Boolean                @default(false)
+  hasSalt               Boolean                @default(false)
+  isNicotineFree        Boolean                @default(false)
+  flavor                String?                // Extracted flavor
+  productLine           String?                // Product line for this variant
+  
+  // Existing fields
   shopifyVariantId      String?                @unique
+  category              String?     
+  supplier              String?
+  barcode               String?
+  
+  // Relations
   product               Product                @relation(fields: [productId], references: [id])
   inventory             Inventory[]
   orderItems            OrderItem[]
-  inventoryTransactions InventoryTransaction[] // Added missing relation
+  inventoryTransactions InventoryTransaction[]
+  pickListItems         PickListItem[]
+  countTasks            CycleCountTask[]
+  purchaseOrderItems    PurchaseOrderItem[]
+  
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  pickListItems         PickListItem[]
 
+  @@index([volume])
+  @@index([strength])
+  @@index([hasIce])
+  @@index([hasSalt])
+  @@index([flavor])
+  @@index([productLine])
   @@map("product_variants")
-  countTasks         CycleCountTask[]
-  category      String?     
-  supplier      String?
-  barcode       String?
 }
 
 model Location {
   id                    String                 @id @default(cuid())
-  name                  String                 @unique
-  type                  LocationType           @default(GENERAL) // Added type field
+  name                  String                 @unique // "1-A-2-B-2-X" format
+  
+  // Enhanced location fields
+  warehouseNumber       Int?                   // WH column (1, 2, 3, etc.)
+  aisle                 String?                // AISLE column (A, B, C, etc.)
+  bay                   Int?                   // BAY column (1, 2, 3, etc.)
+  tier                  String?                // TIER column (A, B, C, etc.)
+  space                 Int?                   // SPACE column (1, 2, 3, etc.)
+  bin                   String?                // BIN column (X, Y, Z, etc.)
+  barcode               String?                @unique // Barcode for scanning
+  
+  // Existing fields
+  type                  LocationType           @default(GENERAL)
   zone                  String?
-  aisle                 String?
-  shelf                 String?
-  bin                   String?
+  shelf                 String?                // Legacy field, can be deprecated
   isPickable            Boolean                @default(true)
   isReceivable          Boolean                @default(true)
+  
+  // Relations
   inventory             Inventory[]
-  inventoryTransactions InventoryTransaction[] // Added missing relation
+  inventoryTransactions InventoryTransaction[]
+  pickListItems         PickListItem[]
+  countTasks            CycleCountTask[]
+  
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  pickListItems     PickListItem[]
-  barcode       String?
 
+  @@index([warehouseNumber, aisle, bay, tier, space, bin])
+  @@index([warehouseNumber, aisle])
+  @@index([barcode])
+  @@index([type])
   @@map("locations")
-  countTasks         CycleCountTask[]
 }
 
 enum LocationType {
@@ -149,13 +205,21 @@ model Inventory {
   id               String         @id @default(cuid())
   productVariantId String
   locationId       String
+  
+  // Unit-level inventory
   quantityOnHand   Int            @default(0)
   quantityReserved Int            @default(0)
+  
+  // Case-level inventory (optional)
+  casesOnHand      Int?           @default(0)    // Full cases available
+  casesReserved    Int?           @default(0)    // Full cases reserved
+  
   reorderPoint     Int?
   maxQuantity      Int?
+  lastCounted      DateTime?
+  
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
   location         Location       @relation(fields: [locationId], references: [id])
-  lastCounted      DateTime?
   updatedAt        DateTime       @updatedAt
 
   @@unique([productVariantId, locationId])
@@ -173,28 +237,28 @@ model Order {
   totalAmount     Decimal     @db.Decimal(10, 2)
   shippingAddress Json
   billingAddress  Json?
-  items           OrderItem[]
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  pickListItems   PickListItem[]
   
-  // Existing shipping fields
+  // Shipping fields
   trackingNumber    String?
   trackingUrl       String?  
   shippedAt         DateTime?
   shippingStatus    String?
-  
-  // ADD THESE NEW FIELDS:
   shippingCost      String?     // Store as string to preserve decimal precision
   shippingCarrier   String?     // usps, fedex, ups, etc.
   shippingService   String?     // usps_ground_advantage, fedex_ground, etc.
   labelUrl          String?     // Direct link to shipping label
   notes             String?     // Packing/shipping notes
-
+  
+  // Relations
+  items           OrderItem[]
+  pickListItems   PickListItem[]
   packages        ShippingPackage[]
+  statusHistory   OrderStatusHistory[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@map("orders")
-  statusHistory     OrderStatusHistory[]
 }
 
 model OrderStatusHistory {
@@ -218,7 +282,7 @@ model OrderItem {
   productVariantId String
   quantity         Int
   unitPrice        Decimal        @db.Decimal(10, 2)
-  totalPrice       Decimal        @db.Decimal(10, 2) // Added total price field
+  totalPrice       Decimal        @db.Decimal(10, 2)
   order            Order          @relation(fields: [orderId], references: [id])
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
 
@@ -271,25 +335,22 @@ enum TransactionType {
 // 🚚 Picking System Models
 // ---------------------------------------------------
 
-// Add these models to your existing prisma/schema.prisma
-
-// Pick Lists - Batched picking assignments
 model PickList {
-  id          String    @id @default(cuid())
-  batchNumber String    @unique
+  id          String     @id @default(cuid())
+  batchNumber String     @unique
   status      PickStatus @default(PENDING)
-  assignedTo  String?   // User ID of assigned picker
-  priority    Int       @default(0)
+  assignedTo  String?    // User ID of assigned picker
+  priority    Int        @default(0)
   totalItems  Int
-  pickedItems Int       @default(0)
+  pickedItems Int        @default(0)
   startTime   DateTime?
   endTime     DateTime?
   notes       String?
   
   // Relations
-  items       PickListItem[]
-  events      PickEvent[]
-  assignedUser User?     @relation(fields: [assignedTo], references: [id])
+  items        PickListItem[]
+  events       PickEvent[]
+  assignedUser User?          @relation(fields: [assignedTo], references: [id])
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -297,7 +358,6 @@ model PickList {
   @@map("pick_lists")
 }
 
-// Individual items within a pick list
 model PickListItem {
   id               String         @id @default(cuid())
   pickListId       String
@@ -314,17 +374,16 @@ model PickListItem {
   notes            String?
   
   // Relations
-  pickList         PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
-  order            Order          @relation(fields: [orderId], references: [id])
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
-  location         Location       @relation(fields: [locationId], references: [id])
-  picker           User?          @relation(fields: [pickedBy], references: [id])
+  pickList       PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  order          Order          @relation(fields: [orderId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  location       Location       @relation(fields: [locationId], references: [id])
+  picker         User?          @relation(fields: [pickedBy], references: [id])
   
   @@unique([pickListId, orderId, productVariantId, locationId])
   @@map("pick_list_items")
 }
 
-// Audit trail for pick events
 model PickEvent {
   id          String        @id @default(cuid())
   pickListId  String
@@ -344,7 +403,6 @@ model PickEvent {
   @@map("pick_events")
 }
 
-// Enums for picking system
 enum PickStatus {
   PENDING
   ASSIGNED
@@ -401,7 +459,10 @@ model ShippingPackage {
   @@map("shipping_packages")
 }
 
-// Cycle Count Campaigns - Overall counting initiatives
+// ---------------------------------------------------
+// 📊 Cycle Counting System Models
+// ---------------------------------------------------
+
 model CycleCountCampaign {
   id          String              @id @default(cuid())
   name        String
@@ -478,7 +539,6 @@ model CycleCountTask {
   @@map("cycle_count_tasks")
 }
 
-// Audit trail for counting events
 model CycleCountEvent {
   id              String            @id @default(cuid())
   taskId          String
@@ -500,7 +560,6 @@ model CycleCountEvent {
   @@map("cycle_count_events")
 }
 
-// Enums for cycle counting
 enum CycleCountType {
   FULL              // Count everything
   PARTIAL           // Count specific items/locations
@@ -552,4 +611,35 @@ enum CountFrequency {
   QUARTERLY
   ANNUALLY
   AD_HOC
+}
+
+model PurchaseOrder {
+  id          String   @id @default(cuid())
+  poNumber    String   @unique // e.g. "PO-202509-226"
+  supplier    String
+  status      String   @default("DRAFT") // or enum
+  orderDate   DateTime @default(now())
+  expectedDate DateTime?
+  totalAmount Decimal  @db.Decimal(10,2)
+
+  // Relations
+  items       PurchaseOrderItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String         @id @default(cuid())
+  purchaseOrderId  String
+  productVariantId String
+  quantity         Int
+  unitCost         Decimal @db.Decimal(10,2)
+  totalCost        Decimal @db.Decimal(10,2)
+
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@map("purchase_order_items")
 }

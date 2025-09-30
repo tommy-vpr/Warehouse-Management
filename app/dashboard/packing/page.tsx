@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertTriangle,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -126,7 +127,7 @@ export default function PackStationDashboard() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
           <p className="text-gray-600">Loading pack station...</p>
         </div>
       </div>

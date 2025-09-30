@@ -100,13 +100,66 @@ export async function POST(
         },
       });
 
-      // If variance exists and doesn't require recount, create inventory transaction
-      if (
-        variance !== null &&
-        variance !== 0 &&
-        !requiresRecount &&
-        task.productVariantId
-      ) {
+      // ⭐ ALWAYS update lastCounted for completed counts (even with zero variance)
+      if (task.productVariantId && status !== "SKIPPED") {
+        await tx.inventory.updateMany({
+          where: {
+            productVariantId: task.productVariantId,
+            locationId: task.locationId,
+          },
+          data: {
+            lastCounted: new Date(),
+          },
+        });
+      }
+
+      // THEN handle variance adjustments separately (only if variance exists)
+      // if (
+      //   variance !== null &&
+      //   variance !== 0 &&
+      //   !requiresRecount &&
+      //   task.productVariantId
+      // ) {
+      //   await tx.inventoryTransaction.create({
+      //     data: {
+      //       productVariantId: task.productVariantId,
+      //       locationId: task.locationId,
+      //       transactionType: "COUNT",
+      //       quantityChange: variance,
+      //       referenceId: taskId,
+      //       referenceType: "CYCLE_COUNT",
+      //       userId: session.user.id,
+      //       notes: `Cycle count adjustment: ${
+      //         notes || "Count variance recorded"
+      //       }`,
+      //     },
+      //   });
+
+      //   // Update inventory quantity (upsert to handle cases where inventory record doesn't exist)
+      //   await tx.inventory.upsert({
+      //     where: {
+      //       productVariantId_locationId: {
+      //         productVariantId: task.productVariantId,
+      //         locationId: task.locationId,
+      //       },
+      //     },
+      //     update: {
+      //       quantityOnHand: {
+      //         increment: variance,
+      //       },
+      //     },
+      //     create: {
+      //       productVariantId: task.productVariantId,
+      //       locationId: task.locationId,
+      //       quantityOnHand: countedQuantity || 0,
+      //       lastCounted: new Date(),
+      //     },
+      //   });
+      // }
+
+      // THEN handle variance adjustments separately (only if variance exists)
+      if (variance !== null && variance !== 0 && task.productVariantId) {
+        // Create inventory transaction
         await tx.inventoryTransaction.create({
           data: {
             productVariantId: task.productVariantId,
@@ -118,7 +171,7 @@ export async function POST(
             userId: session.user.id,
             notes: `Cycle count adjustment: ${
               notes || "Count variance recorded"
-            }`,
+            }${requiresRecount ? " (Recount required - high variance)" : ""}`,
           },
         });
 

@@ -2,7 +2,7 @@
 import { createAdminApiClient } from "@shopify/admin-api-client";
 
 const client = createAdminApiClient({
-  storeDomain: "vpr-collection.myshopify.com",
+  storedomain: "vpr-collection.myshopify.com",
   apiVersion: process.env.SHOPIFY_API_VERSION!,
   accessToken: process.env.SHOPIFY_ACCESS_TOKEN!,
 });

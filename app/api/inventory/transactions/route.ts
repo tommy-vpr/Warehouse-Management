@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const {
       productVariantId,
       locationId,
+      toLocationId,
       transactionType,
       quantityChange,
       notes,
@@ -29,9 +30,108 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate transfer requires both locations
+    if (transactionType === "TRANSFER" && (!locationId || !toLocationId)) {
+      return NextResponse.json(
+        { error: "Transfer requires both source and destination locations" },
+        { status: 400 }
+      );
+    }
+
     // Start a transaction to ensure data consistency
     const result = await prisma.$transaction(async (tx) => {
-      // Create the inventory transaction
+      // Handle TRANSFER separately
+      if (transactionType === "TRANSFER" && locationId && toLocationId) {
+        // 1. Check source inventory
+        const sourceInventory = await tx.inventory.findUnique({
+          where: {
+            productVariantId_locationId: {
+              productVariantId,
+              locationId,
+            },
+          },
+        });
+
+        if (!sourceInventory) {
+          throw new Error("Source location has no inventory");
+        }
+
+        if (sourceInventory.quantityOnHand < quantityChange) {
+          throw new Error(
+            `Insufficient inventory at source location. Available: ${sourceInventory.quantityOnHand}, Requested: ${quantityChange}`
+          );
+        }
+
+        // 2. Deduct from source location
+        await tx.inventory.update({
+          where: { id: sourceInventory.id },
+          data: {
+            quantityOnHand: sourceInventory.quantityOnHand - quantityChange,
+            updatedAt: new Date(),
+          },
+        });
+
+        // 3. Add to destination location
+        const destInventory = await tx.inventory.findUnique({
+          where: {
+            productVariantId_locationId: {
+              productVariantId,
+              locationId: toLocationId,
+            },
+          },
+        });
+
+        if (destInventory) {
+          await tx.inventory.update({
+            where: { id: destInventory.id },
+            data: {
+              quantityOnHand: destInventory.quantityOnHand + quantityChange,
+              updatedAt: new Date(),
+            },
+          });
+        } else {
+          await tx.inventory.create({
+            data: {
+              productVariantId,
+              locationId: toLocationId,
+              quantityOnHand: quantityChange,
+              quantityReserved: 0,
+            },
+          });
+        }
+
+        // 4. Get location names for better notes
+        const [fromLoc, toLoc] = await Promise.all([
+          tx.location.findUnique({
+            where: { id: locationId },
+            select: { name: true },
+          }),
+          tx.location.findUnique({
+            where: { id: toLocationId },
+            select: { name: true },
+          }),
+        ]);
+
+        // 5. Create transaction record
+        const transaction = await tx.inventoryTransaction.create({
+          data: {
+            productVariantId,
+            locationId, // From location
+            transactionType: "TRANSFER",
+            quantityChange: -quantityChange, // Negative for source
+            userId: session.user.id,
+            notes: `Transferred ${quantityChange} units from ${
+              fromLoc?.name
+            } to ${toLoc?.name}${notes ? `: ${notes}` : ""}`,
+            referenceType: referenceType || "MANUAL_TRANSFER",
+            referenceId: toLocationId, // Store destination in referenceId
+          },
+        });
+
+        return transaction;
+      }
+
+      // Handle ADJUSTMENT and COUNT (existing logic)
       const transaction = await tx.inventoryTransaction.create({
         data: {
           productVariantId,
@@ -131,6 +231,11 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
+    }
+
+    // Return the actual error message for validation errors
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json(

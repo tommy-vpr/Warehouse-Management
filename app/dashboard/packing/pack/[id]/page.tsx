@@ -280,7 +280,7 @@ export default function PackingInterface() {
             <Button
               onClick={markOrderAsPacked}
               disabled={isPacking}
-              className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
+              className="w-full h-12 text-lg bg-green-600 hover:bg-green-700 cursor-pointer"
             >
               {isPacking ? (
                 <>

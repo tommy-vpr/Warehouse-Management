@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Home,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -164,6 +165,8 @@ export default function MobilePickingInterface() {
     };
   }, [pickList, currentItemIndex]);
 
+  console.log(pickList);
+
   // Auto-advance to next pending item when data updates
   React.useEffect(() => {
     if (!pickList) return;
@@ -282,7 +285,7 @@ export default function MobilePickingInterface() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
           <p className="text-gray-600">Loading pick list...</p>
         </div>
       </div>
@@ -320,7 +323,7 @@ export default function MobilePickingInterface() {
           <p className="text-green-700 mb-6">
             All items have been processed for {pickList.pickList.batchNumber}
           </p>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-4">
             <Link
               href="/dashboard"
               className="m-auto rounded w-fit px-4 py-2 flex gap-2 items-center justify-center bg-zinc-900 text-white"
@@ -328,7 +331,11 @@ export default function MobilePickingInterface() {
               <Home className="w-4 h-4 mr-2" />
               Return to Dashboard
             </Link>
-            <Link href={`/dashboard/packing/pack/${currentItem?.order.id}`}>
+            <Link
+              href={`/dashboard/packing/pack/${currentItem?.order.id}`}
+              className="m-auto rounded w-fit px-4 py-2 flex gap-2 items-center justify-center bg-green-400 text-green-900"
+            >
+              <Package className="w-4 h-4 mr-2" />
               Pack Order
             </Link>
           </div>

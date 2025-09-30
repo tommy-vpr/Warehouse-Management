@@ -127,7 +127,7 @@ export async function POST(
         }
       }
 
-      // Update order status to DELIVERED
+      // Update order status to DELIVEred
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: {

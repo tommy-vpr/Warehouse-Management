@@ -1,7 +1,6 @@
-// app/dashboard/inventory/count/[id]/results/page.tsx - Campaign Results Page
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +15,10 @@ import {
   Package,
   MapPin,
   Calendar,
-  User,
-  BarChart3,
+  Loader2,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 interface CampaignResults {
   id: string;
@@ -57,38 +56,38 @@ export default function CampaignResults() {
   const router = useRouter();
   const campaignId = params.id;
 
-  const [results, setResults] = useState<CampaignResults | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [reporting, setReporting] = useState(false);
+
   const [viewFilter, setViewFilter] = useState<
     "ALL" | "VARIANCES" | "COMPLETED"
   >("ALL");
 
-  useEffect(() => {
-    if (campaignId) {
-      loadResults();
-    }
-  }, [campaignId]);
-
-  const loadResults = async () => {
-    try {
+  // Fetch campaign results
+  const {
+    data: results,
+    isLoading,
+    isError,
+  } = useQuery<CampaignResults>({
+    queryKey: ["campaign-results", campaignId],
+    queryFn: async () => {
       const response = await fetch(
         `/api/inventory/cycle-counts/campaigns/${campaignId}?includeCompleted=true`
       );
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data);
-      } else {
-        router.push("/dashboard/inventory/count");
+      if (!response.ok) {
+        throw new Error("Campaign not found");
       }
-    } catch (error) {
-      console.error("Failed to load campaign results:", error);
-      router.push("/dashboard/inventory/count");
-    }
-    setIsLoading(false);
-  };
+      return response.json();
+    },
+    enabled: !!campaignId,
+    staleTime: 60000, // 1 minute - results don't change often
+  });
+
+  console.log(results);
 
   const exportResults = async () => {
     try {
+      setExporting(true);
       const response = await fetch(
         `/api/inventory/cycle-counts/campaigns/${campaignId}/export`
       );
@@ -105,15 +104,64 @@ export default function CampaignResults() {
       }
     } catch (error) {
       console.error("Failed to export results:", error);
+    } finally {
+      setExporting(false);
     }
+  };
+
+  const generateReport = async () => {
+    try {
+      setReporting(true);
+      const response = await fetch(
+        `/api/inventory/cycle-counts/campaigns/${campaignId}/report`
+      );
+
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cycle-count-report-${results?.name}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error("Failed to generate report:", await response.text());
+      }
+    } catch (error) {
+      console.error("Error generating report:", error);
+    } finally {
+      setReporting(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
+        return "bg-green-100 text-green-800 dark:bg-green-500 dark:text-green-900";
+      case "VARIANCE_REVIEW":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-500 dark:text-orange-900";
+      case "RECOUNT_REQUIred":
+        return "bg-red-100 text-red-800 dark:bg-red-500 dark:text-red-900";
+      case "SKIPPED":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-500 dark:text-purple-900";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-500 dark:text-gray-900";
+    }
+  };
+
+  const formatVariance = (variance: number) => {
+    return variance > 0 ? `+${variance}` : variance.toString();
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600 dark:text-gray-200">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">
             Loading campaign results...
           </p>
         </div>
@@ -121,7 +169,7 @@ export default function CampaignResults() {
     );
   }
 
-  if (!results) {
+  if (isError || !results) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
@@ -153,54 +201,6 @@ export default function CampaignResults() {
     }
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return "bg-green-100 text-green-800 dark:bg-green-500 dark:text-green-900";
-      case "VARIANCE_REVIEW":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-500 dark:text-orange-900";
-      case "RECOUNT_REQUIRED":
-        return "bg-red-100 text-red-800 dark:bg-red-500 dark:text-red-900";
-      case "SKIPPED":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-500 dark:text-purple-900";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-500 dark:text-gray-900";
-    }
-  };
-
-  const formatVariance = (variance: number) => {
-    return variance > 0 ? `+${variance}` : variance.toString();
-  };
-
-  const generateReport = async () => {
-    try {
-      const response = await fetch(
-        `/api/inventory/cycle-counts/campaigns/${campaignId}/report`
-      );
-      console.log("Status:", response.status);
-
-      if (response.ok) {
-        // Read body once as ArrayBuffer for binary PDF
-        const arrayBuffer = await response.arrayBuffer();
-        const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `cycle-count-report-${results?.name}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      } else {
-        const errorText = await response.text(); // only read if needed
-        console.error("Failed to generate report:", errorText);
-      }
-    } catch (error) {
-      console.error("Error generating report:", error);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
@@ -224,17 +224,30 @@ export default function CampaignResults() {
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={exportResults}>
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
+            <Button
+              variant="outline"
+              onClick={exportResults}
+              disabled={exporting} // disable while processing
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {exporting ? "Exporting..." : "Export CSV"}
             </Button>
+
             <Button
               variant="outline"
               onClick={generateReport}
-              className="cursor-pointer"
+              disabled={reporting}
             >
-              <FileText className="w-4 h-4 mr-2" />
-              Generate Report
+              {reporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4 mr-2" />
+              )}
+              {reporting ? "Generating..." : "Generate Report"}
             </Button>
           </div>
         </div>
@@ -404,14 +417,14 @@ export default function CampaignResults() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b dark:text-gray-500">
-                    <th className="text-left py-2">Task</th>
-                    <th className="text-left py-2">Location</th>
-                    <th className="text-left py-2">Product</th>
-                    <th className="text-right py-2">System Qty</th>
-                    <th className="text-right py-2">Counted Qty</th>
-                    <th className="text-right py-2">Variance</th>
-                    <th className="text-center py-2">Status</th>
-                    <th className="text-left py-2">Notes</th>
+                    <th className="text-left py-2 font-normal">Task</th>
+                    <th className="text-left py-2 font-normal">Location</th>
+                    <th className="text-left py-2 font-normal">Product</th>
+                    <th className="text-right py-2 font-normal">System Qty</th>
+                    <th className="text-right py-2 font-normal">Counted Qty</th>
+                    <th className="text-right py-2 font-normal">Variance</th>
+                    <th className="text-center py-2 font-normal">Status</th>
+                    <th className="text-left py-2 font-normal">Notes</th>
                   </tr>
                 </thead>
                 <tbody>

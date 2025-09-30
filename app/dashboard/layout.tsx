@@ -10,11 +10,11 @@ import {
   Settings,
   ShoppingCart,
   Truck,
-  AlignCenterHorizontal,
-  PackagePlus,
-  Package2,
+  Import,
   Menu,
   X,
+  RefreshCw,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,19 +22,28 @@ import UserMenu from "@/components/UserMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+import clsx from "clsx";
+import GlobalSearch from "@/components/GlobalSearch";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  const checkActive = (id: string) => {
+    if (id === "dashboard") return pathname === "/dashboard";
+    return pathname === `/dashboard/${id}`;
+  };
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "inventory", label: "Inventory", icon: Package },
     { id: "orders", label: "Orders", icon: ShoppingCart },
+    { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "shipping", label: "Shipping", icon: Truck },
+    { id: "import", label: "Import", icon: Import },
+    { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
     { id: "settings", label: "Settings", icon: Settings },
-    // { id: "test-reserve", label: "Test Reserve", icon: AlignCenterHorizontal },
-    // { id: "picking", label: "Pick Orders", icon: PackagePlus },
-    // { id: "packing", label: "Pack Orders", icon: Package2 },
   ];
 
   return (
@@ -57,22 +66,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </button>
 
             <div className="relative w-10 h-10 sm:w-12 sm:h-12">
-              <Image
-                src="/images/headquarter-logo.webp"
-                alt="HQ warehouse management"
-                fill
-                className="object-contain dark:invert"
-                sizes="(max-width: 640px) 32px, 48px"
-              />
+              <Link href={"/dashboard"}>
+                <Image
+                  src="/images/headquarter-logo.webp"
+                  alt="HQ warehouse management"
+                  fill
+                  className="object-contain dark:invert"
+                  sizes="(max-width: 640px) 32px, 48px"
+                />
+              </Link>
             </div>
 
             {/* Search (hidden on very small screens) */}
             <div className="relative hidden sm:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
+              <GlobalSearch />
+              {/* <Input
                 placeholder="Search products, orders, SKUs..."
                 className="pl-10 w-48 md:w-64"
-              />
+              /> */}
             </div>
           </div>
 
@@ -89,9 +101,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Bell className="w-4 h-4" />
             </Button>
 
-            {/* Theme Toggle - ADD IT HERE */}
             <ThemeToggle />
-
             <UserMenu />
           </div>
         </div>
@@ -100,14 +110,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="flex flex-1">
         {/* Sidebar */}
         <aside
-          className={`
-    fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border
-    transform transition-transform duration-200 ease-in-out
-    sm:static sm:translate-x-0 sm:transform-none
-    ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
-  `}
+          className={clsx(
+            "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out sm:static sm:translate-x-0 sm:transform-none",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
         >
-          {/* Mobile-only close button */}
           <div className="flex justify-end sm:hidden p-2">
             <button onClick={() => setMobileMenuOpen(false)}>
               <X className="w-6 h-6 text-foreground" />
@@ -115,21 +122,31 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className="p-4 space-y-2">
-            {menuItems.map((item) => (
-              <Link
-                href={
-                  item.id === "dashboard"
-                    ? "/dashboard"
-                    : `/dashboard/${item.id}`
-                }
-                key={item.id}
-                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-foreground hover:bg-accent transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </Link>
-            ))}
+            {menuItems.map((item) => {
+              const href =
+                item.id === "dashboard"
+                  ? "/dashboard"
+                  : `/dashboard/${item.id}`;
+
+              const active = checkActive(item.id);
+
+              return (
+                <Link
+                  key={item.id}
+                  href={href}
+                  className={clsx(
+                    "text-sm w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
+                    active
+                      ? "bg-gray-200 text-zinc-900 dark:bg-black dark:text-gray-200"
+                      : "text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
         </aside>
 

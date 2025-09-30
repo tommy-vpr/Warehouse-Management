@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { Warehouse } from "lucide-react";
 
 export async function GET(
   request: NextRequest,
@@ -68,13 +69,17 @@ export async function GET(
 
     // Format locations
     const locations = productVariant.inventory.map((inv) => ({
-      id: inv.id,
+      id: inv.location.id, // ← Use location.id, not inv.id
+      inventoryId: inv.id, // Keep this if needed elsewhere
       name: inv.location.name,
       type: inv.location.type || "GENERAL",
-      zone: inv.location.zone,
+      bay: inv.location.bay,
+      space: inv.location.space,
+      tier: inv.location.tier,
       aisle: inv.location.aisle,
       shelf: inv.location.shelf,
       bin: inv.location.bin,
+      warehouse: inv.location.warehouseNumber,
       quantity: inv.quantityOnHand,
       isPickable: inv.location.isPickable,
       isReceivable: inv.location.isReceivable,
@@ -138,12 +143,14 @@ export async function GET(
       productId: productVariant.productId,
       sku: productVariant.sku,
       upc: productVariant.upc,
-      name: productVariant.product.name,
+      name: productVariant.name,
       description: productVariant.product.description,
       costPrice: productVariant.costPrice?.toNumber(),
       sellingPrice: productVariant.sellingPrice?.toNumber(),
       weight: productVariant.weight?.toNumber(),
       dimensions: productVariant.dimensions as any, // JSON field
+      volume: productVariant.volume,
+      strength: productVariant.strength,
       category: "GENERAL", // You may want to add this field to your schema
       supplier: "Unknown", // You may want to add this field to your schema
       shopifyVariantId: productVariant.shopifyVariantId,
