@@ -65,6 +65,7 @@ interface CycleCountCampaign {
   updatedAt: string;
   createdBy: string;
   assignedTo: string[];
+  hasPendingReviews?: boolean;
 }
 
 interface DashboardStats {
@@ -304,8 +305,15 @@ export default function CycleCountDashboard() {
     const matchesSearch =
       campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       campaign.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // ⭐ Add special handling for NEEDS_REVIEW filter
     const matchesStatus =
-      statusFilter === "ALL" || campaign.status === statusFilter;
+      statusFilter === "ALL"
+        ? true
+        : statusFilter === "NEEDS_REVIEW"
+        ? campaign.hasPendingReviews === true
+        : campaign.status === statusFilter;
+
     const matchesType =
       typeFilter === "ALL" || campaign.countType === typeFilter;
 
@@ -536,6 +544,26 @@ export default function CycleCountDashboard() {
                 <option value="HIGH_VALUE">High Value</option>
               </select>
             </div>
+            {stats.pendingReviews > 0 && (
+              <div className="mt-4 flex gap-2">
+                <Button
+                  variant={
+                    statusFilter === "NEEDS_REVIEW" ? "default" : "outline"
+                  }
+                  size="sm"
+                  onClick={() => {
+                    if (statusFilter === "NEEDS_REVIEW") {
+                      setStatusFilter("ALL");
+                    } else {
+                      setStatusFilter("NEEDS_REVIEW");
+                    }
+                  }}
+                >
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  Needs Review ({stats.pendingReviews})
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -669,6 +697,13 @@ export default function CycleCountDashboard() {
                               </div>
                             </div>
                           )}
+                        {campaign.status === "COMPLETED" &&
+                          campaign.hasPendingReviews && (
+                            <div className="mt-3 flex items-center text-sm text-orange-600">
+                              <AlertTriangle className="w-4 h-4 mr-1" />
+                              <span>Has items pending supervisor review</span>
+                            </div>
+                          )}
                       </div>
 
                       {/* Actions */}
@@ -725,18 +760,36 @@ export default function CycleCountDashboard() {
                         )}
 
                         {campaign.status === "COMPLETED" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              router.push(
-                                `/dashboard/inventory/count/${campaign.id}/results`
-                              )
-                            }
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            View Results
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                router.push(
+                                  `/dashboard/inventory/count/${campaign.id}/results`
+                                )
+                              }
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Results
+                            </Button>
+
+                            {/* ⭐ Add this - Review button if there are pending reviews */}
+                            {campaign.hasPendingReviews && (
+                              <Button
+                                size="sm"
+                                className="bg-orange-600 hover:bg-orange-700"
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/inventory/count/${campaign.id}/review`
+                                  )
+                                }
+                              >
+                                <AlertTriangle className="w-4 h-4 mr-1" />
+                                Review
+                              </Button>
+                            )}
+                          </>
                         )}
 
                         <DropdownMenu>

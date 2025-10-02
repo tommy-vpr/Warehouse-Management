@@ -1,4 +1,4 @@
-// app/api/locations/import/route.ts
+// app/api/inventory/locations/import/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 

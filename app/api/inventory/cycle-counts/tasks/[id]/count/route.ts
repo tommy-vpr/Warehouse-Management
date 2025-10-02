@@ -35,7 +35,7 @@ export async function POST(
     let finalStatus = status;
     let variance = null;
     let variancePercentage = null;
-    let requiresRecount = false;
+    let requiresReview = false;
 
     if (countedQuantity !== null && !status) {
       variance = countedQuantity - task.systemQuantity;
@@ -48,16 +48,16 @@ export async function POST(
 
       // Check tolerance
       const tolerance = task.tolerancePercentage?.toNumber() || 5.0;
-      requiresRecount =
+      requiresReview =
         variancePercentage !== null && variancePercentage > tolerance;
 
-      // Determine status based on variance
+      // ⭐ NEW: Always mark as COMPLETED or VARIANCE_REVIEW (not RECOUNT_REQUIRED)
       if (variance === 0) {
         finalStatus = "COMPLETED";
-      } else if (requiresRecount) {
-        finalStatus = "RECOUNT_REQUIRED";
+      } else if (requiresReview) {
+        finalStatus = "VARIANCE_REVIEW"; // ← Changed from RECOUNT_REQUIRED
       } else {
-        finalStatus = "COMPLETED";
+        finalStatus = "COMPLETED"; // Within tolerance
       }
     } else if (status === "SKIPPED") {
       finalStatus = "SKIPPED";
@@ -74,11 +74,9 @@ export async function POST(
           variancePercentage: variancePercentage ? variancePercentage : null,
           status: finalStatus,
           notes,
-          completedAt: ["COMPLETED", "SKIPPED"].includes(finalStatus)
-            ? new Date()
-            : null,
-          requiresRecount,
-          assignedTo: session.user.id, // Track who did the count
+          completedAt: new Date(), // ⭐ Always set completion time
+          requiresRecount: requiresReview, // Track if needs supervisor review
+          assignedTo: session.user.id,
         },
       });
 
@@ -94,13 +92,13 @@ export async function POST(
           metadata: {
             variance,
             variancePercentage,
-            requiresRecount,
+            requiresReview,
             tolerancePercentage: task.tolerancePercentage?.toNumber(),
           },
         },
       });
 
-      // ⭐ ALWAYS update lastCounted for completed counts (even with zero variance)
+      // Always update lastCounted for completed counts
       if (task.productVariantId && status !== "SKIPPED") {
         await tx.inventory.updateMany({
           where: {
@@ -113,51 +111,7 @@ export async function POST(
         });
       }
 
-      // THEN handle variance adjustments separately (only if variance exists)
-      // if (
-      //   variance !== null &&
-      //   variance !== 0 &&
-      //   !requiresRecount &&
-      //   task.productVariantId
-      // ) {
-      //   await tx.inventoryTransaction.create({
-      //     data: {
-      //       productVariantId: task.productVariantId,
-      //       locationId: task.locationId,
-      //       transactionType: "COUNT",
-      //       quantityChange: variance,
-      //       referenceId: taskId,
-      //       referenceType: "CYCLE_COUNT",
-      //       userId: session.user.id,
-      //       notes: `Cycle count adjustment: ${
-      //         notes || "Count variance recorded"
-      //       }`,
-      //     },
-      //   });
-
-      //   // Update inventory quantity (upsert to handle cases where inventory record doesn't exist)
-      //   await tx.inventory.upsert({
-      //     where: {
-      //       productVariantId_locationId: {
-      //         productVariantId: task.productVariantId,
-      //         locationId: task.locationId,
-      //       },
-      //     },
-      //     update: {
-      //       quantityOnHand: {
-      //         increment: variance,
-      //       },
-      //     },
-      //     create: {
-      //       productVariantId: task.productVariantId,
-      //       locationId: task.locationId,
-      //       quantityOnHand: countedQuantity || 0,
-      //       lastCounted: new Date(),
-      //     },
-      //   });
-      // }
-
-      // THEN handle variance adjustments separately (only if variance exists)
+      // ⭐ NEW: Always apply inventory adjustment, even if variance needs review
       if (variance !== null && variance !== 0 && task.productVariantId) {
         // Create inventory transaction
         await tx.inventoryTransaction.create({
@@ -171,7 +125,7 @@ export async function POST(
             userId: session.user.id,
             notes: `Cycle count adjustment: ${
               notes || "Count variance recorded"
-            }${requiresRecount ? " (Recount required - high variance)" : ""}`,
+            }${requiresReview ? " (Pending supervisor review)" : ""}`,
           },
         });
 
@@ -198,14 +152,15 @@ export async function POST(
         });
       }
 
-      // Update campaign statistics if task belongs to campaign
+      // Update campaign statistics
       if (task.campaignId) {
         const campaignTasks = await tx.cycleCountTask.findMany({
           where: { campaignId: task.campaignId },
         });
 
+        // ⭐ Include VARIANCE_REVIEW in completed count
         const completedCount = campaignTasks.filter((t) =>
-          ["COMPLETED", "SKIPPED"].includes(
+          ["COMPLETED", "SKIPPED", "VARIANCE_REVIEW"].includes(
             t.id === taskId ? finalStatus : t.status
           )
         ).length;
@@ -226,6 +181,30 @@ export async function POST(
         });
       }
 
+      // ⭐ NEW: If variance needs review, create notification/flag for supervisor
+      if (requiresReview && task.campaignId) {
+        await tx.cycleCountEvent.create({
+          data: {
+            taskId,
+            eventType: "VARIANCE_NOTED",
+            userId: session.user.id,
+            notes: `High variance detected: ${variance} units (${variancePercentage?.toFixed(
+              1
+            )}%) - Supervisor review requested`,
+            metadata: {
+              variance,
+              variancePercentage,
+              systemQuantity: task.systemQuantity,
+              countedQuantity,
+              requiresSupervisorReview: true,
+            },
+          },
+        });
+
+        // TODO: Send notification to supervisors
+        // You can implement email/in-app notifications here
+      }
+
       return updatedTask;
     });
 
@@ -234,9 +213,9 @@ export async function POST(
       task: result,
       variance,
       variancePercentage,
-      requiresRecount,
-      message: requiresRecount
-        ? "Count recorded - recount required due to high variance"
+      requiresReview, // ← Changed from requiresRecount
+      message: requiresReview
+        ? "Count recorded - supervisor review requested due to high variance"
         : "Count recorded successfully",
     });
   } catch (error) {

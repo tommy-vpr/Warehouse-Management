@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
             quantityChange: item.quantityReceived,
             referenceId: poNumber,
             referenceType: "PURCHASE_ORDER",
-            userId: userId,
+            userId: session.user.id,
             notes: item.notes,
           },
         });

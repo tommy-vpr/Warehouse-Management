@@ -126,6 +126,11 @@ export async function POST(request: NextRequest) {
             referenceType: referenceType || "MANUAL_TRANSFER",
             referenceId: toLocationId, // Store destination in referenceId
           },
+          include: {
+            user: {
+              select: { name: true },
+            },
+          },
         });
 
         return transaction;
@@ -142,6 +147,11 @@ export async function POST(request: NextRequest) {
           notes,
           referenceType,
           referenceId,
+        },
+        include: {
+          user: {
+            select: { name: true },
+          },
         },
       });
 
@@ -218,6 +228,7 @@ export async function POST(request: NextRequest) {
         id: result.id,
         type: result.transactionType,
         quantityChange: result.quantityChange,
+        userName: result.user?.name,
         createdAt: result.createdAt.toISOString(),
       },
     });

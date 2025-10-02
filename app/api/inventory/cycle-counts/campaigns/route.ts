@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     // Transform campaigns to include computed fields
     const campaignsWithStats = campaigns.map((campaign) => {
       const completedTasks = campaign.tasks.filter((task) =>
-        ["COMPLETED"].includes(task.status)
+        ["COMPLETED", "VARIANCE_REVIEW", "SKIPPED"].includes(task.status)
       ).length;
 
       const variancesFound = campaign.tasks.filter(
@@ -104,6 +104,11 @@ export async function GET(request: NextRequest) {
         completedTasks,
         variancesFound,
         accuracy, // Add this field
+        hasPendingReviews: campaign.tasks.some(
+          (task) =>
+            task.status === "VARIANCE_REVIEW" ||
+            task.status === "RECOUNT_REQUIRED"
+        ),
         createdAt: campaign.createdAt.toISOString(),
         updatedAt: campaign.updatedAt.toISOString(),
         createdBy: campaign.createdBy,

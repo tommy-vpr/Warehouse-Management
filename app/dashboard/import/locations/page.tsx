@@ -37,18 +37,18 @@ const LocationInventoryImport = () => {
     });
   };
 
-  const generateLocationBarcode = (locationData) => {
-    const aisleCode = locationData.AISLE.charCodeAt(0) - 64;
-    const tierCode = locationData.TIER.charCodeAt(0) - 64;
-    const binCode = locationData.BIN.charCodeAt(0) - 87;
+  // const generateLocationBarcode = (locationData) => {
+  //   const aisleCode = locationData.AISLE.charCodeAt(0) - 64;
+  //   const tierCode = locationData.TIER.charCodeAt(0) - 64;
+  //   const binCode = locationData.BIN.charCodeAt(0) - 87;
 
-    return `${locationData.WAREHOUSE}${aisleCode
-      .toString()
-      .padStart(2, "0")}${locationData.BAY.toString().padStart(
-      2,
-      "0"
-    )}${tierCode}${locationData.SPACE}${binCode}`;
-  };
+  //   return `${locationData.WAREHOUSE}${aisleCode
+  //     .toString()
+  //     .padStart(2, "0")}${locationData.BAY.toString().padStart(
+  //     2,
+  //     "0"
+  //   )}${tierCode}${locationData.SPACE}${binCode}`;
+  // };
 
   const determineLocationType = (tier) => {
     switch (tier) {
@@ -135,7 +135,7 @@ const LocationInventoryImport = () => {
               tier: row.TIER,
               space: parseInt(row.SPACE),
               bin: row.BIN,
-              barcode: generateLocationBarcode(row),
+              barcode: row.LOCATION,
               type: determineLocationType(row.TIER),
               zone: `WH${row.WAREHOUSE}-AISLE${row.AISLE}`,
               isPickable: row.TIER === "B" || row.TIER === "C",

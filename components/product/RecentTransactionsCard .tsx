@@ -66,6 +66,8 @@ export function RecentTransactionsCard({
       : text;
   };
 
+  console.log(transactions);
+
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "RECEIPT":
@@ -153,20 +155,6 @@ export function RecentTransactionsCard({
             <ExternalLink className="w-4 h-4 mr-1" />
             View All ({transactions.length})
           </Button>
-          {/* {hasMore && productVariantId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                router.push(
-                  `/dashboard/inventory/transactions?product=${productVariantId}`
-                )
-              }
-            >
-              <ExternalLink className="w-4 h-4 mr-1" />
-              View All ({transactions.length})
-            </Button>
-          )} */}
         </div>
       </CardHeader>
       <CardContent>
@@ -203,6 +191,17 @@ export function RecentTransactionsCard({
                         {transaction.quantityChange}
                       </span>
                     </div>
+
+                    {/* Timestamp with username inline */}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      {new Date(transaction.createdAt).toLocaleString()}
+                      {transaction.userName && (
+                        <span className="ml-1">
+                          • by {transaction.userName}
+                        </span>
+                      )}
+                    </p>
+
                     {transaction.notes && (
                       <div className="text-xs text-gray-600 dark:text-gray-400">
                         <p className="break-words">
@@ -230,14 +229,6 @@ export function RecentTransactionsCard({
                         )}
                       </div>
                     )}
-                    {transaction.userName && (
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        By {transaction.userName}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {new Date(transaction.createdAt).toLocaleString()}
-                    </p>
                   </div>
                 </div>
               </div>

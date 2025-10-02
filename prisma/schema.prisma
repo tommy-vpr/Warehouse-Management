@@ -48,10 +48,16 @@ model User {
   name                  String?
   email                 String                 @unique
   emailVerified         DateTime?
+  password              String?
   image                 String?
   role                  UserRole               @default(STAFF)
+  
+  currentChallenge      String?
+
   accounts              Account[]
   sessions              Session[]
+  credentials   UserCredential[]
+
   inventoryTransactions InventoryTransaction[]
   assignedPickLists     PickList[]
   pickedItems           PickListItem[]
@@ -64,6 +70,24 @@ model User {
 
   @@map("users")
 }
+
+model UserCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // WebAuthn-specific fields
+  credentialId String   @unique         // base64url ID of the passkey
+  publicKey    String                  // base64-encoded public key
+  counter      Int                     // used to prevent replay attacks
+  transports   String?                 // "usb,nfc,ble,internal"
+  deviceType   String?                 // "singleDevice" | "multiDevice"
+  backedUp     Boolean?                // if authenticator supports backup
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 
 enum UserRole {
   ADMIN

@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/card";
 import { Package, AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import Image from "next/image";
+import { startRegistration } from "@simplewebauthn/browser";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     company: "",
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +62,33 @@ export default function SignUp() {
       setIsLoading(false);
     }
   };
+
+  async function handlePasskeySignup(email: string) {
+    // Step 1. Ask server for registration challenge
+    const options = await fetch("/api/webauthn/register", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => r.json());
+
+    // Step 2. Run WebAuthn registration in browser
+    const attResp = await startRegistration(options);
+
+    // Step 3. Send result back to server
+    const verifyRes = await fetch("/api/webauthn/register/verify", {
+      method: "POST",
+      body: JSON.stringify({ email, attResp }),
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => r.json());
+
+    if (verifyRes.success) {
+      setSuccess(
+        "Passkey created! You can now sign in with Face ID / Touch ID."
+      );
+    } else {
+      setError("Passkey registration failed.");
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -132,6 +161,21 @@ export default function SignUp() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Minimum 6 characters"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                disabled={isLoading}
+                minLength={6}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="company">Company name</Label>
               <Input
                 id="company"
@@ -149,11 +193,20 @@ export default function SignUp() {
               className="w-full"
               disabled={isLoading || success !== ""}
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Create Account
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Create Account (Email)
             </Button>
+            {typeof window !== "undefined" &&
+              "PublicKeyCredential" in window && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handlePasskeySignup(formData.email)}
+                >
+                  Sign up with Passkey
+                </Button>
+              )}
           </form>
         </CardContent>
 

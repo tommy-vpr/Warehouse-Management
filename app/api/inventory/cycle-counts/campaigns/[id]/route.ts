@@ -50,7 +50,7 @@ export async function GET(
             : {
                 where: {
                   status: {
-                    notIn: ["COMPLETED", "SKIPPED"],
+                    notIn: ["COMPLETED", "SKIPPED", "CANCELLED"],
                   },
                 },
               }),

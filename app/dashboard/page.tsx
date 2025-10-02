@@ -198,7 +198,14 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-900 dark:text-gray-200">
                           {activity.message}
                         </p>
-                        <p className="text-xs text-gray-500">{activity.time}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {activity.time}
+                          {activity.userName && (
+                            <span className="ml-1 text-blue-500">
+                              • by {activity.userName}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   ))}

@@ -26,6 +26,7 @@ export async function GET() {
         t.quantityChange > 0 ? "+" : ""
       }${t.quantityChange})`,
       time: getTimeAgo(t.createdAt),
+      userName: t.user?.name || "System", // Add this line
     }));
 
     return NextResponse.json(activity);

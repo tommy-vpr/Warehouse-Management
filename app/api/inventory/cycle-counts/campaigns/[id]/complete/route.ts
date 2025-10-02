@@ -36,9 +36,11 @@ export async function POST(
       );
     }
 
-    // Check if all tasks are completed
     const incompleteTasks = campaign.tasks.filter(
-      (task) => !["COMPLETED", "SKIPPED", "CANCELLED"].includes(task.status)
+      (task) =>
+        !["COMPLETED", "SKIPPED", "CANCELLED", "VARIANCE_REVIEW"].includes(
+          task.status
+        )
     );
 
     if (incompleteTasks.length > 0) {
@@ -51,21 +53,26 @@ export async function POST(
       );
     }
 
-    // Calculate final statistics
+    // Calculate final statistics including review tasks
     const completedTasks = campaign.tasks.filter(
       (task) => task.status === "COMPLETED"
     ).length;
+
+    const reviewTasks = campaign.tasks.filter(
+      (task) => task.status === "VARIANCE_REVIEW"
+    ).length;
+
     const varianceTasks = campaign.tasks.filter(
       (task) => task.variance !== null && task.variance !== 0
     ).length;
 
-    // Update campaign status
+    // ⭐ UPDATE CAMPAIGN STATUS - This was missing!
     const updatedCampaign = await prisma.cycleCountCampaign.update({
       where: { id: campaignId },
       data: {
         status: "COMPLETED",
         endDate: new Date(),
-        completedTasks,
+        completedTasks: completedTasks + reviewTasks, // Include both
         variancesFound: varianceTasks,
         updatedAt: new Date(),
       },
@@ -97,6 +104,7 @@ export async function POST(
       skippedTasks: campaign.tasks.filter((task) => task.status === "SKIPPED")
         .length,
       varianceTasks,
+      reviewTasks,
       accuracyPercentage:
         completedTasks > 0
           ? ((completedTasks - varianceTasks) / completedTasks) * 100

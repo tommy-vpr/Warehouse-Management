@@ -234,7 +234,7 @@ export default function InventoryDashboard() {
             onClick={() =>
               queryClient.invalidateQueries({ queryKey: ["inventory"] })
             }
-            className="mt-4"
+            className="mt-4 cursor-pointer"
           >
             Retry
           </Button>
@@ -626,6 +626,7 @@ export default function InventoryDashboard() {
                           <td className="px-4 py-4">
                             <div className="flex gap-1">
                               <Button
+                                className="cursor-pointer"
                                 variant="outline"
                                 size="sm"
                                 onClick={() =>
@@ -635,6 +636,7 @@ export default function InventoryDashboard() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                               <Button
+                                className="cursor-pointer"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
@@ -653,6 +655,7 @@ export default function InventoryDashboard() {
                               {item.reorderStatus === "CRITICAL" &&
                                 !item.hasReorderRequest && (
                                   <Button
+                                    className="cursor-pointer"
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>

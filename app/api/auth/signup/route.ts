@@ -1,19 +1,27 @@
+// app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
+import { UserRole } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, company } = await request.json();
+    const { name, email, password } = await request.json();
 
-    if (!name || !email) {
+    if (!name || !email || !password) {
       return NextResponse.json(
-        { error: "Name and email are required" },
+        { error: "Name, email, and password are required" },
         { status: 400 }
       );
     }
 
-    // Check if user already exists
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: "Password must be at least 6 characters" },
+        { status: 400 }
+      );
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
@@ -21,17 +29,21 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: "User with this email already exists" },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
-    // Create user
+    const userCount = await prisma.user.count();
+    const role = userCount === 0 ? UserRole.ADMIN : UserRole.STAFF;
+
+    const hashedPassword = await hash(password, 12);
+
     const user = await prisma.user.create({
       data: {
         name,
         email: email.toLowerCase(),
-        role: "STAFF", // Default role
-        // Note: We don't store passwords with email auth
+        password: hashedPassword,
+        role,
       },
     });
 
@@ -39,6 +51,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "User created successfully",
       userId: user.id,
+      role: user.role,
     });
   } catch (error) {
     console.error("Signup error:", error);

@@ -148,7 +148,7 @@ export default function CycleCountInterface() {
     },
     onSuccess: (result, variables) => {
       // Update campaign cache with optimistic update
-      queryClient.setQueryData<CycleCountCampaign>(
+      const updatedCampaign = queryClient.setQueryData<CycleCountCampaign>(
         ["cycle-count-campaign", campaignId],
         (old) => {
           if (!old) return old;
@@ -164,7 +164,7 @@ export default function CycleCountInterface() {
                   status: result.task.status,
                   notes: variables.notes,
                   completedAt: result.task.completedAt,
-                  requiresRecount: result.requiresRecount || false,
+                  requiresRecount: result.requiresReview || false, // ← Changed field name
                 }
               : task
           );
@@ -172,8 +172,12 @@ export default function CycleCountInterface() {
           return {
             ...old,
             tasks: updatedTasks,
+            // ⭐ Include VARIANCE_REVIEW in completed count
             completedTasks: updatedTasks.filter(
-              (t) => t.status === "COMPLETED" || t.status === "SKIPPED"
+              (t) =>
+                t.status === "COMPLETED" ||
+                t.status === "SKIPPED" ||
+                t.status === "VARIANCE_REVIEW"
             ).length,
             variancesFound: updatedTasks.filter(
               (t) => t.variance !== undefined && t.variance !== 0
@@ -182,9 +186,9 @@ export default function CycleCountInterface() {
         }
       );
 
-      // Move to next task
-      if (campaign) {
-        const nextIndex = campaign.tasks.findIndex(
+      // Move to next task or complete campaign
+      if (updatedCampaign) {
+        const nextIndex = updatedCampaign.tasks.findIndex(
           (task, index) =>
             index > currentTaskIndex &&
             (task.status === "PENDING" || task.status === "ASSIGNED")
@@ -194,6 +198,7 @@ export default function CycleCountInterface() {
           setCurrentTaskIndex(nextIndex);
           resetForm();
         } else {
+          // ⭐ All tasks counted - auto complete campaign
           completeCampaignMutation.mutate();
         }
       }
@@ -335,7 +340,7 @@ export default function CycleCountInterface() {
         return "bg-yellow-100 text-yellow-800";
       case "COMPLETED":
         return "bg-green-100 text-green-800";
-      case "VARIANCE_REVIEW":
+      case "VARIANCE_REVIEW": // ⭐ Add this
         return "bg-orange-100 text-orange-800";
       case "RECOUNT_REQUIRED":
         return "bg-red-100 text-red-800";
@@ -469,6 +474,31 @@ export default function CycleCountInterface() {
             )}
           </CardContent>
         </Card>
+
+        {/* ⭐ ADD IT HERE - Supervisor Review Alert */}
+        {campaign.tasks.filter((t) => t.status === "VARIANCE_REVIEW").length >
+          0 && (
+          <Card className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/30">
+            <CardContent className="p-4">
+              <div className="flex items-center text-orange-800 dark:text-orange-200">
+                <AlertTriangle className="w-5 h-5 mr-2" />
+                <div>
+                  <div className="font-medium">
+                    {
+                      campaign.tasks.filter(
+                        (t) => t.status === "VARIANCE_REVIEW"
+                      ).length
+                    }{" "}
+                    items need supervisor review
+                  </div>
+                  <div className="text-sm">
+                    High variances have been flagged for approval
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Current Task */}
@@ -726,6 +756,20 @@ export default function CycleCountInterface() {
                     %
                   </span>
                 </div>
+
+                {/* ⭐ Add review count */}
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-200">
+                    Needs Review:
+                  </span>
+                  <span className="font-medium text-orange-600">
+                    {
+                      campaign.tasks.filter(
+                        (t) => t.status === "VARIANCE_REVIEW"
+                      ).length
+                    }
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
@@ -825,6 +869,10 @@ export default function CycleCountInterface() {
                           {task.status === "SKIPPED" ? (
                             <Badge variant="secondary" className="text-xs">
                               Skipped
+                            </Badge>
+                          ) : task.status === "VARIANCE_REVIEW" ? (
+                            <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200 text-xs">
+                              Needs Review
                             </Badge>
                           ) : (
                             <>
