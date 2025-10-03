@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: "WMS - Warehouse Management System",
   description:
     "Comprehensive warehouse management with inventory tracking and order fulfillment",
+  icons: {
+    icon: "/headquarter-logo.webp", // favicon
+    shortcut: "/headquarter-logo.webp",
+    apple: "/headquarter-logo.webp",
+  },
 };
 
 export default function RootLayout({

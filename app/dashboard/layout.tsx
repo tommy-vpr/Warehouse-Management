@@ -26,6 +26,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import GlobalSearch from "@/components/GlobalSearch";
+import NotificationBell from "@/components/notification/NotificationBell";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -129,9 +130,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </Button>
             </Link>
 
-            <Button variant="outline" size="icon">
-              <Bell className="w-4 h-4" />
-            </Button>
+            <NotificationBell />
 
             <ThemeToggle />
             <UserMenu />

@@ -10,32 +10,109 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get recent inventory transactions
     const transactions = await prisma.inventoryTransaction.findMany({
-      take: 10,
+      take: 5,
       orderBy: { createdAt: "desc" },
       include: {
-        productVariant: { select: { sku: true } },
-        user: { select: { name: true } },
+        productVariant: {
+          include: {
+            product: true,
+          },
+        },
+        user: { select: { id: true, name: true } },
       },
     });
 
-    const activity = transactions.map((t) => ({
-      id: t.id,
-      type: t.transactionType.toLowerCase(),
-      message: `${t.transactionType}: ${t.productVariant.sku} (${
-        t.quantityChange > 0 ? "+" : ""
-      }${t.quantityChange})`,
-      time: getTimeAgo(t.createdAt),
-      userName: t.user?.name || "System", // Add this line
-    }));
+    // Get recent orders
+    const recentOrders = await prisma.order.findMany({
+      take: 3,
+      orderBy: { createdAt: "desc" },
+    });
 
-    return NextResponse.json(activity);
+    // Get recent cycle count events
+    const countEvents = await prisma.cycleCountEvent.findMany({
+      take: 3,
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: { select: { id: true, name: true } },
+        task: {
+          include: {
+            productVariant: {
+              include: { product: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Combine all activities
+    const allActivities = [
+      // Inventory transactions
+      ...transactions.map((t) => ({
+        id: `txn-${t.id}`,
+        type: t.transactionType.toLowerCase(),
+        message: `${t.transactionType}: ${t.productVariant.product.name} (${
+          t.quantityChange > 0 ? "+" : ""
+        }${t.quantityChange})`,
+        time: getTimeAgo(t.createdAt),
+        userName: t.user?.name || "System",
+        userId: t.userId,
+        timestamp: t.createdAt,
+      })),
+
+      // Orders
+      ...recentOrders.map((o) => ({
+        id: `order-${o.id}`,
+        type: "order",
+        message: `New order ${o.orderNumber} from ${o.customerName}`,
+        time: getTimeAgo(o.createdAt),
+        userName: "Shopify",
+        userId: null,
+        timestamp: o.createdAt,
+      })),
+
+      // Cycle count events
+      ...countEvents.map((e) => ({
+        id: `count-${e.id}`,
+        type: "scan",
+        message: formatCountEvent(e),
+        time: getTimeAgo(e.createdAt),
+        userName: e.user.name,
+        userId: e.userId,
+        timestamp: e.createdAt,
+      })),
+    ];
+
+    // Sort by timestamp and take top 10
+    const sortedActivities = allActivities
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 10)
+      .map(({ timestamp, ...rest }) => rest); // Remove timestamp from response
+
+    return NextResponse.json(sortedActivities);
   } catch (error) {
     console.error("Error fetching activity:", error);
     return NextResponse.json(
       { error: "Failed to fetch activity" },
       { status: 500 }
     );
+  }
+}
+
+function formatCountEvent(event: any): string {
+  const eventType = event.eventType.replace(/_/g, " ").toLowerCase();
+  const product = event.task.productVariant?.product.name || "location";
+
+  switch (event.eventType) {
+    case "COUNT_RECORDED":
+      return `Count recorded for ${product}`;
+    case "VARIANCE_NOTED":
+      return `Variance detected on ${product}`;
+    case "RECOUNT_REQUESTED":
+      return `Recount requested for ${product}`;
+    default:
+      return `${eventType} on ${product}`;
   }
 }
 

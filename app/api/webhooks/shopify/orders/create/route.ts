@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { notifyRole } from "@/lib/ably-server";
 
 // Verify webhook signature for security
 function verifyShopifyWebhook(body: string, signature: string): boolean {
@@ -127,6 +128,16 @@ async function processShopifyOrder(shopifyOrder: any) {
     });
 
     console.log(`📋 Created order ${order.orderNumber}`);
+
+    await notifyRole("STAFF", "new-order", {
+      type: "NEW_ORDER",
+      title: "New Order Received",
+      message: `Order ${order.orderNumber} from ${order.customerName}`,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      link: `/dashboard/orders/${order.id}`,
+      timestamp: new Date().toISOString(),
+    });
 
     // Create order items
     const lineItems = shopifyOrder.line_items || [];

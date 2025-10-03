@@ -83,27 +83,26 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-blue-50 dark:bg-zinc-900 px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
+      <Card className="w-full max-w-md bg-white border border-gray-200 text-gray-700">
         <CardHeader className="space-y-1 text-center">
           <div className="relative w-18 h-18 sm:w-14 sm:h-14 m-auto">
             <Image
               src="/images/headquarter-logo.webp"
               alt="HQ warehouse management"
               fill
-              className="object-contain dark:invert"
+              className="object-contain"
               sizes="(max-width: 640px) 32px, 48px"
             />
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-500">
             Sign in to your warehouse management system
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
           {error && (
-            <div className="flex items-center space-x-2 text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-md border border-red-200 dark:border-red-800">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm">{error}</span>
             </div>
@@ -120,6 +119,7 @@ export default function SignIn() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                className="border border-gray-200 bg-white"
               />
             </div>
 
@@ -134,11 +134,12 @@ export default function SignIn() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
+                  className="border border-gray-200 bg-white"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -149,7 +150,11 @@ export default function SignIn() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer transition"
+              disabled={isLoading}
+            >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Sign in
             </Button>
@@ -157,18 +162,15 @@ export default function SignIn() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-gray-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or
-              </span>
+              <span className="bg-white px-2 text-muted-foreground">Or</span>
             </div>
           </div>
 
           <Button
-            variant="outline"
-            className="w-full"
+            className="w-full bg-gray-700 text-gray-200 cursor-pointer hover:bg-gray-600 transiton"
             onClick={handleDemoLogin}
             disabled={isLoading}
           >

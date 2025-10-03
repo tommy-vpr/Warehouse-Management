@@ -699,7 +699,7 @@ export default function CycleCountDashboard() {
                           )}
                         {campaign.status === "COMPLETED" &&
                           campaign.hasPendingReviews && (
-                            <div className="mt-3 flex items-center text-sm text-orange-600">
+                            <div className="mt-3 flex items-center text-sm text-red-400">
                               <AlertTriangle className="w-4 h-4 mr-1" />
                               <span>Has items pending supervisor review</span>
                             </div>
@@ -762,6 +762,7 @@ export default function CycleCountDashboard() {
                         {campaign.status === "COMPLETED" && (
                           <>
                             <Button
+                              className="cursor-pointer"
                               size="sm"
                               variant="outline"
                               onClick={() =>
@@ -778,7 +779,7 @@ export default function CycleCountDashboard() {
                             {campaign.hasPendingReviews && (
                               <Button
                                 size="sm"
-                                className="bg-orange-600 hover:bg-orange-700"
+                                className="bg-blue-500 hover:bg-blue-600 cursor-pointer"
                                 onClick={() =>
                                   router.push(
                                     `/dashboard/inventory/count/${campaign.id}/review`

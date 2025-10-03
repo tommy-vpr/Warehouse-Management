@@ -7,6 +7,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { useState } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { AblyProvider } from "@/context/ably-context";
 
 interface Props {
   children: React.ReactNode;
@@ -51,40 +52,42 @@ export function AppProviders({ children }: Props) {
 
   return (
     <NextAuthSessionProvider>
-      {persister ? (
-        <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{ persister }}
-        >
-          <NextThemesProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            storageKey="wms-theme"
+      <AblyProvider>
+        {persister ? (
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{ persister }}
           >
-            {children}
-            {process.env.NODE_ENV === "development" && (
-              <ReactQueryDevtools initialIsOpen={false} />
-            )}
-          </NextThemesProvider>
-        </PersistQueryClientProvider>
-      ) : (
-        <QueryClientProvider client={queryClient}>
-          <NextThemesProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            storageKey="wms-theme"
-          >
-            {children}
-            {process.env.NODE_ENV === "development" && (
-              <ReactQueryDevtools initialIsOpen={false} />
-            )}
-          </NextThemesProvider>
-        </QueryClientProvider>
-      )}
+            <NextThemesProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              storageKey="wms-theme"
+            >
+              {children}
+              {process.env.NODE_ENV === "development" && (
+                <ReactQueryDevtools initialIsOpen={false} />
+              )}
+            </NextThemesProvider>
+          </PersistQueryClientProvider>
+        ) : (
+          <QueryClientProvider client={queryClient}>
+            <NextThemesProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              storageKey="wms-theme"
+            >
+              {children}
+              {process.env.NODE_ENV === "development" && (
+                <ReactQueryDevtools initialIsOpen={false} />
+              )}
+            </NextThemesProvider>
+          </QueryClientProvider>
+        )}
+      </AblyProvider>
     </NextAuthSessionProvider>
   );
 }

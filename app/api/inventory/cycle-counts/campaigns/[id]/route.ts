@@ -43,6 +43,19 @@ export async function GET(
                 email: true,
               },
             },
+            events: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
           },
           orderBy: [{ priority: "desc" }, { taskNumber: "asc" }],
           ...(includeCompleted

@@ -136,7 +136,7 @@ export default function ShippingDashboard() {
                   </p>
                   <p className="text-2xl font-bold">{stats.totalPackages}</p>
                 </div>
-                <Package className="w-8 h-8 text-purple-600" />
+                <Package className="w-8 h-8 text-gray-400" />
               </div>
             </CardContent>
           </Card>
@@ -242,14 +242,14 @@ export default function ShippingDashboard() {
                           className="flex items-center justify-between p-3 bg-gray-100 dark:bg-zinc-900 rounded"
                         >
                           <div className="flex items-center gap-3">
-                            <Package className="w-4 h-4 text-gray-600" />
+                            <Package className="w-4 h-4 text-gray-400" />
                             <div>
                               <p className="font-mono text-sm">
                                 {pkg.trackingNumber}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
                                 <CarrierBadge carrierCode={pkg.carrierCode} />
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
                                   ${pkg.cost}
                                 </span>
                               </div>

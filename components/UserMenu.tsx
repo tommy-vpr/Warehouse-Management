@@ -68,7 +68,7 @@ export default function UserMenu() {
         <Button
           variant="outline"
           size="lg"
-          className="flex items-center space-x-2"
+          className="flex items-center space-x-2 cursor-pointer"
         >
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
             {session.user?.name ? (
@@ -162,11 +162,11 @@ export default function UserMenu() {
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          className="text-gray-200 focus:text-gray-800 focus:bg-red-50"
+          className="cursor-pointer group"
           onClick={handleSignOut}
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign out</span>
+          <LogOut className="mr-2 h-4 w-4 group-hover:text-red-400 transition" />
+          <span className="group-hover:text-red-400 transition">Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

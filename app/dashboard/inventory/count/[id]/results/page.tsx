@@ -16,6 +16,7 @@ import {
   MapPin,
   Calendar,
   Loader2,
+  ArrowDown,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -48,6 +49,20 @@ interface CampaignResults {
     status: string;
     completedAt?: string;
     notes?: string;
+    assignedUser?: {
+      id: string;
+      name: string;
+    };
+    events?: Array<{
+      id: string;
+      eventType: string;
+      createdAt: string;
+      user: {
+        id: string;
+        name: string;
+      };
+      notes?: string;
+    }>;
   }>;
 }
 
@@ -58,6 +73,8 @@ export default function CampaignResults() {
 
   const [exporting, setExporting] = useState(false);
   const [reporting, setReporting] = useState(false);
+
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const [viewFilter, setViewFilter] = useState<
     "ALL" | "VARIANCES" | "COMPLETED"
@@ -82,8 +99,6 @@ export default function CampaignResults() {
     enabled: !!campaignId,
     staleTime: 60000, // 1 minute - results don't change often
   });
-
-  console.log(results);
 
   const exportResults = async () => {
     try {
@@ -417,85 +432,200 @@ export default function CampaignResults() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b dark:text-gray-500">
-                    <th className="text-left py-2 font-normal">Task</th>
-                    <th className="text-left py-2 font-normal">Location</th>
-                    <th className="text-left py-2 font-normal">Product</th>
-                    <th className="text-right py-2 font-normal">System Qty</th>
-                    <th className="text-right py-2 font-normal">Counted Qty</th>
-                    <th className="text-right py-2 font-normal">Variance</th>
-                    <th className="text-center py-2 font-normal">Status</th>
-                    <th className="text-left py-2 font-normal">Notes</th>
+                    <th className="text-left py-2 font-normal dark:text-gray-400">
+                      Task
+                    </th>
+                    <th className="text-left py-2 font-normal dark:text-gray-400">
+                      Location
+                    </th>
+                    <th className="text-left py-2 font-normal dark:text-gray-400">
+                      Product
+                    </th>
+                    <th className="text-right py-2 font-normal dark:text-gray-400">
+                      System Qty
+                    </th>
+                    <th className="text-right py-2 font-normal dark:text-gray-400">
+                      Counted Qty
+                    </th>
+                    <th className="text-right py-2 font-normal dark:text-gray-400">
+                      Variance
+                    </th>
+                    <th className="text-center py-2 font-normal dark:text-gray-400">
+                      Status
+                    </th>
+                    {/* <th className="text-left py-2 font-normal">Audit Trail</th>
+                    <th className="text-left py-2 font-normal">Notes</th> */}
+                    <th className="text-left"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTasks.map((task) => (
-                    <tr key={task.id} className="border-b hover:bg-background">
-                      <td className="py-2 font-medium">{task.taskNumber}</td>
-                      <td className="py-2">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-                          {task.location.name}
-                          {task.location.zone && (
-                            <span className="ml-1 text-gray-500">
-                              ({task.location.zone})
+                    <>
+                      <tr
+                        key={task.id}
+                        className="border-b hover:bg-background cursor-pointer"
+                        onClick={() =>
+                          setExpandedRow(
+                            expandedRow === task.id ? null : task.id
+                          )
+                        }
+                      >
+                        <td className="py-2 font-medium">{task.taskNumber}</td>
+                        <td className="py-2">
+                          <div className="flex items-center">
+                            <MapPin className="w-4 h-4 mr-1 text-gray-400" />
+                            {task.location.name}
+                          </div>
+                        </td>
+                        <td className="py-2">
+                          {task.productVariant ? (
+                            <div>
+                              <div className="font-medium">
+                                {task.productVariant.product.name}
+                              </div>
+                              <div className="text-gray-500 text-xs">
+                                SKU: {task.productVariant.sku}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">
+                              Location Count
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-2">
-                        {task.productVariant ? (
-                          <div>
-                            <div className="font-medium">
-                              {task.productVariant.product.name}
-                            </div>
-                            <div className="text-gray-500 text-xs">
-                              SKU: {task.productVariant.sku}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">Location Count</span>
-                        )}
-                      </td>
-                      <td className="py-2 text-right font-medium">
-                        {task.systemQuantity}
-                      </td>
-                      <td className="py-2 text-right">
-                        {task.countedQuantity !== null
-                          ? task.countedQuantity
-                          : "-"}
-                      </td>
-                      <td className="py-2 text-right">
-                        {task.variance !== null &&
-                        task.variance !== undefined ? (
-                          <span
-                            className={`font-medium ${
-                              task.variance > 0
-                                ? "text-green-600"
-                                : task.variance < 0
-                                ? "text-red-400"
-                                : "text-gray-600"
-                            }`}
-                          >
-                            {formatVariance(task.variance)}
-                            {task.variancePercentage && (
-                              <div className="text-xs text-gray-500">
-                                ({task.variancePercentage.toFixed(1)}%)
+                        </td>
+                        <td className="py-2 text-right font-medium">
+                          {task.systemQuantity}
+                        </td>
+                        <td className="py-2 text-right">
+                          {task.countedQuantity !== null
+                            ? task.countedQuantity
+                            : "-"}
+                        </td>
+                        <td className="py-2 text-right">
+                          {task.variance !== null &&
+                          task.variance !== undefined ? (
+                            <span
+                              className={`font-medium ${
+                                task.variance > 0
+                                  ? "text-green-600"
+                                  : task.variance < 0
+                                  ? "text-red-400"
+                                  : "text-gray-600"
+                              }`}
+                            >
+                              {formatVariance(task.variance)}
+                              {task.variancePercentage && (
+                                <div className="text-xs text-gray-500">
+                                  ({task.variancePercentage.toFixed(1)}%)
+                                </div>
+                              )}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="py-2 text-center">
+                          <Badge className={getStatusColor(task.status)}>
+                            {task.status.replace("_", " ")}
+                          </Badge>
+                        </td>
+
+                        {/* <td className="py-2 text-xs">
+                          <div className="space-y-1">
+                            {task.assignedUser && (
+                              <div className="text-gray-600">
+                                <span className="font-medium">Counted by:</span>{" "}
+                                {task.assignedUser.name}
                               </div>
                             )}
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td className="py-2 text-center">
-                        <Badge className={getStatusColor(task.status)}>
-                          {task.status.replace("_", " ")}
-                        </Badge>
-                      </td>
-                      <td className="py-2 max-w-xs truncate">
-                        {task.notes || "-"}
-                      </td>
-                    </tr>
+
+                            {task.events?.find(
+                              (e) => e.eventType === "RECOUNT_REQUESTED"
+                            ) && (
+                              <div className="text-orange-600">
+                                <span className="font-medium">
+                                  Recount requested by:
+                                </span>{" "}
+                                {
+                                  task.events.find(
+                                    (e) => e.eventType === "RECOUNT_REQUESTED"
+                                  )?.user.name
+                                }
+                              </div>
+                            )}
+
+                            {task.events?.find(
+                              (e) =>
+                                e.eventType === "VARIANCE_NOTED" &&
+                                e.notes?.includes("approved")
+                            ) && (
+                              <div className="text-green-600">
+                                <span className="font-medium">
+                                  Approved by:
+                                </span>{" "}
+                                {
+                                  task.events.find(
+                                    (e) =>
+                                      e.eventType === "VARIANCE_NOTED" &&
+                                      e.notes?.includes("approved")
+                                  )?.user.name
+                                }
+                              </div>
+                            )}
+
+                            {task.completedAt && (
+                              <div className="text-gray-500">
+                                {new Date(task.completedAt).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-2 max-w-xs truncate">
+                          {task.notes || "-"}
+                        </td> */}
+                        <td className="h-full text-xs">
+                          <div className="flex items-center justify-center gap-2 w-full h-full">
+                            Expand Details
+                            <ArrowDown size={14} />
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expandable audit trail */}
+                      {expandedRow === task.id && (
+                        <tr className="bg-gray-50 dark:bg-zinc-800">
+                          <td colSpan={9} className="p-4">
+                            <div className="text-xs">
+                              <h4>{task.notes}</h4>
+                              {/* <h4 className="font-semibold mb-2">
+                                Full Audit Trail
+                              </h4> */}
+                              <div className="space-y-3">
+                                {task.events?.map((event) => (
+                                  <div
+                                    key={event.id}
+                                    className="flex justify-between"
+                                  >
+                                    <span>
+                                      <span className="text-blue-400 mr-1">
+                                        {event.eventType.replace("_", " ")}:
+                                      </span>{" "}
+                                      {event.user.name}
+                                    </span>
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      {new Date(
+                                        event.createdAt
+                                      ).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
