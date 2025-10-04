@@ -59,10 +59,13 @@ export default function TrackingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   useEffect(() => {
     loadTrackingInfo();
   }, [id]);
+
+  console.log(trackingInfo);
 
   const loadTrackingInfo = async () => {
     try {
@@ -166,7 +169,7 @@ export default function TrackingPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <Link href="/dashboard/orders">
-              <Button variant="ghost" className="mr-4">
+              <Button variant="ghost" className="mr-4 cursor-pointer">
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </Link>
@@ -257,6 +260,7 @@ export default function TrackingPage() {
                         </div>
                         <div className="flex gap-2">
                           <Button
+                            className="cursor-pointer"
                             variant="outline"
                             onClick={() =>
                               copyToClipboard(
@@ -276,6 +280,7 @@ export default function TrackingPage() {
                             pkg.trackingNumber
                           ) && (
                             <Button
+                              className="cursor-pointer"
                               onClick={() =>
                                 window.open(
                                   getCarrierTrackingUrl(
@@ -334,7 +339,7 @@ export default function TrackingPage() {
                     <div className="space-y-3">
                       <Button
                         onClick={() => window.open(pkg.labelUrl, "_blank")}
-                        className="w-full"
+                        className="w-full cursor-pointer"
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Download Shipping Label
@@ -355,7 +360,7 @@ export default function TrackingPage() {
                               "_blank"
                             )
                           }
-                          className="w-full"
+                          className="w-full cursor-pointer"
                         >
                           <ExternalLink className="w-4 h-4 mr-2" />
                           Track on {getCarrierName(pkg.carrierCode)} Website
@@ -370,7 +375,7 @@ export default function TrackingPage() {
                             pkg.trackingNumber
                           )
                         }
-                        className="w-full"
+                        className="w-full cursor-pointer"
                       >
                         {copiedTracking === pkg.trackingNumber ? (
                           <>
@@ -397,21 +402,50 @@ export default function TrackingPage() {
           <Card className="mt-6">
             <CardContent className="p-6">
               <div className="text-center">
-                <h3 className="font-medium mb-2">Download All Labels</h3>
+                <h3 className="font-medium mb-2 text-green-400">
+                  Download All Labels
+                </h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
                   Get all {trackingInfo.packages.length} shipping labels at once
                 </p>
                 <Button
-                  onClick={() => {
-                    trackingInfo.packages.forEach((pkg, index) => {
-                      setTimeout(() => {
-                        window.open(pkg.labelUrl, "_blank");
-                      }, index * 500);
-                    });
+                  className="cursor-pointer"
+                  disabled={isDownloadingAll}
+                  onClick={async () => {
+                    try {
+                      setIsDownloadingAll(true);
+                      const res = await fetch(
+                        `/api/shipping/tracking/${trackingInfo.order.id}/labels`
+                      );
+                      if (!res.ok) throw new Error("Failed to download labels");
+
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${trackingInfo.order.orderNumber}-labels.pdf`;
+                      a.click();
+
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setIsDownloadingAll(false);
+                    }
                   }}
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download All Labels
+                  {isDownloadingAll ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download All Labels
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>

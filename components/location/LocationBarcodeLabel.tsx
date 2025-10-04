@@ -61,7 +61,8 @@ export default function LocationBarcodeLabel({
       {/* Thumbnail - clickable */}
       <div
         onClick={() => setIsModalOpen(true)}
-        className="relative flex flex-col items-center p-4 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg cursor-pointer hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 transition-all group"
+        className="relative flex flex-col items-center p-4 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 
+        rounded-lg cursor-pointer hover:shadow-lg hover:border-gray-400 dark:hover:border-gray-400 transition-all group"
       >
         <canvas ref={thumbnailCanvasRef}></canvas>
         <div className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -70,7 +71,7 @@ export default function LocationBarcodeLabel({
 
         {/* Hover indicator */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Maximize2 className="w-4 h-4 text-blue-500" />
+          <Maximize2 className="w-4 h-4 text-gray-500 dark:text-gray-200" />
         </div>
       </div>
 
@@ -87,7 +88,7 @@ export default function LocationBarcodeLabel({
             {/* Close button */}
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              className="cursor-pointer absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
               aria-label="Close"
             >
               <X className="w-6 h-6" />
@@ -114,48 +115,3 @@ export default function LocationBarcodeLabel({
     </>
   );
 }
-// // components/LocationBarcodeLabel.tsx
-// "use client";
-
-// import { useEffect, useRef } from "react";
-// import JsBarcode from "jsbarcode";
-
-// interface LocationBarcodeLabelProps {
-//   locationName: string;
-//   width?: number;
-//   height?: number;
-// }
-
-// export default function LocationBarcodeLabel({
-//   locationName,
-//   width = 2,
-//   height = 60,
-// }: LocationBarcodeLabelProps) {
-//   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-//   useEffect(() => {
-//     if (canvasRef.current) {
-//       try {
-//         JsBarcode(canvasRef.current, locationName, {
-//           format: "CODE128", // Most common for alphanumeric
-//           width,
-//           height,
-//           displayValue: true, // Shows "1-E-13-A-3-X" below barcode
-//           fontSize: 14,
-//           margin: 10,
-//         });
-//       } catch (error) {
-//         console.error("Error generating barcode:", error);
-//       }
-//     }
-//   }, [locationName, width, height]);
-
-//   return (
-//     <div className="flex flex-col items-center p-4 bg-white">
-//       <canvas ref={canvasRef}></canvas>
-//       <div className="mt-2 text-sm font-medium text-gray-700">
-//         Location: {locationName}
-//       </div>
-//     </div>
-//   );
-// }

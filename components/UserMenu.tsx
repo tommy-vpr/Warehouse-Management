@@ -43,21 +43,22 @@ export default function UserMenu() {
   const getRoleBadgeColor = (role?: string) => {
     switch (role) {
       case "ADMIN":
-        return "bg-red-100 text-red-800 hover:bg-red-200";
+        return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400";
       case "MANAGER":
-        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400";
       case "STAFF":
-        return "bg-green-100 text-green-800 hover:bg-green-200";
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400";
       case "READONLY":
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+        return "bg-gray-100 text-gray-800";
       default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const handleSignOut = () => {
     signOut({
-      callbackUrl: "/auth/signin",
+      // callbackUrl: "/auth/signin",
+      callbackUrl: "/",
       redirect: true,
     });
   };
@@ -65,14 +66,10 @@ export default function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="lg"
-          className="flex items-center space-x-2 cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+        <div className="flex items-center space-x-2 cursor-pointer">
+          <div className="w-8 h-8 rounded-full bg-zinc-800 dark:bg-gray-200 flex items-center justify-center">
             {session.user?.name ? (
-              <span className="text-xs font-medium text-blue-600">
+              <span className="text-xs font-medium text-gray-200 dark:text-gray-800">
                 {session.user.name
                   .split(" ")
                   .map((n) => n[0])
@@ -83,21 +80,21 @@ export default function UserMenu() {
               <User className="w-4 h-4 text-blue-600" />
             )}
           </div>
-          <div className="hidden md:block text-left">
+          {/* <div className="hidden md:block text-left">
             <div className="text-sm font-medium">
               {session.user?.name || "User"}
             </div>
             <div className="text-xs text-gray-500">{session.user?.email}</div>
           </div>
-          <ChevronDown className="w-3 h-3 text-gray-400" />
-        </Button>
+          <ChevronDown className="w-3 h-3 text-gray-400" /> */}
+        </div>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-64" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              {/* <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                 {session.user?.name ? (
                   <span className="text-sm font-medium text-blue-600">
                     {session.user.name
@@ -109,7 +106,7 @@ export default function UserMenu() {
                 ) : (
                   <User className="w-5 h-5 text-blue-600" />
                 )}
-              </div>
+              </div> */}
               <div className="flex-1">
                 <p className="text-sm font-medium">
                   {session.user?.name || "User"}
@@ -121,7 +118,7 @@ export default function UserMenu() {
             {session.user?.role && (
               <Badge
                 variant="secondary"
-                className={`text-xs w-fit ${getRoleBadgeColor(
+                className={`rounded-4xl text-[10px] w-fit ${getRoleBadgeColor(
                   session.user.role
                 )}`}
               >
@@ -132,7 +129,7 @@ export default function UserMenu() {
           </div>
         </DropdownMenuLabel>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="dark:bg-zinc-800" />
 
         <DropdownMenuItem>
           <User className="mr-2 h-4 w-4" />

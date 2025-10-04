@@ -16,6 +16,7 @@ import {
   RefreshCw,
   DollarSign,
   MapPin,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "orders", label: "Orders", icon: ShoppingCart },
     { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
+    { id: "supply-planning", label: "Supply Planning", icon: CalendarDays },
     { id: "shipping", label: "Shipping", icon: Truck },
     { id: "import", label: "Import", icon: Import },
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },

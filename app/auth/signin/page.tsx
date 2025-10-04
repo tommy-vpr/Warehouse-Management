@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Package, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -25,6 +26,8 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  const { toast } = useToast();
 
   const handlePasswordSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +44,9 @@ export default function SignIn() {
       if (result?.error) {
         setError("Invalid email or password. Please try again.");
       } else if (result?.ok) {
+        toast({
+          title: "Welcome!",
+        });
         router.push("/dashboard");
         router.refresh();
       }
@@ -83,26 +89,35 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50">
-      <Card className="w-full max-w-md bg-white border border-gray-200 text-gray-700">
+    <div className="flex items-center justify-center">
+      <Card
+        className="w-full max-w-md 
+             bg-white/10 backdrop-blur-xl 
+             border border-white/20 
+             shadow-xl rounded-2xl 
+             text-gray-100"
+      >
         <CardHeader className="space-y-1 text-center">
-          <div className="relative w-18 h-18 sm:w-14 sm:h-14 m-auto">
+          <div className="relative w-16 h-16 m-auto">
             <Image
               src="/images/headquarter-logo.webp"
               alt="HQ warehouse management"
               fill
-              className="object-contain"
-              sizes="(max-width: 640px) 32px, 48px"
+              className="object-contain drop-shadow-lg invert"
+              sizes="64px"
             />
           </div>
-          <CardDescription className="text-gray-500">
+          <CardTitle className="text-xl text-white">
+            Sign into your account
+          </CardTitle>
+          {/* <CardDescription className="text-gray-00">
             Sign in to your warehouse management system
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
 
         <CardContent className="space-y-4">
           {error && (
-            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-md border border-red-200 dark:border-red-800">
+            <div className="flex items-center space-x-2 text-red-400 bg-red-700/10 p-3 rounded-md border border-red-400">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm">{error}</span>
             </div>
@@ -110,7 +125,9 @@ export default function SignIn() {
 
           <form onSubmit={handlePasswordSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
+              <Label htmlFor="email" className="text-gray-100">
+                Email address
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -119,12 +136,15 @@ export default function SignIn() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
-                className="border border-gray-200 bg-white"
+                className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400
+                     focus:ring-2 focus:ring-blue-400 focus:outline-none"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-gray-100">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -134,12 +154,13 @@ export default function SignIn() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="border border-gray-200 bg-white"
+                  className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400
+                       focus:ring-2 focus:ring-blue-400 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -152,7 +173,10 @@ export default function SignIn() {
 
             <Button
               type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer transition"
+              className="w-full bg-gradient-to-r from-blue-500 to-violet-500 
+                   text-white font-semibold rounded-xl py-2 
+                   hover:shadow-[0_0_20px_rgba(59,130,246,0.6)] 
+                   transition-all duration-300"
               disabled={isLoading}
             >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -160,17 +184,17 @@ export default function SignIn() {
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Or</span>
-            </div>
+          <div className="flex items-center gap-4">
+            <span className="flex-1 border-t border-white/20" />
+            <span className="text-gray-300 text-xs uppercase">Or</span>
+            <span className="flex-1 border-t border-white/20" />
           </div>
 
           <Button
-            className="w-full bg-gray-700 text-gray-200 cursor-pointer hover:bg-gray-600 transiton"
+            className="w-full bg-white/10 text-white 
+                 border border-white/20 rounded-xl py-2
+                 hover:bg-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] 
+                 transition-all duration-300"
             onClick={handleDemoLogin}
             disabled={isLoading}
           >
@@ -179,14 +203,17 @@ export default function SignIn() {
           </Button>
         </CardContent>
 
-        <CardFooter>
-          <p className="text-center text-sm text-muted-foreground w-full">
+        {/* <CardFooter>
+          <p className="text-center text-sm text-gray-300 w-full">
             Don't have an account?{" "}
-            <Link href="/auth/signup" className="text-blue-600 hover:underline">
+            <Link
+              href="/auth/signup"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
               Sign up
             </Link>
           </p>
-        </CardFooter>
+        </CardFooter> */}
       </Card>
     </div>
   );

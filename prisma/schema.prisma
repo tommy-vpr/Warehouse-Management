@@ -691,3 +691,70 @@ model PurchaseOrderItem {
 
   @@map("purchase_order_items")
 }
+
+// ---------------------------------------------------
+// *** Inventory Planner
+// ---------------------------------------------------
+model ForecastSuggestion {
+  id             String   @id @default(cuid())
+  sku            String   @unique
+  productName    String?
+  vendorId       String?
+  warehouseId    String?
+  currentStock   Int?
+  forecast30Days Int?
+  forecast60Days Int?
+  forecast90Days Int?
+  daysOfStock    Int?
+  safetyStock    Int?
+  leadTimeDays   Int?
+  reorderPoint   DateTime?
+  recommendedQty Int?
+  unitCost       Float?
+  currency       String?
+  replenishment  Int?      // from API
+  reviewPeriod   Int?      // from API
+  lastUpdated    DateTime
+
+  @@index([sku, warehouseId])
+}
+
+model InventoryPlannerPurchaseOrder {
+  id           String   @id @default(cuid())
+  poId         String   @unique
+  reference    String?
+  vendorId     String?
+  vendorName   String?
+  status       String
+  createdAt    DateTime
+  expectedDate DateTime?
+  currency     String?
+  totalValue   Float?
+  lastUpdated  DateTime
+
+  lines        InventoryPlannerPOLine[]
+}
+
+model InventoryPlannerPOLine {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  sku             String
+  productName     String?
+  qtyOrdered      Int
+  unitCost        Float?
+  totalCost       Float?
+
+  purchaseOrder   InventoryPlannerPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([sku])
+}
+
+
+model SyncLog {
+  id     String   @id @default(cuid())
+  type   String   // "forecast" | "purchase_order"
+  status String   // "success" | "error"
+  count  Int?
+  error  String?
+  runAt  DateTime @default(now())
+}

@@ -220,6 +220,7 @@ export default function ShippingDashboard() {
                       </div>
                       <div className="flex gap-2">
                         <Button
+                          className="cursor-pointer"
                           variant="outline"
                           size="sm"
                           onClick={() =>

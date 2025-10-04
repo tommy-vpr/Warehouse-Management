@@ -74,12 +74,12 @@ export default function PrintLabelsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
           Location Labels
         </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
+        <p className="text-green-600 dark:text-green-400 mt-1">
           {locations.length} location{locations.length !== 1 ? "s" : ""} found
         </p>
         <Button
           onClick={() => window.print()}
-          className="mt-4"
+          className="mt-4 cursor-pointer"
           disabled={locations.length === 0}
         >
           Print All Labels

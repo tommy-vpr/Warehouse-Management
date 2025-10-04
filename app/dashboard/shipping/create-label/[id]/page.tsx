@@ -18,6 +18,27 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 
+interface PackageConfig {
+  id: string;
+  packageCode: string;
+  weight: string;
+  dimensions: {
+    length: string;
+    width: string;
+    height: string;
+  };
+}
+
+interface Shipment {
+  id: string;
+  name: string;
+  items: ShipmentItem[];
+  carrierId: string;
+  serviceCode: string;
+  packages: PackageConfig[]; // 👈 multiple packages
+  notes: string;
+}
+
 // TypeScript interfaces
 interface OrderItem {
   id: string;
@@ -71,24 +92,6 @@ interface ShipmentItem {
   unitPrice: number;
   quantity: number;
   weight?: number;
-}
-
-interface Shipment {
-  id: string;
-  name: string;
-  items: ShipmentItem[];
-  shippingConfig: {
-    carrierId: string;
-    serviceCode: string;
-    packageCode: string;
-    weight: string;
-    dimensions: {
-      length: string;
-      width: string;
-      height: string;
-    };
-  };
-  notes: string;
 }
 
 interface CompletedShipment {
@@ -183,17 +186,16 @@ const OrderSplitter: React.FC = () => {
         id: generateId(),
         name: "Shipment 1",
         items: [],
-        shippingConfig: {
-          carrierId: "",
-          serviceCode: "",
-          packageCode: "",
-          weight: "",
-          dimensions: {
-            length: "10",
-            width: "8",
-            height: "6",
+        carrierId: "",
+        serviceCode: "",
+        packages: [
+          {
+            id: generateId(),
+            packageCode: "",
+            weight: "",
+            dimensions: { length: "10", width: "8", height: "6" },
           },
-        },
+        ],
         notes: "",
       };
 
@@ -227,21 +229,83 @@ const OrderSplitter: React.FC = () => {
       id: generateId(),
       name: `Shipment ${shipments.length + 1}`,
       items: [],
-      shippingConfig: {
-        carrierId: "",
-        serviceCode: "",
-        packageCode: "",
-        weight: "",
-        dimensions: {
-          length: "10",
-          width: "8",
-          height: "6",
+      carrierId: "",
+      serviceCode: "",
+      packages: [
+        {
+          id: generateId(),
+          packageCode: "",
+          weight: "",
+          dimensions: { length: "10", width: "8", height: "6" },
         },
-      },
+      ],
       notes: "",
     };
 
     setShipments([...shipments, newShipment]);
+  };
+
+  const addPackageToShipment = (shipmentId: string) => {
+    setShipments(
+      shipments.map((shipment) =>
+        shipment.id === shipmentId
+          ? {
+              ...shipment,
+              packages: [
+                ...shipment.packages,
+                {
+                  id: generateId(),
+                  packageCode: "",
+                  weight: "",
+                  dimensions: { length: "10", width: "8", height: "6" },
+                },
+              ],
+            }
+          : shipment
+      )
+    );
+  };
+
+  const removePackageFromShipment = (shipmentId: string, packageId: string) => {
+    setShipments(
+      shipments.map((shipment) =>
+        shipment.id === shipmentId
+          ? {
+              ...shipment,
+              packages: shipment.packages.filter((p) => p.id !== packageId),
+            }
+          : shipment
+      )
+    );
+  };
+
+  const updatePackageConfig = (
+    shipmentId: string,
+    packageId: string,
+    field: string,
+    value: string
+  ) => {
+    setShipments(
+      shipments.map((shipment) => {
+        if (shipment.id !== shipmentId) return shipment;
+        return {
+          ...shipment,
+          packages: shipment.packages.map((pkg) =>
+            pkg.id === packageId
+              ? field.includes(".")
+                ? {
+                    ...pkg,
+                    dimensions: {
+                      ...pkg.dimensions,
+                      [field.split(".")[1]]: value,
+                    },
+                  }
+                : { ...pkg, [field]: value }
+              : pkg
+          ),
+        };
+      })
+    );
   };
 
   // Remove shipment
@@ -352,26 +416,9 @@ const OrderSplitter: React.FC = () => {
     value: string
   ) => {
     setShipments(
-      shipments.map((shipment) => {
-        if (shipment.id !== shipmentId) return shipment;
-
-        const newConfig = { ...shipment.shippingConfig };
-
-        if (field.includes(".")) {
-          const [parent, child] = field.split(".");
-          if (parent === "dimensions") {
-            newConfig.dimensions = { ...newConfig.dimensions, [child]: value };
-          }
-        } else {
-          (newConfig as any)[field] = value;
-          if (field === "carrierId") {
-            newConfig.serviceCode = "";
-            newConfig.packageCode = "";
-          }
-        }
-
-        return { ...shipment, shippingConfig: newConfig };
-      })
+      shipments.map((shipment) =>
+        shipment.id === shipmentId ? { ...shipment, [field]: value } : shipment
+      )
     );
   };
 
@@ -385,32 +432,43 @@ const OrderSplitter: React.FC = () => {
   };
 
   // Validation
+  // Validation
   const validateShipments = (): string[] => {
     const errors: string[] = [];
-
     if (!order) return ["Order not loaded"];
 
-    // Check that shipments have items
     shipments.forEach((shipment) => {
       if (shipment.items.length === 0) {
         errors.push(`${shipment.name} must have at least one item`);
       }
 
-      const { carrierId, serviceCode, packageCode, weight } =
-        shipment.shippingConfig;
+      const { carrierId, serviceCode, packages } = shipment;
+
       if (shipment.items.length > 0) {
-        if (!carrierId || !serviceCode || !packageCode) {
-          errors.push(
-            `${shipment.name} needs carrier, service, and package selected`
-          );
+        if (!carrierId || !serviceCode) {
+          errors.push(`${shipment.name} needs carrier and service selected`);
         }
-        if (!weight || parseFloat(weight) <= 0) {
-          errors.push(`${shipment.name} needs valid weight`);
+
+        if (packages.length === 0) {
+          errors.push(`${shipment.name} must have at least one package`);
+        } else {
+          packages.forEach((pkg, i) => {
+            if (!pkg.packageCode) {
+              errors.push(
+                `${shipment.name} package ${i + 1} needs a package type`
+              );
+            }
+            if (!pkg.weight || parseFloat(pkg.weight) <= 0) {
+              errors.push(
+                `${shipment.name} package ${i + 1} needs a valid weight`
+              );
+            }
+          });
         }
       }
     });
 
-    // Check for unallocated items
+    // Check for unallocated items - ADD THIS HERE
     const unallocatedItems = getAllocationSummary.filter(
       (item) => item.remaining > 0
     );
@@ -447,7 +505,7 @@ const OrderSplitter: React.FC = () => {
 
       for (const shipment of validShipments) {
         const selectedCarrier = carriers.find(
-          (c) => c.carrier_id === shipment.shippingConfig.carrierId
+          (c) => c.carrier_id === shipment.carrierId
         );
         if (!selectedCarrier) {
           throw new Error(`Carrier not found for ${shipment.name}`);
@@ -456,16 +514,14 @@ const OrderSplitter: React.FC = () => {
         const shipmentData = {
           orderId: order.id,
           carrierCode: selectedCarrier.carrier_code,
-          serviceCode: shipment.shippingConfig.serviceCode,
-          packages: [
-            {
-              packageCode: shipment.shippingConfig.packageCode,
-              weight: parseFloat(shipment.shippingConfig.weight),
-              length: parseFloat(shipment.shippingConfig.dimensions.length),
-              width: parseFloat(shipment.shippingConfig.dimensions.width),
-              height: parseFloat(shipment.shippingConfig.dimensions.height),
-            },
-          ],
+          serviceCode: shipment.serviceCode,
+          packages: shipment.packages.map((pkg) => ({
+            packageCode: pkg.packageCode,
+            weight: parseFloat(pkg.weight),
+            length: parseFloat(pkg.dimensions.length),
+            width: parseFloat(pkg.dimensions.width),
+            height: parseFloat(pkg.dimensions.height),
+          })),
           shippingAddress: {
             name: order.customerName,
             address1: order.shippingAddress.address1,
@@ -549,7 +605,7 @@ const OrderSplitter: React.FC = () => {
   if (completedShipments.length > 0) {
     return (
       <div className="max-w-6xl mx-auto p-6">
-        <div className="p-6 bg-green-50 border border-green-200 dark:border-green-500 dark:bg-background rounded-lg">
+        <div className="p-6 bg-green-50 border border-green-200 dark:border-gray-700 dark:bg-background rounded-lg">
           <div className="flex items-center mb-4">
             <Check className="w-6 h-6 text-green-600 mr-2" />
             <h2 className="text-xl font-semibold text-green-800 dark:text-green-400">
@@ -597,31 +653,6 @@ const OrderSplitter: React.FC = () => {
               </div>
             ))}
           </div>
-
-          {/* <button
-            onClick={() => {
-              setCompletedShipments([]);
-              setShipments([
-                {
-                  id: generateId(),
-                  name: "Shipment 1",
-                  items: [],
-                  shippingConfig: {
-                    carrierId: "",
-                    serviceCode: "",
-                    packageCode: "",
-                    weight: "",
-                    dimensions: { length: "10", width: "8", height: "6" },
-                  },
-                  notes: "",
-                },
-              ]);
-            }}
-            className="mt-4 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Create New Split
-          </button> */}
         </div>
       </div>
     );
@@ -853,7 +884,7 @@ const OrderSplitter: React.FC = () => {
 
                     {/* Carrier Selection */}
                     <select
-                      value={shipment.shippingConfig.carrierId}
+                      value={shipment.carrierId}
                       onChange={(e) =>
                         updateShippingConfig(
                           shipment.id,
@@ -878,9 +909,9 @@ const OrderSplitter: React.FC = () => {
                     </select>
 
                     {/* Service Selection */}
-                    {shipment.shippingConfig.carrierId && (
+                    {shipment.carrierId && (
                       <select
-                        value={shipment.shippingConfig.serviceCode}
+                        value={shipment.serviceCode}
                         onChange={(e) =>
                           updateShippingConfig(
                             shipment.id,
@@ -891,126 +922,171 @@ const OrderSplitter: React.FC = () => {
                         className="w-full px-2 py-1 border rounded text-xs dark:text-gray-400"
                       >
                         <option value="">Select Service</option>
-                        {getCarrierOptions(
-                          shipment.shippingConfig.carrierId
-                        ).services.map((service) => (
-                          <option
-                            key={service.service_code}
-                            value={service.service_code}
-                          >
-                            {service.name}
-                          </option>
-                        ))}
+                        {getCarrierOptions(shipment.carrierId).services.map(
+                          (service) => (
+                            <option
+                              key={service.service_code}
+                              value={service.service_code}
+                            >
+                              {service.name}
+                            </option>
+                          )
+                        )}
                       </select>
                     )}
 
-                    {/* Package Selection */}
-                    {shipment.shippingConfig.carrierId && (
-                      <select
-                        value={shipment.shippingConfig.packageCode}
-                        onChange={(e) =>
-                          updateShippingConfig(
-                            shipment.id,
-                            "packageCode",
-                            e.target.value
+                    {/* Notes */}
+                    <input
+                      type="text"
+                      value={shipment.notes}
+                      onChange={(e) =>
+                        setShipments(
+                          shipments.map((s) =>
+                            s.id === shipment.id
+                              ? { ...s, notes: e.target.value }
+                              : s
                           )
-                        }
-                        className="w-full px-2 py-1 border rounded text-xs dark:text-gray-400"
-                      >
-                        <option value="">Select Package</option>
-                        {getCarrierOptions(
-                          shipment.shippingConfig.carrierId
-                        ).packages.map((pkg) => (
-                          <option
-                            key={pkg.package_code}
-                            value={pkg.package_code}
-                          >
-                            {pkg.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                        )
+                      }
+                      className="w-full px-2 py-1 border rounded text-xs"
+                      placeholder="Notes (optional)"
+                    />
 
-                    {/* Weight and Dimensions */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={shipment.shippingConfig.weight}
-                        onChange={(e) =>
-                          updateShippingConfig(
-                            shipment.id,
-                            "weight",
-                            e.target.value
-                          )
-                        }
-                        className="px-2 py-1 border rounded text-xs"
-                        placeholder="Weight (lbs)"
-                      />
-                      <input
-                        type="text"
-                        value={shipment.notes}
-                        onChange={(e) =>
-                          setShipments(
-                            shipments.map((s) =>
-                              s.id === shipment.id
-                                ? { ...s, notes: e.target.value }
-                                : s
-                            )
-                          )
-                        }
-                        className="px-2 py-1 border rounded text-xs"
-                        placeholder="Notes (optional)"
-                      />
-                    </div>
+                    {/* Packages Section */}
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400">
+                          Packages ({shipment.packages.length})
+                        </h5>
+                        <button
+                          onClick={() => addPackageToShipment(shipment.id)}
+                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Add Package
+                        </button>
+                      </div>
 
-                    <div className="grid grid-cols-3 gap-1">
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={shipment.shippingConfig.dimensions.length}
-                        onChange={(e) =>
-                          updateShippingConfig(
-                            shipment.id,
-                            "dimensions.length",
-                            e.target.value
-                          )
-                        }
-                        placeholder="L"
-                        className="px-2 py-1 border rounded text-xs"
-                      />
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={shipment.shippingConfig.dimensions.width}
-                        onChange={(e) =>
-                          updateShippingConfig(
-                            shipment.id,
-                            "dimensions.width",
-                            e.target.value
-                          )
-                        }
-                        placeholder="W"
-                        className="px-2 py-1 border rounded text-xs"
-                      />
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={shipment.shippingConfig.dimensions.height}
-                        onChange={(e) =>
-                          updateShippingConfig(
-                            shipment.id,
-                            "dimensions.height",
-                            e.target.value
-                          )
-                        }
-                        placeholder="H"
-                        className="px-2 py-1 border rounded text-xs"
-                      />
+                      {shipment.packages.map((pkg, pkgIndex) => (
+                        <div
+                          key={pkg.id}
+                          className="border p-3 rounded bg-gray-50 dark:bg-zinc-800 space-y-2"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                              Package {pkgIndex + 1}
+                            </span>
+                            {shipment.packages.length > 1 && (
+                              <button
+                                onClick={() =>
+                                  removePackageFromShipment(shipment.id, pkg.id)
+                                }
+                                className="text-red-400 hover:text-red-500"
+                              >
+                                <X className="w-5 h-5 cursor-pointer" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* Package Type */}
+                            <select
+                              value={pkg.packageCode}
+                              onChange={(e) =>
+                                updatePackageConfig(
+                                  shipment.id,
+                                  pkg.id,
+                                  "packageCode",
+                                  e.target.value
+                                )
+                              }
+                              className="border rounded px-2 py-1 text-xs dark:text-gray-400"
+                            >
+                              <option value="">Select Package Type</option>
+                              {getCarrierOptions(
+                                shipment.carrierId
+                              ).packages.map((option) => (
+                                <option
+                                  key={option.package_code}
+                                  value={option.package_code}
+                                >
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Weight */}
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              placeholder="Weight (lbs)"
+                              value={pkg.weight}
+                              onChange={(e) =>
+                                updatePackageConfig(
+                                  shipment.id,
+                                  pkg.id,
+                                  "weight",
+                                  e.target.value
+                                )
+                              }
+                              className="border rounded px-2 py-1 text-xs"
+                            />
+                          </div>
+
+                          {/* Dimensions */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              placeholder="Length (in)"
+                              value={pkg.dimensions.length}
+                              onChange={(e) =>
+                                updatePackageConfig(
+                                  shipment.id,
+                                  pkg.id,
+                                  "dimensions.length",
+                                  e.target.value
+                                )
+                              }
+                              className="border rounded px-2 py-1 text-xs"
+                            />
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              placeholder="Width (in)"
+                              value={pkg.dimensions.width}
+                              onChange={(e) =>
+                                updatePackageConfig(
+                                  shipment.id,
+                                  pkg.id,
+                                  "dimensions.width",
+                                  e.target.value
+                                )
+                              }
+                              className="border rounded px-2 py-1 text-xs"
+                            />
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              placeholder="Height (in)"
+                              value={pkg.dimensions.height}
+                              onChange={(e) =>
+                                updatePackageConfig(
+                                  shipment.id,
+                                  pkg.id,
+                                  "dimensions.height",
+                                  e.target.value
+                                )
+                              }
+                              className="border rounded px-2 py-1 text-xs"
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
