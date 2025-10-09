@@ -132,6 +132,17 @@ export default function ProductDetailPage() {
     toLocationId: "",
     notes: "",
     reason: "",
+    confirmerId: "",
+  });
+
+  // Query to fetch users
+  const { data: confirmUsers } = useQuery({
+    queryKey: ["assignable-users"],
+    queryFn: async () => {
+      const response = await fetch("/api/users/assignable");
+      if (!response.ok) throw new Error("Failed to fetch users");
+      return response.json();
+    },
   });
 
   // Fetch product details
@@ -232,6 +243,7 @@ export default function ProductDetailPage() {
         toLocationId: "",
         notes: "",
         reason: "",
+        confirmerId: "",
       });
     },
     onError: (error: Error) => {
@@ -261,6 +273,7 @@ export default function ProductDetailPage() {
             toLocationId: transactionData.toLocationId,
             notes: transactionData.notes,
             referenceType: "MANUAL",
+            confirmerId: transactionData.confirmerId, // ⭐ Add this
           }
         : {
             productVariantId,
@@ -272,9 +285,10 @@ export default function ProductDetailPage() {
             referenceType: "MANUAL",
           };
 
-    console.log("Transaction data:", data); // Debug log
+    console.log("Transaction data:", data);
     transactionMutation.mutate(data);
   };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "OK":
@@ -332,7 +346,7 @@ export default function ProductDetailPage() {
           <Button
             variant="ghost"
             onClick={() => router.push("/dashboard/inventory")}
-            className="mr-4"
+            className="mr-4 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -352,11 +366,13 @@ export default function ProductDetailPage() {
                 setShowTransactionModal(true);
               }}
               disabled={transactionMutation.isPending}
+              className="cursor-pointer"
             >
               <Edit className="w-4 h-4" />
               Adjust Stock
             </Button>
             <Button
+              className="cursor-pointer"
               variant={isEditing ? "outline" : "default"}
               onClick={() => {
                 if (isEditing) {
@@ -381,6 +397,7 @@ export default function ProductDetailPage() {
             </Button>
             {isEditing && (
               <Button
+                className="cursor-pointer"
                 onClick={handleSaveEdit}
                 disabled={updateMutation.isPending}
               >
@@ -407,7 +424,7 @@ export default function ProductDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       Product Name
                     </label>
                     {isEditing ? (
@@ -424,7 +441,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       SKU
                     </label>
                     <p className="text-gray-900 dark:text-gray-200 font-mono">
@@ -432,7 +449,7 @@ export default function ProductDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       UPC
                     </label>
                     {isEditing ? (
@@ -449,7 +466,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       Category
                     </label>
                     {isEditing ? (
@@ -469,7 +486,7 @@ export default function ProductDetailPage() {
 
                 {product.description && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       Description
                     </label>
                     {isEditing ? (
@@ -493,9 +510,9 @@ export default function ProductDetailPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
-                      <DollarSign className="w-4 h-4 inline mr-1 dark:text-gray-500" />
+                  {/* <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                      <DollarSign className="w-4 h-4 inline mr-1 dark:text-emerald-500" />
                       Cost Price
                     </label>
                     {isEditing ? (
@@ -519,7 +536,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       <DollarSign className="w-4 h-4 inline mr-1" />
                       Selling Price
                     </label>
@@ -542,9 +559,9 @@ export default function ProductDetailPage() {
                           : "Not set"}
                       </p>
                     )}
-                  </div>
+                  </div> */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       <Weight className="w-4 h-4 inline mr-1" />
                       Weight (oz)
                     </label>
@@ -573,7 +590,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       <Waves className="w-4 h-4 inline mr-1" />
                       Volume
                     </label>
@@ -596,7 +613,7 @@ export default function ProductDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
                       <Activity className="w-4 h-4 inline mr-1" />
                       Strength
                     </label>
@@ -801,7 +818,7 @@ export default function ProductDetailPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start cursor-pointer"
                   onClick={() =>
                     router.push(
                       `/dashboard/inventory/count?product=${productVariantId}`
@@ -813,7 +830,7 @@ export default function ProductDetailPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start cursor-pointer"
                   onClick={() => {
                     setTransactionType("TRANSFER");
                     setShowTransactionModal(true);
@@ -827,7 +844,7 @@ export default function ProductDetailPage() {
                   !hasRecentReorderRequest && (
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
+                      className="w-full justify-start cursor-pointer"
                       disabled={isCreatingReorder}
                       onClick={async () => {
                         try {
@@ -939,7 +956,7 @@ export default function ProductDetailPage() {
                             locationId: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                       >
                         <option value="">Select source location</option>
                         {product.locations.map((location) => (
@@ -962,7 +979,7 @@ export default function ProductDetailPage() {
                             toLocationId: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                       >
                         <option value="">Select destination location</option>
                         {allLocations?.map((location) => (
@@ -971,6 +988,34 @@ export default function ProductDetailPage() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* ⭐ Add Confirmer Dropdown */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                        Assign Confirmer <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={transactionData.confirmerId}
+                        onChange={(e) =>
+                          setTransactionData({
+                            ...transactionData,
+                            confirmerId: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
+                        required
+                      >
+                        <option value="">Select a confirmer...</option>
+                        {confirmUsers?.map((user: any) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} ({user.role})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        This user must confirm the transfer before it's applied
+                      </p>
                     </div>
                   </>
                 ) : (
@@ -1056,7 +1101,7 @@ export default function ProductDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => setShowTransactionModal(false)}
-                  className="flex-1"
+                  className="flex-1 cursor-pointer"
                 >
                   Cancel
                 </Button>
@@ -1067,12 +1112,15 @@ export default function ProductDetailPage() {
                     !transactionData.quantity ||
                     (transactionType === "TRANSFER" &&
                       (!transactionData.locationId ||
-                        !transactionData.toLocationId))
+                        !transactionData.toLocationId ||
+                        !transactionData.confirmerId)) // Add confirmerId check
                   }
-                  className="flex-1"
+                  className="flex-1 cursor-pointer"
                 >
                   {transactionMutation.isPending
                     ? "Processing..."
+                    : transactionType === "TRANSFER"
+                    ? "Request Transfer" // Change button text
                     : "Apply Change"}
                 </Button>
               </div>

@@ -54,6 +54,7 @@
     "react-dom": "19.1.0",
     "react-hook-form": "^7.62.0",
     "react-qr-barcode-scanner": "^2.1.10",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "uuid": "^13.0.0",
     "zod": "^4.1.5",

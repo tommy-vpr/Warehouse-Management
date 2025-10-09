@@ -17,6 +17,7 @@ import {
   DollarSign,
   MapPin,
   CalendarDays,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +45,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "orders", label: "Orders", icon: ShoppingCart },
     { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
-    { id: "supply-planning", label: "Supply Planning", icon: CalendarDays },
+    { id: "inventory/transfers", label: "Transfers", icon: ArrowLeftRight },
+    {
+      id: "inventory-planner",
+      label: "Inventory Planner",
+      icon: CalendarDays,
+    },
     { id: "shipping", label: "Shipping", icon: Truck },
     { id: "import", label: "Import", icon: Import },
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
@@ -100,14 +106,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               href="/dashboard/inventory/receive"
               className="hidden sm:block"
             >
-              <Button className="bg-blue-600 hover:bg-blue-700 dark:text-gray-200">
+              <Button className="cursor-pointer bg-blue-600 hover:bg-blue-700 dark:text-gray-200">
                 <Scan className="w-4 h-4" />
                 Receive
               </Button>
             </Link>
 
             <Link href="/dashboard/picking/scan" className="hidden sm:block">
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
+              <Button className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
                 <Scan className="w-4 h-4" />
                 Pick
               </Button>

@@ -2,330 +2,539 @@
 
 import { useState, useEffect } from "react";
 import {
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
+  Search,
+  Download,
   TrendingUp,
-  Database,
-  Clock,
-  Activity,
+  AlertTriangle,
   Loader2,
+  RefreshCw,
+  ShoppingCart,
+  Package,
 } from "lucide-react";
 
-interface SyncLog {
+interface Variant {
   id: string;
-  type: string;
+  sku: string;
+  title: string;
+  in_stock?: number;
+  replenishment?: number;
+  oos?: number;
+  cost_price?: number;
+  vendor_id?: string;
+}
+
+interface PurchaseOrder {
+  id: string;
+  reference: string;
+  vendor_name?: string;
   status: string;
-  count: number | null;
-  error: string | null;
-  runAt: string;
+  created_at: string;
+  expected_date?: string;
+  total_value?: number;
+  currency?: string;
 }
 
-interface Stats {
-  totalSyncs: number;
-  successRate: number;
-  lastForecastSync: string | null;
-  lastPOSync: string | null;
-  forecastCount: number;
-  poCount: number;
-}
+export default function InventoryReports() {
+  const [activeTab, setActiveTab] = useState<"forecast" | "po">("forecast");
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState({
+    lowStock: false,
+    limit: 50,
+  });
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
-export default function SyncDashboard() {
-  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState({ forecast: false, po: false });
-
-  useEffect(() => {
-    loadData();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const [logsRes, statsRes] = await Promise.all([
-        fetch("/api/inventory-planner/sync-logs"),
-        fetch("/api/inventory-planner/sync-stats"),
-      ]);
-
-      if (logsRes.ok) setSyncLogs(await logsRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
-    } catch (err) {
-      console.error("Failed to load sync data:", err);
-    } finally {
-      setLoading(false);
+  const loadForecasts = async (page: number = 0, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
     }
-  };
 
-  const triggerSync = async (type: "forecast" | "po") => {
-    setSyncing((prev) => ({ ...prev, [type]: true }));
     try {
-      const endpoint =
-        type === "forecast"
-          ? "/api/inventory-planner/sync-forecast"
-          : "/api/inventory-planner/sync-purchase-orders";
+      const params = new URLSearchParams({
+        endpoint: "variants",
+        fields: "id,sku,title,in_stock,replenishment,oos,cost_price,vendor_id",
+        limit: String(filters.limit),
+        page: String(page),
+      });
 
-      const res = await fetch(endpoint);
+      if (filters.lowStock) {
+        params.set("oos_lt", "7");
+      }
+
+      const res = await fetch(`/api/inventory-planner/reports?${params}`);
       const data = await res.json();
 
-      if (res.ok) {
-        alert(
-          `Sync complete: ${data.count} items processed${
-            data.errors ? ` (${data.errors.length} errors)` : ""
-          }`
-        );
-        loadData();
-      } else {
-        alert(`Sync failed: ${data.error}`);
+      if (data.success && data.data) {
+        if (append) {
+          setVariants((prev) => [...prev, ...data.data]);
+        } else {
+          setVariants(data.data);
+        }
+
+        // Check if there's more data
+        setHasMore(data.data.length === filters.limit);
+        setCurrentPage(page);
       }
-    } catch (err: any) {
-      alert(`Sync error: ${err.message}`);
+    } catch (error) {
+      console.error("Failed to load forecasts:", error);
     } finally {
-      setSyncing((prev) => ({ ...prev, [type]: false }));
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "success":
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case "error":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case "partial_success":
-        return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
-      default:
-        return <Activity className="w-5 h-5 text-gray-600" />;
+  const loadPurchaseOrders = async (
+    page: number = 0,
+    append: boolean = false
+  ) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const params = new URLSearchParams({
+        endpoint: "purchase-orders",
+        limit: String(filters.limit),
+        page: String(page),
+      });
+
+      const res = await fetch(`/api/inventory-planner/reports?${params}`);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        if (append) {
+          setPurchaseOrders((prev) => [...prev, ...data.data]);
+        } else {
+          setPurchaseOrders(data.data);
+        }
+
+        setHasMore(data.data.length === filters.limit);
+        setCurrentPage(page);
+      }
+    } catch (error) {
+      console.error("Failed to load purchase orders:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      success:
-        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-      error: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-      partial_success:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    };
-
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${
-          styles[status] || "bg-gray-100 text-gray-800"
-        }`}
-      >
-        {status.replace("_", " ").toUpperCase()}
-      </span>
-    );
+  const handleRefresh = () => {
+    setCurrentPage(0);
+    setHasMore(true);
+    if (activeTab === "forecast") {
+      loadForecasts(0, false);
+    } else {
+      loadPurchaseOrders(0, false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600 dark:text-gray-400">
-            Loading supply planning...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const loadMoreData = () => {
+    const nextPage = currentPage + 1;
+    if (activeTab === "forecast") {
+      loadForecasts(nextPage, true);
+    } else {
+      loadPurchaseOrders(nextPage, true);
+    }
+  };
+
+  const exportToCSV = () => {
+    const params = new URLSearchParams({
+      endpoint: activeTab === "forecast" ? "variants" : "purchase-orders",
+      format: "csv",
+      limit: "1000",
+    });
+
+    if (activeTab === "forecast" && filters.lowStock) {
+      params.set("oos_lt", "7");
+    }
+
+    window.open(`/api/inventory-planner/reports?${params}`, "_blank");
+  };
+
+  const filteredVariants = variants.filter(
+    (v) =>
+      !searchTerm ||
+      v.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPOs = purchaseOrders.filter(
+    (po) =>
+      !searchTerm ||
+      po.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.vendor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Inventory Planner Sync Dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            Monitor and manage data synchronization
+          <h1 className="text-3xl font-bold mb-2">Inventory Planner Reports</h1>
+          <p className="text-gray-600">
+            Real-time data from Inventory Planner API
           </p>
         </div>
 
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-card p-6 rounded-lg shadow border">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg w-fit mb-4">
-                <Database className="w-6 h-6 text-blue-600 dark:text-blue-300" />
-              </div>
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Total Syncs
-              </h3>
-              <p className="text-2xl font-bold">{stats.totalSyncs}</p>
-            </div>
-
-            <div className="bg-card p-6 rounded-lg shadow border">
-              <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg w-fit mb-4">
-                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-300" />
-              </div>
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Success Rate
-              </h3>
-              <p className="text-2xl font-bold">{stats.successRate}%</p>
-            </div>
-
-            <div className="bg-card p-6 rounded-lg shadow border">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg w-fit mb-4">
-                <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-300" />
-              </div>
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Forecasts Synced
-              </h3>
-              <p className="text-2xl font-bold">
-                {stats.forecastCount?.toLocaleString()}
-              </p>
-            </div>
-
-            <div className="bg-card p-6 rounded-lg shadow border">
-              <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg w-fit mb-4">
-                <Activity className="w-6 h-6 text-orange-600 dark:text-orange-300" />
-              </div>
-              <h3 className="text-sm font-medium text-muted-foreground">
-                POs Synced
-              </h3>
-              <p className="text-2xl font-bold">
-                {stats.poCount?.toLocaleString()}
-              </p>
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="border-b">
+            <div className="flex">
+              <button
+                onClick={() => {
+                  setActiveTab("forecast");
+                  setVariants([]);
+                  setCurrentPage(0);
+                  setHasMore(true);
+                }}
+                className={`px-6 py-4 font-medium border-b-2 transition ${
+                  activeTab === "forecast"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Forecast & Replenishment
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("po");
+                  setPurchaseOrders([]);
+                  setCurrentPage(0);
+                  setHasMore(true);
+                }}
+                className={`px-6 py-4 font-medium border-b-2 transition ${
+                  activeTab === "po"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  Purchase Orders
+                </div>
+              </button>
             </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-card p-6 rounded-lg shadow border">
-            <h3 className="text-lg font-semibold mb-4">Forecast Sync</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Sync replenishment suggestions and forecasts
-            </p>
-            {stats?.lastForecastSync && (
-              <p className="text-xs text-muted-foreground mb-4">
-                Last sync: {new Date(stats.lastForecastSync).toLocaleString()}
-              </p>
-            )}
-            <button
-              onClick={() => triggerSync("forecast")}
-              disabled={syncing.forecast}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition"
-            >
-              {syncing.forecast ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync Now
-                </>
-              )}
-            </button>
-          </div>
+          <div className="p-6">
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex-1 min-w-64">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by SKU, name, or reference..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
 
-          <div className="bg-card p-6 rounded-lg shadow border">
-            <h3 className="text-lg font-semibold mb-4">Purchase Orders Sync</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Sync purchase orders and line items
-            </p>
-            {stats?.lastPOSync && (
-              <p className="text-xs text-muted-foreground mb-4">
-                Last sync: {new Date(stats.lastPOSync).toLocaleString()}
-              </p>
-            )}
-            <button
-              onClick={() => triggerSync("po")}
-              disabled={syncing.po}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition"
-            >
-              {syncing.po ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync Now
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+              <div className="flex gap-2">
+                {activeTab === "forecast" && (
+                  <label className="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={filters.lowStock}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          lowStock: e.target.checked,
+                        }))
+                      }
+                      className="rounded"
+                    />
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm">Low Stock Only</span>
+                  </label>
+                )}
 
-        <div className="bg-card rounded-lg shadow border">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold">Recent Sync Activity</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                    Count
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                    Run Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">
-                    Error
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {syncLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-muted/50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(log.status)}
-                        <span className="ml-2">
-                          {getStatusBadge(log.status)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm capitalize">
-                        {log.type.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm">
-                        {log.count?.toLocaleString() || "—"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {new Date(log.runAt).toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {log.error ? (
-                        <details className="text-sm text-red-600 dark:text-red-400">
-                          <summary className="cursor-pointer hover:underline">
-                            View error
-                          </summary>
-                          <pre className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs overflow-x-auto max-w-md">
-                            {typeof log.error === "string"
-                              ? log.error
-                              : JSON.stringify(JSON.parse(log.error), null, 2)}
-                          </pre>
-                        </details>
+                <select
+                  value={filters.limit}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, limit: Number(e.target.value) }))
+                  }
+                  className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={25}>25 items</option>
+                  <option value={50}>50 items</option>
+                  <option value={100}>100 items</option>
+                  <option value={250}>250 items</option>
+                </select>
+
+                <button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Load Data
+                </button>
+
+                <button
+                  onClick={exportToCSV}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-600">
+                  Loading data from Inventory Planner...
+                </p>
+              </div>
+            ) : activeTab === "forecast" ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          SKU
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Product
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          In Stock
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          Replenishment
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          Days to OOS
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          Cost
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredVariants.length > 0 ? (
+                        filteredVariants.map((variant) => (
+                          <tr key={variant.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium">
+                              {variant.sku}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {variant.title || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              {variant.in_stock ?? "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">
+                              {variant.replenishment ?? "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              {variant.oos !== undefined ? (
+                                <span
+                                  className={
+                                    variant.oos < 7
+                                      ? "text-red-600 font-medium"
+                                      : ""
+                                  }
+                                >
+                                  {variant.oos} days
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              {variant.cost_price
+                                ? `$${variant.cost_price.toFixed(2)}`
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {variant.oos !== undefined && variant.oos < 7 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Urgent
+                                </span>
+                              ) : variant.replenishment &&
+                                variant.replenishment > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                  <Package className="w-3 h-3" />
+                                  Reorder
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                                  OK
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <tr>
+                          <td
+                            colSpan={7}
+                            className="px-4 py-12 text-center text-gray-500"
+                          >
+                            {variants.length === 0
+                              ? "Click 'Load Data' to fetch forecasts"
+                              : "No items match your search"}
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </tbody>
+                  </table>
+                </div>
+
+                {hasMore && variants.length > 0 && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={loadMoreData}
+                      disabled={loadingMore}
+                      className="px-6 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading more...
+                        </>
+                      ) : (
+                        <>Load More</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Reference
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Vendor
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Created
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                          Expected
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                          Total Value
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredPOs.length > 0 ? (
+                        filteredPOs.map((po) => (
+                          <tr key={po.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium">
+                              {po.reference}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {po.vendor_name || "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                  po.status === "open"
+                                    ? "bg-green-100 text-green-800"
+                                    : po.status === "closed"
+                                    ? "bg-gray-100 text-gray-600"
+                                    : "bg-blue-100 text-blue-800"
+                                }`}
+                              >
+                                {po.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {new Date(po.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {po.expected_date
+                                ? new Date(
+                                    po.expected_date
+                                  ).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-semibold">
+                              {po.total_value
+                                ? `${
+                                    po.currency || "$"
+                                  }${po.total_value.toLocaleString()}`
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="px-4 py-12 text-center text-gray-500"
+                          >
+                            {purchaseOrders.length === 0
+                              ? "Click 'Load Data' to fetch purchase orders"
+                              : "No items match your search"}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {hasMore && purchaseOrders.length > 0 && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={loadMoreData}
+                      disabled={loadingMore}
+                      className="px-6 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading more...
+                        </>
+                      ) : (
+                        <>Load More</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {(filteredVariants.length > 0 || filteredPOs.length > 0) && (
+              <div className="mt-4 text-sm text-gray-600 text-center">
+                Showing{" "}
+                {activeTab === "forecast"
+                  ? filteredVariants.length
+                  : filteredPOs.length}{" "}
+                items
+              </div>
+            )}
           </div>
         </div>
       </div>

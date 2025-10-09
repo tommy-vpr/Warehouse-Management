@@ -15,8 +15,10 @@ import {
   Truck,
   ShoppingCart,
   Loader2,
+  SquareArrowOutUpRight,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import Link from "next/link";
 // Types - inline until you create the types file
 export enum OrderStatus {
   PENDING = "PENDING",
@@ -306,25 +308,25 @@ export default function OrdersManagementDashboard() {
       case OrderStatus.PENDING:
         return "bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900";
       case OrderStatus.ALLOCATED:
-        return "bg-blue-100 text-blue-800 dark:bg-blue-600 dark:text-gray-900";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
       case OrderStatus.PICKING:
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-gray-900";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
       case OrderStatus.PICKED:
-        return "bg-purple-100 text-purple-800 dark:bg-purple-600 dark:text-gray-900";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
       case OrderStatus.PACKED:
-        return "bg-orange-100 text-orange-800 dark:bg-orange-600 dark:text-gray-900";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
       case OrderStatus.SHIPPED:
-        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case OrderStatus.FULFILLED:
-        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
+        return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
       case OrderStatus.DELIVERED:
-        return "bg-green-100 text-green-800 dark:bg-green-600 dark:text-gray-900";
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400";
       case OrderStatus.CANCELLED:
-        return "bg-red-100 text-red-800 dark:bg-red-600 dark:text-gray-900";
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       case OrderStatus.RETURNED:
-        return "bg-red-100 text-red-800 dark:bg-red-600 dark:text-gray-900";
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-900";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
     }
   };
 
@@ -369,7 +371,7 @@ export default function OrdersManagementDashboard() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             {error instanceof Error ? error.message : "An error occurred"}
           </p>
-          <Button onClick={() => refetch()}>
+          <Button onClick={() => refetch()} className="cursor-pointer">
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
@@ -641,9 +643,9 @@ export default function OrdersManagementDashboard() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Priority
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Qty
                     </th>
@@ -655,6 +657,9 @@ export default function OrdersManagementDashboard() {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Details
                     </th>
                   </tr>
                 </thead>
@@ -704,11 +709,11 @@ export default function OrdersManagementDashboard() {
                             {order.status.replace("_", " ")}
                           </Badge>
                         </td>
-                        <td className="px-4 py-4">
+                        {/* <td className="px-4 py-4">
                           <Badge className={getPriorityColor(order.priority)}>
                             {order.priority}
                           </Badge>
-                        </td>
+                        </td> */}
                         <td className="px-4 py-4">
                           <div>
                             <div className="text-sm">
@@ -764,6 +769,16 @@ export default function OrdersManagementDashboard() {
                               </Button>
                             )}
                           </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Link
+                            href={`/dashboard/orders/${order.id}`}
+                            className="cursor-pointer text-xs text-gray-400 dark:text-gray-400 
+                            hover:text-gray-500 dark:hover:text-gray-200 transition flex items-center gap-2"
+                          >
+                            View
+                            <SquareArrowOutUpRight size={12} />
+                          </Link>
                         </td>
                       </tr>
 

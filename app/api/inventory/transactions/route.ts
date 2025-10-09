@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { Prisma } from "@prisma/client";
+import { notifyUser } from "@/lib/ably-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,208 +13,185 @@ export async function POST(request: NextRequest) {
 
     const {
       productVariantId,
-      locationId,
-      toLocationId,
       transactionType,
       quantityChange,
+      locationId,
+      toLocationId,
       notes,
       referenceType,
-      referenceId,
+      confirmerId,
     } = await request.json();
 
-    // Validate required fields
-    if (!productVariantId || !transactionType || quantityChange === undefined) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Validate transfer requires both locations
-    if (transactionType === "TRANSFER" && (!locationId || !toLocationId)) {
-      return NextResponse.json(
-        { error: "Transfer requires both source and destination locations" },
-        { status: 400 }
-      );
-    }
-
-    // Start a transaction to ensure data consistency
-    const result = await prisma.$transaction(async (tx) => {
-      // Handle TRANSFER separately
-      if (transactionType === "TRANSFER" && locationId && toLocationId) {
-        // 1. Check source inventory
-        const sourceInventory = await tx.inventory.findUnique({
-          where: {
-            productVariantId_locationId: {
-              productVariantId,
-              locationId,
-            },
-          },
-        });
-
-        if (!sourceInventory) {
-          throw new Error("Source location has no inventory");
-        }
-
-        if (sourceInventory.quantityOnHand < quantityChange) {
-          throw new Error(
-            `Insufficient inventory at source location. Available: ${sourceInventory.quantityOnHand}, Requested: ${quantityChange}`
-          );
-        }
-
-        // 2. Deduct from source location
-        await tx.inventory.update({
-          where: { id: sourceInventory.id },
-          data: {
-            quantityOnHand: sourceInventory.quantityOnHand - quantityChange,
-            updatedAt: new Date(),
-          },
-        });
-
-        // 3. Add to destination location
-        const destInventory = await tx.inventory.findUnique({
-          where: {
-            productVariantId_locationId: {
-              productVariantId,
-              locationId: toLocationId,
-            },
-          },
-        });
-
-        if (destInventory) {
-          await tx.inventory.update({
-            where: { id: destInventory.id },
-            data: {
-              quantityOnHand: destInventory.quantityOnHand + quantityChange,
-              updatedAt: new Date(),
-            },
-          });
-        } else {
-          await tx.inventory.create({
-            data: {
-              productVariantId,
-              locationId: toLocationId,
-              quantityOnHand: quantityChange,
-              quantityReserved: 0,
-            },
-          });
-        }
-
-        // 4. Get location names for better notes
-        const [fromLoc, toLoc] = await Promise.all([
-          tx.location.findUnique({
-            where: { id: locationId },
-            select: { name: true },
-          }),
-          tx.location.findUnique({
-            where: { id: toLocationId },
-            select: { name: true },
-          }),
-        ]);
-
-        // 5. Create transaction record
-        const transaction = await tx.inventoryTransaction.create({
-          data: {
-            productVariantId,
-            locationId, // From location
-            transactionType: "TRANSFER",
-            quantityChange: -quantityChange, // Negative for source
-            userId: session.user.id,
-            notes: `Transferred ${quantityChange} units from ${
-              fromLoc?.name
-            } to ${toLoc?.name}${notes ? `: ${notes}` : ""}`,
-            referenceType: referenceType || "MANUAL_TRANSFER",
-            referenceId: toLocationId, // Store destination in referenceId
-          },
-          include: {
-            user: {
-              select: { name: true },
-            },
-          },
-        });
-
-        return transaction;
+    // ⭐ For TRANSFER, confirmer is MANDATORY
+    if (transactionType === "TRANSFER") {
+      if (!confirmerId) {
+        return NextResponse.json(
+          { error: "Confirmer is required for transfers" },
+          { status: 400 }
+        );
       }
 
-      // Handle ADJUSTMENT and COUNT (existing logic)
-      const transaction = await tx.inventoryTransaction.create({
-        data: {
-          productVariantId,
-          locationId,
-          transactionType,
-          quantityChange,
-          userId: session.user.id,
-          notes,
-          referenceType,
-          referenceId,
-        },
-        include: {
-          user: {
-            select: { name: true },
+      if (!locationId || !toLocationId) {
+        return NextResponse.json(
+          { error: "Both from and to locations are required for transfers" },
+          { status: 400 }
+        );
+      }
+
+      // Validate quantity available at source location
+      const sourceInventory = await prisma.inventory.findUnique({
+        where: {
+          productVariantId_locationId: {
+            productVariantId,
+            locationId,
           },
         },
       });
 
-      // Update inventory quantities if locationId is provided
-      if (locationId) {
-        const inventory = await tx.inventory.findUnique({
-          where: {
-            productVariantId_locationId: {
-              productVariantId,
-              locationId,
+      if (
+        !sourceInventory ||
+        sourceInventory.quantityOnHand < Math.abs(quantityChange)
+      ) {
+        return NextResponse.json(
+          { error: "Insufficient quantity at source location" },
+          { status: 400 }
+        );
+      }
+
+      // Create pending transfer request
+      const pendingTransfer = await prisma.$transaction(async (tx) => {
+        // Get product and location details
+        const product = await tx.productVariant.findUnique({
+          where: { id: productVariantId },
+          include: { product: true },
+        });
+
+        const fromLocation = await tx.location.findUnique({
+          where: { id: locationId },
+        });
+
+        const toLocation = await tx.location.findUnique({
+          where: { id: toLocationId },
+        });
+
+        const requestingUser = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { name: true },
+        });
+
+        // Create the transfer request (not yet applied to inventory)
+        const transferRequest = await tx.inventoryTransaction.create({
+          data: {
+            productVariantId,
+            transactionType: "TRANSFER",
+            quantityChange: 0, // Not applied yet
+            locationId,
+            referenceType: "TRANSFER_PENDING",
+            userId: session.user.id,
+            notes: `PENDING CONFIRMATION: ${notes || "Transfer request"}`,
+            metadata: {
+              status: "PENDING",
+              fromLocationId: locationId,
+              fromLocationName: fromLocation?.name,
+              toLocationId,
+              toLocationName: toLocation?.name,
+              quantity: quantityChange,
+              requestedBy: session.user.id,
+              requestedByName: requestingUser?.name,
+              confirmerId,
+              productName: product?.product.name,
             },
           },
         });
 
-        if (inventory) {
-          const newQuantity = Math.max(
-            0,
-            inventory.quantityOnHand + quantityChange
-          );
-          await tx.inventory.update({
-            where: { id: inventory.id },
-            data: {
-              quantityOnHand: newQuantity,
-              updatedAt: new Date(),
-            },
-          });
-        } else if (quantityChange > 0) {
-          // Create new inventory record if it doesn't exist and we're adding stock
-          await tx.inventory.create({
-            data: {
-              productVariantId,
-              locationId,
-              quantityOnHand: quantityChange,
-              quantityReserved: 0,
-            },
-          });
-        }
-      } else {
-        // If no specific location, update all locations proportionally
-        const inventoryItems = await tx.inventory.findMany({
-          where: { productVariantId },
+        // Notify the confirmer via Ably
+        await notifyUser(confirmerId, {
+          type: "TRANSFER_CONFIRMATION",
+          title: "Transfer Confirmation Required",
+          message: `${
+            requestingUser?.name || "Someone"
+          } requests transfer of ${quantityChange} ${
+            product?.product.name
+          } from ${fromLocation?.name} to ${toLocation?.name}`,
+          // link: `/dashboard/inventory/transfers/pending/${transferRequest.id}`,
+          link: `/dashboard/inventory/transfers/${transferRequest.id}`,
+          timestamp: new Date().toISOString(),
         });
 
-        if (inventoryItems.length > 0) {
-          const totalQuantity = inventoryItems.reduce(
-            (sum, item) => sum + item.quantityOnHand,
-            0
-          );
+        // Create database notification
+        await tx.notification.create({
+          data: {
+            userId: confirmerId,
+            type: "TRANSFER_CONFIRMATION",
+            title: "Transfer Confirmation Required",
+            message: `${
+              requestingUser?.name || "Someone"
+            } requests transfer of ${quantityChange} ${product?.product.name}`,
+            // link: `/dashboard/inventory/transfers/pending/${transferRequest.id}`,
+            link: `/dashboard/inventory/transfers/${transferRequest.id}`,
+            metadata: {
+              transferId: transferRequest.id,
+              fromLocation: fromLocation?.name,
+              toLocation: toLocation?.name,
+              quantity: quantityChange,
+              productName: product?.product.name,
+              requestedBy: session.user.id,
+            },
+          },
+        });
 
-          for (const item of inventoryItems) {
-            if (totalQuantity > 0) {
-              const proportion = item.quantityOnHand / totalQuantity;
-              const adjustment = Math.round(quantityChange * proportion);
-              const newQuantity = Math.max(0, item.quantityOnHand + adjustment);
+        return transferRequest;
+      });
 
-              await tx.inventory.update({
-                where: { id: item.id },
-                data: {
-                  quantityOnHand: newQuantity,
-                  updatedAt: new Date(),
-                },
-              });
-            }
+      return NextResponse.json({
+        success: true,
+        message: "Transfer request sent for confirmation",
+        transferId: pendingTransfer.id,
+      });
+    }
+
+    // ⭐ Regular transactions (ADJUSTMENT, RECEIPT, SALE, etc.)
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.inventoryTransaction.create({
+        data: {
+          productVariantId,
+          transactionType,
+          quantityChange,
+          locationId: locationId || null,
+          referenceType: referenceType || "MANUAL",
+          userId: session.user.id,
+          notes,
+        },
+      });
+
+      // Update inventory for adjustments
+      if (transactionType === "ADJUSTMENT") {
+        if (locationId) {
+          // Update specific location
+          await tx.inventory.update({
+            where: {
+              productVariantId_locationId: {
+                productVariantId,
+                locationId,
+              },
+            },
+            data: {
+              quantityOnHand: { increment: quantityChange },
+            },
+          });
+        } else {
+          // Update first available location
+          const firstInventory = await tx.inventory.findFirst({
+            where: { productVariantId },
+          });
+
+          if (firstInventory) {
+            await tx.inventory.update({
+              where: { id: firstInventory.id },
+              data: {
+                quantityOnHand: { increment: quantityChange },
+              },
+            });
           }
         }
       }
@@ -224,31 +201,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      transaction: {
-        id: result.id,
-        type: result.transactionType,
-        quantityChange: result.quantityChange,
-        userName: result.user?.name,
-        createdAt: result.createdAt.toISOString(),
-      },
+      transaction: result,
     });
   } catch (error) {
-    console.error("Error creating inventory transaction:", error);
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
-        return NextResponse.json(
-          { error: "Duplicate transaction" },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Return the actual error message for validation errors
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
+    console.error("Error creating transaction:", error);
     return NextResponse.json(
       { error: "Failed to create transaction" },
       { status: 500 }

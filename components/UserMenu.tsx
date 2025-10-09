@@ -67,7 +67,7 @@ export default function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <div className="flex items-center space-x-2 cursor-pointer">
-          <div className="w-8 h-8 rounded-full bg-zinc-800 dark:bg-gray-200 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-zinc-800 dark:bg-gray-200 hover:opacity-85 transition flex items-center justify-center">
             {session.user?.name ? (
               <span className="text-xs font-medium text-gray-200 dark:text-gray-800">
                 {session.user.name

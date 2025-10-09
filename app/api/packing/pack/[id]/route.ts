@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await context.params;
 
     // Get order details for packing
     const order = await prisma.order.findUnique({
@@ -42,20 +42,39 @@ export async function GET(
       );
     }
 
-    // Calculate shipping recommendations
-    const totalWeight = order.items.reduce(
-      (sum, item) =>
-        sum + (Number(item.productVariant.weight) || 1) * item.quantity,
-      0
-    );
+    // Calculate total weight in grams, then convert to ounces and pounds
+    const totalWeightGrams = order.items.reduce((sum, item) => {
+      // Use unit weight (not master case weight)
+      const unitWeightGrams = item.productVariant.weight
+        ? parseFloat(item.productVariant.weight.toString())
+        : 94; // Default ~3.3 oz if no weight
+      return sum + unitWeightGrams * item.quantity;
+    }, 0);
+
+    // Convert grams to ounces (1 gram = 0.035274 oz)
+    const totalWeightOz = totalWeightGrams * 0.035274;
+
+    // Convert grams to pounds (1 gram = 0.00220462 lbs)
+    const totalWeightLbs = totalWeightGrams * 0.00220462;
 
     const totalVolume = order.items.reduce((sum, item) => {
       const dims = item.productVariant.dimensions as any;
-      const volume = dims ? dims.length * dims.width * dims.height : 100; // default 100 cubic inches
+
+      // Handle dimensions properly - check if it's the unit dimensions or master case
+      let volume = 100; // default cubic inches for small item
+
+      if (dims) {
+        // Assuming dimensions are for a single unit in inches
+        // Format: { length: X, width: Y, height: Z, unit: "in" }
+        if (dims.length && dims.width && dims.height) {
+          volume = dims.length * dims.width * dims.height;
+        }
+      }
+
       return sum + volume * item.quantity;
     }, 0);
 
-    // Suggest box size based on volume
+    // Suggest box size based on volume (cubic inches)
     let suggestedBox = "SMALL";
     if (totalVolume > 1000) suggestedBox = "LARGE";
     else if (totalVolume > 500) suggestedBox = "MEDIUM";
@@ -80,15 +99,24 @@ export async function GET(
           quantity: item.quantity,
           unitPrice: item.unitPrice.toString(),
           totalPrice: item.totalPrice.toString(),
-          weight: Number(item.productVariant.weight) || 1,
+          // Return weight in grams for individual unit
+          weightGrams: item.productVariant.weight
+            ? parseFloat(item.productVariant.weight.toString())
+            : 94,
+          weightOz: item.productVariant.weight
+            ? parseFloat(item.productVariant.weight.toString()) * 0.035274
+            : 3.31,
           dimensions: item.productVariant.dimensions,
         })),
       },
       packingInfo: {
-        totalWeight,
-        totalVolume,
+        totalWeightGrams: Math.round(totalWeightGrams * 100) / 100,
+        totalWeightOz: Math.round(totalWeightOz * 100) / 100,
+        totalWeightLbs: Math.round(totalWeightLbs * 100) / 100,
+        totalVolume: Math.round(totalVolume),
         suggestedBox,
-        estimatedShippingCost: totalWeight * 0.5, // rough estimate
+        // Estimate based on ounces (more appropriate for small packages)
+        estimatedShippingCost: Math.round(totalWeightOz * 0.15 * 100) / 100,
       },
     });
   } catch (error) {

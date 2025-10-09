@@ -15,9 +15,10 @@ import {
   Pause,
   CheckCircle,
   Eye,
-  Users,
+  ChartColumnIncreasing,
   TrendingUp,
   Loader,
+  Scan,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -370,7 +371,7 @@ export default function PickManagementDashboard() {
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center">
-                  <Users className="w-8 h-8 text-orange-600" />
+                  <ChartColumnIncreasing className="w-8 h-8 text-orange-600" />
                   <div className="ml-4">
                     <p className="text-2xl font-bold">{stats.inProgress}</p>
                     <p className="text-gray-600 dark:text-gray-400">
@@ -509,14 +510,14 @@ export default function PickManagementDashboard() {
                         {pickList.orders.slice(0, 3).map((order) => (
                           <Badge
                             key={order}
-                            variant="secondary"
+                            variant="outline"
                             className="text-xs"
                           >
                             {order}
                           </Badge>
                         ))}
                         {pickList.orders.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="outline" className="text-xs">
                             +{pickList.orders.length - 3} more
                           </Badge>
                         )}
@@ -564,8 +565,8 @@ export default function PickManagementDashboard() {
                             )
                           }
                         >
-                          <MapPin className="w-4 h-4 mr-2" />
-                          View Mobile
+                          <Scan className="w-4 h-4 mr-2" />
+                          Mobile Picking
                         </Button>
                       )}
 

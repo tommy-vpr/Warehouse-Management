@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getLastSyncTime } from "@/lib/getLastSyncTime";
 
-const API_URL = process.env.INVENTORY_PLANNER_API!;
+const API_URL = process.env.INVENTORY_PLANNER_API!; // https://app.inventory-planner.com
 const API_KEY = process.env.INVENTORY_PLANNER_KEY!;
 const ACCOUNT_ID = process.env.INVENTORY_PLANNER_ACCOUNT!;
 
 interface VariantWarehouse {
   in_stock?: number;
   replenishment?: number;
+  warehouse_id?: string;
 }
 
 interface Variant {
@@ -21,16 +22,20 @@ interface Variant {
   cost_price?: number;
   replenishment?: number;
   last_updated?: string;
+  // Additional fields from API docs
+  lead_time?: number;
+  review_period?: number;
+  oos?: number; // days to sell out
 }
 
 interface APIResponse {
-  meta: {
+  meta?: {
     total: number;
     count: number;
     limit: number;
     page: number;
   };
-  variants: Variant[];
+  variants?: Variant[];
 }
 
 export async function GET() {
@@ -70,6 +75,12 @@ export async function GET() {
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("page", String(page));
 
+      // Request specific fields for efficiency (optional but recommended)
+      url.searchParams.set(
+        "fields",
+        "id,sku,title,vendor_id,warehouse,cost_price,replenishment,last_updated,lead_time,review_period,oos"
+      );
+
       if (lastSync) {
         // API supports filtering, use lastSync if available
         url.searchParams.set("updated_at_gte", lastSync.toISOString());
@@ -85,70 +96,115 @@ export async function GET() {
         },
       });
 
+      if (!res.ok) {
+        throw new Error(`API request failed: ${res.status} ${res.statusText}`);
+      }
+
       const json = (await res.json()) as APIResponse;
       const data = Array.isArray(json?.variants) ? json.variants : [];
 
-      console.log(`[Forecast Sync] Received ${data.length} variants`);
+      console.log(
+        `[Forecast Sync] Received ${data.length} variants (page ${page})`
+      );
 
       if (data.length === 0) {
         console.log("[Forecast Sync] No more data to fetch");
         break;
       }
 
-      for (const variant of data) {
-        try {
-          const warehouse = Array.isArray(variant.warehouse)
-            ? variant.warehouse[0]
-            : undefined;
+      // Process variants in batches for better performance
+      const batchSize = 10;
+      for (let i = 0; i < data.length; i += batchSize) {
+        const batch = data.slice(i, i + batchSize);
 
-          await prisma.forecastSuggestion.upsert({
-            where: { sku: String(variant.sku) },
-            update: {
-              productName: variant.title ?? null,
-              vendorId: variant.vendor_id ?? null,
-              currentStock: warehouse?.in_stock ?? null,
-              recommendedQty:
-                warehouse?.replenishment ?? variant.replenishment ?? null,
-              unitCost:
-                typeof variant.cost_price === "number"
-                  ? variant.cost_price
-                  : null,
-              lastUpdated: variant.last_updated
-                ? new Date(variant.last_updated)
-                : startedAt,
-            },
-            create: {
-              sku: String(variant.sku),
-              productName: variant.title ?? null,
-              vendorId: variant.vendor_id ?? null,
-              currentStock: warehouse?.in_stock ?? null,
-              recommendedQty:
-                warehouse?.replenishment ?? variant.replenishment ?? null,
-              unitCost:
-                typeof variant.cost_price === "number"
-                  ? variant.cost_price
-                  : null,
-              lastUpdated: variant.last_updated
-                ? new Date(variant.last_updated)
-                : startedAt,
-            },
-          });
+        await Promise.allSettled(
+          batch.map(async (variant) => {
+            try {
+              // Safely extract warehouse data
+              let warehouseData: VariantWarehouse | null = null;
+              if (
+                Array.isArray(variant.warehouse) &&
+                variant.warehouse.length > 0
+              ) {
+                warehouseData = variant.warehouse[0];
+              }
 
-          totalProcessed++;
-        } catch (err: any) {
-          const errorMsg = err?.message || String(err);
-          errors.push({
-            sku: String(variant.sku),
-            error: errorMsg,
-          });
-          console.error(
-            `[Forecast Sync] Failed to process SKU ${variant.sku}:`,
-            errorMsg
-          );
-        }
+              // Determine the best replenishment value
+              const replenishmentQty =
+                warehouseData?.replenishment ?? variant.replenishment ?? null;
+
+              // Determine the best stock value
+              const currentStock = warehouseData?.in_stock ?? null;
+
+              await prisma.forecastSuggestion.upsert({
+                where: { sku: String(variant.sku) },
+                update: {
+                  productName: variant.title ?? null,
+                  vendorId: variant.vendor_id ?? null,
+                  currentStock,
+                  recommendedQty: replenishmentQty,
+                  unitCost:
+                    typeof variant.cost_price === "number"
+                      ? variant.cost_price
+                      : null,
+                  lastUpdated: variant.last_updated
+                    ? new Date(variant.last_updated)
+                    : startedAt,
+                },
+                create: {
+                  sku: String(variant.sku),
+                  productName: variant.title ?? null,
+                  vendorId: variant.vendor_id ?? null,
+                  currentStock,
+                  recommendedQty: replenishmentQty,
+                  unitCost:
+                    typeof variant.cost_price === "number"
+                      ? variant.cost_price
+                      : null,
+                  lastUpdated: variant.last_updated
+                    ? new Date(variant.last_updated)
+                    : startedAt,
+                },
+              });
+
+              totalProcessed++;
+            } catch (err: any) {
+              const errorMsg = err?.message || String(err);
+              errors.push({
+                sku: String(variant.sku),
+                error: errorMsg,
+              });
+              console.error(
+                `[Forecast Sync] Failed to process SKU ${variant.sku}:`,
+                errorMsg
+              );
+            }
+          })
+        );
       }
 
-      if (json.meta && data.length < limit) {
+      // Improved pagination logic
+      const shouldContinue = (() => {
+        // If we got fewer items than limit, we're done
+        if (data.length < limit) {
+          return false;
+        }
+
+        // If we have meta information, check against total
+        if (json.meta) {
+          const fetched = (page + 1) * limit;
+          if (fetched >= json.meta.total) {
+            console.log(
+              `[Forecast Sync] Reached end: ${fetched} / ${json.meta.total}`
+            );
+            return false;
+          }
+        }
+
+        return true;
+      })();
+
+      if (!shouldContinue) {
         console.log("[Forecast Sync] No more pages available");
         break;
       }

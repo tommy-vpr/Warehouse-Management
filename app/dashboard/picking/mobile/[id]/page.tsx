@@ -461,7 +461,10 @@ export default function MobilePickingInterface() {
                 <div>
                   <span className="text-gray-500">Price:</span>
                   <div className="font-medium">
-                    ${currentItem.product.sellingPrice}
+                    {/* ${currentItem.product.sellingPrice} */}$
+                    {Number.parseFloat(currentItem.order.totalAmount).toFixed(
+                      2
+                    )}
                   </div>
                 </div>
               </div>
@@ -507,7 +510,7 @@ export default function MobilePickingInterface() {
             <Button
               onClick={() => processItem("PICK")}
               disabled={pickActionMutation.isPending}
-              className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
+              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
             >
               {pickActionMutation.isPending ? (
                 <>
