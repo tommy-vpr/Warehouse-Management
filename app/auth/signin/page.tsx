@@ -160,7 +160,7 @@ export default function SignIn() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white"
+                  className="cursor-pointer absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -173,7 +173,7 @@ export default function SignIn() {
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-violet-500 
+              className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-violet-500 
                    text-white font-semibold rounded-xl py-2 
                    hover:shadow-[0_0_20px_rgba(59,130,246,0.6)] 
                    transition-all duration-300"
@@ -191,7 +191,7 @@ export default function SignIn() {
           </div>
 
           <Button
-            className="w-full bg-white/10 text-white 
+            className="cursor-pointer w-full bg-white/10 text-white 
                  border border-white/20 rounded-xl py-2
                  hover:bg-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] 
                  transition-all duration-300"

@@ -29,6 +29,8 @@ import InventoryView from "@/components/InventoryView";
 import OrdersView from "@/components/OrdersView";
 import Link from "next/link";
 
+import { getActivityIcon } from "@/lib/activity-utils";
+
 // Mock data for demonstration
 const mockStats = {
   totalProducts: 1247,
@@ -99,21 +101,6 @@ export default function Dashboard() {
     { id: "shipping", label: "Shipping", icon: Truck },
     { id: "settings", label: "Settings", icon: Settings },
   ];
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "order":
-        return <ShoppingCart className="w-4 h-4 text-blue-500" />;
-      case "inventory":
-        return <Package className="w-4 h-4 text-green-500" />;
-      case "shipment":
-        return <Truck className="w-4 h-4 text-purple-500" />;
-      case "scan":
-        return <Scan className="w-4 h-4 text-orange-500" />;
-      default:
-        return <Bell className="w-4 h-4 text-gray-500" />;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">

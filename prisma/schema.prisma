@@ -339,17 +339,36 @@ enum OrderStatus {
 }
 
 // Activity Tracking
+enum TransactionType {
+  ADJUSTMENT
+  RECEIPT
+  SALE
+  TRANSFER
+  COUNT
+  ALLOCATION
+  DEALLOCATION
+  PO_RECEIVING         // Purchase Order from Supplier
+  ASN_RECEIVING        // Advanced Ship Notice from Supplier
+  TRANSFER_RECEIVING   // Inter-warehouse transfer
+  RETURNS 
+}
+
 model InventoryTransaction {
   id               String          @id @default(cuid())
   productVariantId String
   locationId       String?
   transactionType  TransactionType
   quantityChange   Int
-  referenceId      String?
-  referenceType    String?
+  
+  // Enhanced reference tracking
+  referenceId      String?         // PO ID, Transfer ID, Order ID, etc.
+  referenceType    String?         // "PURCHASE_ORDER", "TRANSFER", "RETURN_ORDER"
+  sourceLocation   String?         // For transfers (which warehouse it came from)
+  
   userId           String?
   notes            String?
-  metadata         Json?           // Transfer confirmation
+  metadata         Json?
+  
   productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
   location         Location?       @relation(fields: [locationId], references: [id])
   user             User?           @relation(fields: [userId], references: [id])
@@ -360,16 +379,6 @@ model InventoryTransaction {
   @@index([userId])
   @@index([referenceType])
   @@map("inventory_transactions")
-}
-
-enum TransactionType {
-  ADJUSTMENT
-  RECEIPT
-  SALE
-  TRANSFER
-  COUNT
-  ALLOCATION
-  DEALLOCATION
 }
 
 // ---------------------------------------------------

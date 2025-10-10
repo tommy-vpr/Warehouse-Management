@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,12 +16,18 @@ import {
   AlertTriangle,
   Trash2,
   RefreshCw,
-  Barcode,
-  Building2,
   Box,
+  Loader2,
 } from "lucide-react";
-
 import { toast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ProductVariant {
   id: string;
@@ -70,10 +77,69 @@ interface ReceivedItem {
   productVariant: ProductVariant;
   location: Location;
   quantityReceived: number;
+  transactionType: string;
   notes?: string;
 }
 
+// API functions
+const fetchProductByBarcode = async (
+  barcode: string
+): Promise<ProductVariant> => {
+  const response = await fetch(
+    `/api/inventory/product/lookup?barcode=${encodeURIComponent(barcode)}`
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Product not found");
+  }
+  return response.json();
+};
+
+const fetchLocationByBarcode = async (barcode: string): Promise<Location> => {
+  const response = await fetch(
+    `/api/inventory/location/lookup?barcode=${encodeURIComponent(barcode)}`
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Location not found");
+  }
+  return response.json();
+};
+
+const submitBatchReceiving = async (items: ReceivedItem[]) => {
+  const response = await fetch("/api/inventory/receive/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      items: items.map((item) => ({
+        productVariant: {
+          id: item.productVariant.id,
+          sku: item.productVariant.sku,
+          name: item.productVariant.name,
+        },
+        location: {
+          id: item.location.id,
+          name: item.location.name,
+        },
+        quantityReceived: item.quantityReceived,
+        transactionType: item.transactionType,
+        notes: item.notes,
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to receive items");
+  }
+
+  return response.json();
+};
+
 export default function SchemaEnhancedReceiving() {
+  const queryClient = useQueryClient();
+  const [isComponentReady, setIsComponentReady] = useState(false);
+
   const [currentStep, setCurrentStep] = useState<
     "product" | "location" | "quantity"
   >("product");
@@ -88,84 +154,102 @@ export default function SchemaEnhancedReceiving() {
   );
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [quantity, setQuantity] = useState("");
+  const [transactionType, setTransactionType] = useState("PO_RECEIVING");
   const [notes, setNotes] = useState("");
 
   // Batch receiving
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
 
   // UI state
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const quantityInputRef = useRef<HTMLInputElement>(null);
-
   const [stopStream, setStopStream] = useState(false);
+
+  // Component ready check
+  useEffect(() => {
+    setIsComponentReady(true);
+  }, []);
+
+  // Product lookup mutation
+  const productLookupMutation = useMutation({
+    mutationFn: fetchProductByBarcode,
+    onSuccess: (product) => {
+      console.log("[DEBUG] Scanned Product:", product);
+      setCurrentProduct(product);
+      setCurrentStep("location");
+      setScannerTarget("location");
+      setShowScanner(false);
+      setError("");
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  // Location lookup mutation
+  const locationLookupMutation = useMutation({
+    mutationFn: fetchLocationByBarcode,
+    onSuccess: (location) => {
+      if (!location.isReceivable) {
+        setError("This location is not configured for receiving");
+        return;
+      }
+
+      setCurrentLocation(location);
+      setCurrentStep("quantity");
+      setShowScanner(false);
+      setError("");
+
+      setTimeout(() => {
+        if (quantityInputRef.current) {
+          quantityInputRef.current.focus();
+        }
+      }, 100);
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+    },
+  });
+
+  // Batch receiving mutation
+  const batchReceivingMutation = useMutation({
+    mutationFn: submitBatchReceiving,
+    onSuccess: (result) => {
+      setReceivedItems([]);
+      setError("");
+      resetCurrentReceiving();
+      toast({
+        title: "✅ Success",
+        description: `Successfully received ${result.results.length} items!`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const resetCurrentReceiving = () => {
     setCurrentProduct(null);
     setCurrentLocation(null);
     setQuantity("");
+    setTransactionType("PO_RECEIVING");
     setNotes("");
     setCurrentStep("product");
   };
 
   const handleBarcodeScanned = async (barcode: string) => {
-    setLoading(true);
     setError("");
 
-    try {
-      if (scannerTarget === "product") {
-        const response = await fetch(
-          `/api/inventory/product/lookup?barcode=${encodeURIComponent(barcode)}`
-        );
-
-        if (response.ok) {
-          const product = await response.json();
-          console.log("[DEBUG] Scanned Product:", product); // ← ADD THIS LINE
-
-          setCurrentProduct(product);
-          setCurrentStep("location");
-          setScannerTarget("location");
-          setShowScanner(false);
-        } else {
-          const errorData = await response.json();
-          setError(errorData.error || "Product not found");
-        }
-      } else if (scannerTarget === "location") {
-        const response = await fetch(
-          `/api/inventory/location/lookup?barcode=${encodeURIComponent(
-            barcode
-          )}`
-        );
-
-        if (response.ok) {
-          const location = await response.json();
-
-          if (!location.isReceivable) {
-            setError("This location is not configured for receiving");
-            return;
-          }
-
-          setCurrentLocation(location);
-          setCurrentStep("quantity");
-          setShowScanner(false);
-
-          // Auto-focus quantity input
-          setTimeout(() => {
-            if (quantityInputRef.current) {
-              quantityInputRef.current.focus();
-            }
-          }, 100);
-        } else {
-          const errorData = await response.json();
-          setError(errorData.error || "Location not found");
-        }
-      }
-    } catch (error) {
-      console.error("Barcode scan error:", error);
-      setError("Error processing barcode scan");
-    } finally {
-      setLoading(false);
+    if (scannerTarget === "product") {
+      productLookupMutation.mutate(barcode);
+    } else if (scannerTarget === "location") {
+      locationLookupMutation.mutate(barcode);
     }
   };
 
@@ -186,6 +270,7 @@ export default function SchemaEnhancedReceiving() {
       productVariant: currentProduct,
       location: currentLocation,
       quantityReceived: quantityNum,
+      transactionType,
       notes: notes || undefined,
     };
 
@@ -194,57 +279,13 @@ export default function SchemaEnhancedReceiving() {
     setError("");
   };
 
-  const handleFinalizeReceiving = async () => {
+  const handleFinalizeReceiving = () => {
     if (receivedItems.length === 0) {
       setError("No items to receive");
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetch("/api/inventory/receive/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: receivedItems.map((item) => ({
-            productVariant: {
-              id: item.productVariant.id,
-              sku: item.productVariant.sku,
-              name: item.productVariant.name,
-            },
-            location: {
-              id: item.location.id,
-              name: item.location.name,
-            },
-            quantityReceived: item.quantityReceived,
-            notes: item.notes,
-          })),
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setReceivedItems([]);
-        setError("");
-        toast({
-          title: "✅ Success",
-          description: `Successfully received ${result.results.length} items!`,
-        });
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Error",
-          description: error.message || "Failed to receive items",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Finalize receiving error:", error);
-      setError("Error finalizing receiving");
-    } finally {
-      resetCurrentReceiving();
-      setLoading(false);
-    }
+    batchReceivingMutation.mutate(receivedItems);
   };
 
   const removeReceivedItem = (itemId: string) => {
@@ -264,18 +305,39 @@ export default function SchemaEnhancedReceiving() {
     return colors[type as keyof typeof colors] || colors.GENERAL;
   };
 
-  const handleCancelReceiving = () => {
-    // reset in-progress fields
-    resetCurrentReceiving();
-    setReceivedItems([]); // clear batch (optional — or ask confirm)
-    setError("");
-    setShowScanner(false); // close scanner + release camera
+  const getTransactionTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      PO_RECEIVING: "PO Receiving",
+      ASN_RECEIVING: "ASN Receiving",
+      TRANSFER_RECEIVING: "Transfer Receiving",
+      RETURNS: "Returns",
+      ADJUSTMENT: "Adjustment",
+      COUNT: "Count",
+    };
+    return labels[type] || type;
   };
 
   const handleCloseScanner = () => {
     setStopStream(true);
-    setTimeout(() => setShowScanner(false), 100); // delay unmount one tick
+    setTimeout(() => setShowScanner(false), 100);
   };
+
+  const isLoading =
+    productLookupMutation.isPending ||
+    locationLookupMutation.isPending ||
+    batchReceivingMutation.isPending;
+
+  // Show loading spinner while component initializes
+  if (!isComponentReady) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-200">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -286,17 +348,29 @@ export default function SchemaEnhancedReceiving() {
             <span className="hidden">Receiving Progress</span>
             <div className="flex gap-2">
               <Badge
-                variant={currentStep === "product" ? "default" : "secondary"}
+                className={`text-xs rounded-4xl px-2 py-1 ${
+                  currentStep === "product"
+                    ? "bg-green-600 border border-green-600 dark:bg-green-900/30 dark:text-green-500 "
+                    : "text-gray-700 bg-transparent dark:text-gray-300"
+                }`}
               >
                 1. Product
               </Badge>
               <Badge
-                variant={currentStep === "location" ? "default" : "secondary"}
+                className={`text-xs rounded-4xl px-2 py-1 ${
+                  currentStep === "location"
+                    ? "bg-green-600 border border-green-600 dark:bg-green-900/30 dark:text-green-500 "
+                    : "text-gray-700 bg-transparent dark:text-gray-300"
+                }`}
               >
                 2. Location
               </Badge>
               <Badge
-                variant={currentStep === "quantity" ? "default" : "secondary"}
+                className={`text-xs rounded-4xl px-2 py-1 ${
+                  currentStep === "quantity"
+                    ? "bg-green-600 border border-green-600 dark:bg-green-900/30 dark:text-green-500 "
+                    : "text-gray-700 bg-transparent dark:text-gray-300"
+                }`}
               >
                 3. Quantity
               </Badge>
@@ -330,6 +404,7 @@ export default function SchemaEnhancedReceiving() {
               <div className="flex gap-3">
                 <Input
                   placeholder="Scan barcode, UPC, or enter SKU"
+                  disabled={isLoading}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       const value = (e.target as HTMLInputElement).value;
@@ -346,9 +421,9 @@ export default function SchemaEnhancedReceiving() {
                     setStopStream(false);
                     setShowScanner(true);
                   }}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
-                  {loading ? (
+                  {isLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <Camera className="w-4 h-4" />
@@ -393,7 +468,6 @@ export default function SchemaEnhancedReceiving() {
                     </div>
                   </div>
 
-                  {/* Show current inventory levels */}
                   {currentProduct.inventory.length > 0 && (
                     <div className="mt-3">
                       <p className="text-sm font-medium text-green-700 mb-2">
@@ -435,6 +509,7 @@ export default function SchemaEnhancedReceiving() {
               <div className="flex gap-3">
                 <Input
                   placeholder="Scan location barcode or enter location code"
+                  disabled={isLoading}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       const value = (e.target as HTMLInputElement).value;
@@ -451,9 +526,9 @@ export default function SchemaEnhancedReceiving() {
                     setStopStream(false);
                     setShowScanner(true);
                   }}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
-                  {loading ? (
+                  {isLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <Camera className="w-4 h-4" />
@@ -536,7 +611,7 @@ export default function SchemaEnhancedReceiving() {
             <div className="space-y-4">
               <h4 className="font-medium flex items-center">
                 <Box className="w-4 h-4 mr-2" />
-                Enter Quantity and Notes
+                Enter Quantity, Type, and Notes
               </h4>
               <div className="space-y-3">
                 <div className="flex gap-3">
@@ -547,27 +622,70 @@ export default function SchemaEnhancedReceiving() {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     min="1"
+                    disabled={isLoading}
                   />
                   <Button
                     onClick={handleAddToReceiving}
-                    disabled={!quantity || loading}
+                    disabled={!quantity || isLoading}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Item
                   </Button>
                 </div>
-                <Input
-                  placeholder="Notes (optional)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
 
-                {/* Summary of what's being added */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Transaction Type
+                  </label>
+                  <Select
+                    value={transactionType}
+                    onValueChange={setTransactionType}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select transaction type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PO_RECEIVING">
+                        PO Receiving (Supplier → Warehouse)
+                      </SelectItem>
+                      <SelectItem value="ASN_RECEIVING">
+                        ASN Receiving (Supplier → Warehouse)
+                      </SelectItem>
+                      <SelectItem value="TRANSFER_RECEIVING">
+                        Transfer Receiving (Warehouse → Warehouse)
+                      </SelectItem>
+                      <SelectItem value="RETURNS">
+                        Returns / Reverse Logistics (Customer → Warehouse)
+                      </SelectItem>
+                      <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                      <SelectItem value="COUNT">Count</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Notes (Optional)
+                  </label>
+                  <Textarea
+                    placeholder="Add any notes about this receiving..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    disabled={isLoading}
+                    rows={3}
+                    className="resize-none"
+                  />
+                </div>
+
                 {currentProduct && currentLocation && quantity && (
-                  <div className="p-3 bg-background rounded border">
+                  <div className="p-3 bg-muted rounded border">
                     <p className="text-sm">
                       <strong>Adding:</strong> {quantity} units of{" "}
                       {currentProduct.sku} to {currentLocation.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Type: {getTransactionTypeLabel(transactionType)}
                     </p>
                   </div>
                 )}
@@ -583,8 +701,11 @@ export default function SchemaEnhancedReceiving() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Items to Receive ({receivedItems.length})</span>
-              <Button onClick={handleFinalizeReceiving} disabled={loading}>
-                {loading ? (
+              <Button
+                onClick={handleFinalizeReceiving}
+                disabled={batchReceivingMutation.isPending}
+              >
+                {batchReceivingMutation.isPending ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
@@ -607,7 +728,7 @@ export default function SchemaEnhancedReceiving() {
                       </h5>
                       <Badge variant="outline">{item.productVariant.sku}</Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                       <div className="flex items-center">
                         <MapPin className="w-3 h-3 mr-1" />
                         {item.location.name}
@@ -623,6 +744,9 @@ export default function SchemaEnhancedReceiving() {
                         <Package className="w-3 h-3 mr-1" />
                         {item.quantityReceived} units
                       </div>
+                      <Badge variant="outline" className="text-xs">
+                        {getTransactionTypeLabel(item.transactionType)}
+                      </Badge>
                     </div>
                     {item.notes && (
                       <p className="text-sm text-gray-500 mt-1">
@@ -634,6 +758,7 @@ export default function SchemaEnhancedReceiving() {
                     variant="ghost"
                     size="sm"
                     onClick={() => removeReceivedItem(item.id)}
+                    disabled={batchReceivingMutation.isPending}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -649,7 +774,7 @@ export default function SchemaEnhancedReceiving() {
         isOpen={showScanner}
         onClose={handleCloseScanner}
         onScan={handleBarcodeScanned}
-        stopStream={stopStream} // <-- NEW
+        stopStream={stopStream}
         title={
           scannerTarget === "product"
             ? "Scan Product Barcode"

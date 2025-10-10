@@ -577,7 +577,7 @@ export default function ShippingLabelForm({
           <div className="flex justify-end">
             <button
               onClick={enableSplitMode}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+              className="cursor-pointer px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
             >
               <Package className="w-4 h-4 mr-2" />
               Split into Multiple Shipments
@@ -671,7 +671,7 @@ export default function ShippingLabelForm({
                 </h3>
                 <button
                   onClick={createNewShipment}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                  className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Add Shipment
@@ -742,7 +742,7 @@ export default function ShippingLabelForm({
                                       item.quantity + 1
                                     )
                                   }
-                                  className="w-5 h-5 border rounded flex items-center justify-center hover:bg-background"
+                                  className="cursor-pointer w-5 h-5 border rounded flex items-center justify-center hover:bg-background"
                                 >
                                   <Plus className="w-3 h-3" />
                                 </button>
@@ -831,7 +831,7 @@ export default function ShippingLabelForm({
                             </h5>
                             <button
                               onClick={() => addPackageToShipment(shipment.id)}
-                              className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
+                              className="cursor-pointer px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
                             >
                               <Plus className="w-3 h-3 mr-1" />
                               Add
@@ -855,7 +855,7 @@ export default function ShippingLabelForm({
                                         pkg.id
                                       )
                                     }
-                                    className="text-red-400 hover:text-red-500"
+                                    className="text-red-400 hover:text-red-500 cursor-pointer "
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -1038,7 +1038,7 @@ export default function ShippingLabelForm({
                     {shipment.packages.length < 5 && (
                       <button
                         onClick={() => addPackageToShipment(shipment.id)}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                        className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Add Package
@@ -1049,10 +1049,10 @@ export default function ShippingLabelForm({
                   {shipment.packages.map((pkg, pkgIndex) => (
                     <div
                       key={pkg.id}
-                      className="border p-4 rounded bg-gray-50 dark:bg-gray-800 space-y-3 mb-3"
+                      className="border p-4 rounded bg-gray-50 dark:bg-zinc-800 space-y-3 mb-3"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
+                        <span className="text-md font-medium text-emerald-500">
                           Package {pkgIndex + 1}
                         </span>
                         {shipment.packages.length > 1 && (
@@ -1060,7 +1060,7 @@ export default function ShippingLabelForm({
                             onClick={() =>
                               removePackageFromShipment(shipment.id, pkg.id)
                             }
-                            className="text-red-600 hover:text-red-800"
+                            className="text-red-600 hover:text-red-800 cursor-pointer "
                           >
                             <X className="w-5 h-5" />
                           </button>
@@ -1182,7 +1182,7 @@ export default function ShippingLabelForm({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="px-6 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="cursor-pointer px-6 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-800"
               disabled={processing}
             >
               Cancel
@@ -1193,7 +1193,7 @@ export default function ShippingLabelForm({
             disabled={
               processing || shipments.every((s) => s.items.length === 0)
             }
-            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="cursor-pointer px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             {processing ? (
               <>
@@ -1247,7 +1247,7 @@ export default function ShippingLabelForm({
                   onClick={() =>
                     setSplitQuantity(Math.max(1, splitQuantity - 1))
                   }
-                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="cursor-pointer w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
@@ -1276,7 +1276,7 @@ export default function ShippingLabelForm({
                       )
                     )
                   }
-                  className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="cursor-pointer w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -1315,7 +1315,7 @@ export default function ShippingLabelForm({
                   setSelectedItemForSplit(null);
                   setSplitQuantity(1);
                 }}
-                className="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="cursor-pointer px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>

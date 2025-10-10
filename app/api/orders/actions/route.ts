@@ -5,10 +5,7 @@ import { reserveOrderInventory } from "@/lib/reserveInventory";
 import { fulfillOrderAndUpdateShopify } from "@/lib/fulfillOrderAndUpdateShopify";
 import { generateBulkPickLists } from "@/lib/generateBulkPickLists";
 import { generateSinglePickList } from "@/lib/generateSinglePickList";
-import {
-  updateOrderStatus,
-  batchUpdateOrderStatus,
-} from "@/lib/order-status-helper"; // ← ADD THIS
+import { updateOrderStatus } from "@/lib/order-status-helper";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,9 +24,7 @@ export async function POST(request: NextRequest) {
           userId: session.user.id,
         });
 
-        // ✅ NEW: Create status history for allocation
-        // Note: If reserveOrderInventory already updates status, you may need to
-        // modify that function to use the helper instead
+        // Create status history for allocation
         await updateOrderStatus({
           orderId,
           newStatus: "ALLOCATED",
@@ -42,7 +37,7 @@ export async function POST(request: NextRequest) {
         // Fulfill order and update Shopify
         await fulfillOrderAndUpdateShopify(orderId, session.user.id);
 
-        // ✅ NEW: Create status history for fulfillment
+        // Create status history for fulfillment
         await updateOrderStatus({
           orderId,
           newStatus: "FULFILLED",
@@ -53,22 +48,16 @@ export async function POST(request: NextRequest) {
 
       case "GENERATE_SINGLE_PICK":
         try {
-          // Generate pick list
+          // ✅ FIXED: Just generate - status update happens inside generateSinglePickList
           const result = await generateSinglePickList({
             orderIds: [orderId],
             pickingStrategy: "SINGLE",
             userId: session.user.id,
           });
 
-          // ✅ NEW: Create status history for pick list generation
-          await updateOrderStatus({
-            orderId,
-            newStatus: "PICKING",
-            userId: session.user.id,
-            notes: `Pick list ${result.batchNumber} generated`,
-          });
+          // ❌ REMOVED: Don't update status here - already done in generateSinglePickList
 
-          // Automatically start the pick list using the same logic as your startPicking function
+          // Automatically start the pick list
           const startResponse = await fetch(
             `${
               process.env.NEXTAUTH_URL || "http://localhost:3000"
@@ -102,16 +91,8 @@ export async function POST(request: NextRequest) {
         break;
 
       case "BULK_GENERATE_PICKS":
-        // Generate bulk pick lists
+        // ✅ Generate bulk pick lists - status updates handled in /api/picking/generate
         await generateBulkPickLists(orderIds);
-
-        // ✅ NEW: Create status history for bulk pick list generation
-        await batchUpdateOrderStatus({
-          orderIds,
-          newStatus: "PICKING",
-          userId: session.user.id,
-          notes: "Bulk pick list generation",
-        });
         break;
 
       default:
@@ -138,6 +119,10 @@ export async function POST(request: NextRequest) {
 // import { fulfillOrderAndUpdateShopify } from "@/lib/fulfillOrderAndUpdateShopify";
 // import { generateBulkPickLists } from "@/lib/generateBulkPickLists";
 // import { generateSinglePickList } from "@/lib/generateSinglePickList";
+// import {
+//   updateOrderStatus,
+//   batchUpdateOrderStatus,
+// } from "@/lib/order-status-helper"; // ← ADD THIS
 
 // export async function POST(request: NextRequest) {
 //   try {
@@ -150,19 +135,51 @@ export async function POST(request: NextRequest) {
 
 //     switch (action) {
 //       case "ALLOCATE":
-//         await reserveOrderInventory({ orderId, userId: session.user.id });
+//         // Allocate inventory
+//         const allocationResult = await reserveOrderInventory({
+//           orderId,
+//           userId: session.user.id,
+//         });
+
+//         // ✅ NEW: Create status history for allocation
+//         // Note: If reserveOrderInventory already updates status, you may need to
+//         // modify that function to use the helper instead
+//         await updateOrderStatus({
+//           orderId,
+//           newStatus: "ALLOCATED",
+//           userId: session.user.id,
+//           notes: `Inventory allocated successfully - ${allocationResult.reservations.length} location(s)`,
+//         });
 //         break;
 
 //       case "MARK_FULFILLED":
+//         // Fulfill order and update Shopify
 //         await fulfillOrderAndUpdateShopify(orderId, session.user.id);
+
+//         // ✅ NEW: Create status history for fulfillment
+//         await updateOrderStatus({
+//           orderId,
+//           newStatus: "FULFILLED",
+//           userId: session.user.id,
+//           notes: "Order marked as fulfilled",
+//         });
 //         break;
 
 //       case "GENERATE_SINGLE_PICK":
 //         try {
+//           // Generate pick list
 //           const result = await generateSinglePickList({
 //             orderIds: [orderId],
 //             pickingStrategy: "SINGLE",
 //             userId: session.user.id,
+//           });
+
+//           // ✅ NEW: Create status history for pick list generation
+//           await updateOrderStatus({
+//             orderId,
+//             newStatus: "PICKING",
+//             userId: session.user.id,
+//             notes: `Pick list ${result.batchNumber} generated`,
 //           });
 
 //           // Automatically start the pick list using the same logic as your startPicking function
@@ -199,7 +216,16 @@ export async function POST(request: NextRequest) {
 //         break;
 
 //       case "BULK_GENERATE_PICKS":
+//         // Generate bulk pick lists
 //         await generateBulkPickLists(orderIds);
+
+//         // ✅ NEW: Create status history for bulk pick list generation
+//         await batchUpdateOrderStatus({
+//           orderIds,
+//           newStatus: "PICKING",
+//           userId: session.user.id,
+//           notes: "Bulk pick list generation",
+//         });
 //         break;
 
 //       default:

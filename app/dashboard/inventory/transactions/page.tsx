@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { getActivityBadgeColor, getActivityIcon } from "@/lib/activity-utils";
+
 interface Transaction {
   id: string;
   productVariantId: string;
@@ -76,39 +78,39 @@ export default function TransactionsPage() {
     return matchesSearch && matchesType;
   });
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case "RECEIPT":
-        return <Plus className="w-4 h-4 text-green-600" />;
-      case "SALE":
-        return <Minus className="w-4 h-4 text-red-600" />;
-      case "ADJUSTMENT":
-        return <Edit className="w-4 h-4 text-blue-600" />;
-      case "TRANSFER":
-        return <ArrowRightLeft className="w-4 h-4 text-teal-600" />;
-      case "COUNT":
-        return <Archive className="w-4 h-4 text-orange-600" />;
-      default:
-        return <History className="w-4 h-4 text-gray-600" />;
-    }
-  };
+  // const getTransactionIcon = (type: string) => {
+  //   switch (type) {
+  //     case "RECEIPT":
+  //       return <Plus className="w-4 h-4 text-green-600" />;
+  //     case "SALE":
+  //       return <Minus className="w-4 h-4 text-red-600" />;
+  //     case "ADJUSTMENT":
+  //       return <Edit className="w-4 h-4 text-blue-600" />;
+  //     case "TRANSFER":
+  //       return <ArrowRightLeft className="w-4 h-4 text-teal-600" />;
+  //     case "COUNT":
+  //       return <Archive className="w-4 h-4 text-orange-600" />;
+  //     default:
+  //       return <History className="w-4 h-4 text-gray-600" />;
+  //   }
+  // };
 
-  const getTransactionBadgeColor = (type: string) => {
-    switch (type) {
-      case "RECEIPT":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "SALE":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      case "ADJUSTMENT":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case "TRANSFER":
-        return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200";
-      case "COUNT":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-    }
-  };
+  // const getTransactionBadgeColor = (type: string) => {
+  //   switch (type) {
+  //     case "RECEIPT":
+  //       return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+  //     case "SALE":
+  //       return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+  //     case "ADJUSTMENT":
+  //       return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+  //     case "TRANSFER":
+  //       return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200";
+  //     case "COUNT":
+  //       return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
+  //     default:
+  //       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+  //   }
+  // };
 
   if (isLoading) {
     return (
@@ -219,9 +221,9 @@ export default function TransactionsPage() {
                         )}
                         <td className="py-4">
                           <div className="flex items-center gap-2">
-                            {getTransactionIcon(transaction.transactionType)}
+                            {getActivityIcon(transaction.transactionType)}
                             <Badge
-                              className={getTransactionBadgeColor(
+                              className={getActivityBadgeColor(
                                 transaction.transactionType
                               )}
                             >

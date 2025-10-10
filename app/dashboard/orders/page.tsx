@@ -525,7 +525,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setStatusFilter(e.target.value as OrderFilters["status"])
               }
-              className="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
               <option value={OrderStatus.PENDING}>Pending</option>
@@ -543,7 +543,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setPriorityFilter(e.target.value as OrderFilters["priority"])
               }
-              className="text-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Priorities</option>
               <option value="URGENT">Urgent</option>

@@ -21,7 +21,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface PickListItem {
@@ -139,6 +139,8 @@ export default function MobilePickingInterface() {
   const [showShortPickModal, setShowShortPickModal] = useState(false);
   const [shortPickQuantity, setShortPickQuantity] = useState("");
   const [shortPickReason, setShortPickReason] = useState("");
+
+  const router = useRouter();
 
   // TanStack Query hooks
   const {
@@ -270,7 +272,7 @@ export default function MobilePickingInterface() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry
             </Button>
-            <Button variant="outline" onClick={() => window.history.back()}>
+            <Button variant="outline" onClick={() => router.back()}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Go Back
             </Button>
@@ -301,7 +303,7 @@ export default function MobilePickingInterface() {
           <Button
             variant="outline"
             className="mt-4"
-            onClick={() => window.history.back()}
+            onClick={() => router.back()}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
@@ -510,7 +512,7 @@ export default function MobilePickingInterface() {
             <Button
               onClick={() => processItem("PICK")}
               disabled={pickActionMutation.isPending}
-              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
+              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-500 hover:bg-blue-600 text-gray-200"
             >
               {pickActionMutation.isPending ? (
                 <>

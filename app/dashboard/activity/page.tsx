@@ -6,7 +6,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Search,
-  Filter,
+  DollarSign,
   Download,
   Loader2,
   Package,
@@ -17,16 +17,16 @@ import {
   RefreshCw,
   User,
   Clock,
+  ArrowLeftRight,
+  Settings,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import ActivityDetailModal from "@/components/modal/ActivityDetailModal"; // ← Add this import
+
+import { getActivityBadgeColor, getActivityIcon } from "@/lib/activity-utils";
 
 interface Activity {
   id: string;
@@ -72,6 +72,10 @@ const fetchActivities = async ({
 export default function ActivityPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null
+  ); // ← Add this
+  const [isModalOpen, setIsModalOpen] = useState(false); // ← Add this
   const [filters, setFilters] = useState({
     type: "all",
     limit: 50,
@@ -94,8 +98,8 @@ export default function ActivityPage() {
       return allPages.length;
     },
     initialPageParam: 0,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 
   const activities = useMemo(() => {
@@ -120,34 +124,21 @@ export default function ActivityPage() {
     }));
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "order":
-        return <ShoppingCart className="w-5 h-5 text-blue-500" />;
-      case "inventory":
-        return <Package className="w-5 h-5 text-green-500" />;
-      case "shipment":
-        return <Truck className="w-5 h-5 text-teal-500" />;
-      case "scan":
-        return <Scan className="w-5 h-5 text-orange-500" />;
-      default:
-        return <Bell className="w-5 h-5 text-gray-500 dark:text-blue-500" />;
-    }
+  // ← Add this handler
+  const handleActivityClick = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setIsModalOpen(true);
   };
 
-  const getActivityBadgeColor = (type: string) => {
-    switch (type) {
-      case "order":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case "inventory":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "shipment":
-        return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
-      case "scan":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
-      default:
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-    }
+  const getTransactionTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      receipt: "Receipt",
+      sale: "Sale",
+      order: "Order",
+      scan: "Scan/Count",
+      shipment: "Shipment",
+    };
+    return labels[type.toLowerCase()] || type.toUpperCase();
   };
 
   const exportCSV = () => {
@@ -204,10 +195,27 @@ export default function ActivityPage() {
                 className="text-sm px-4 py-2 border dark:border-border rounded-lg bg-white dark:bg-background text-foreground"
               >
                 <option value="all">All Types</option>
-                <option value="order">Orders</option>
-                <option value="inventory">Inventory</option>
-                <option value="shipment">Shipments</option>
-                <option value="scan">Scans</option>
+                <optgroup label="Receiving">
+                  <option value="PO_RECEIVING">PO Receiving</option>
+                  <option value="ASN_RECEIVING">ASN Receiving</option>
+                  <option value="TRANSFER_RECEIVING">Transfer Receiving</option>
+                  <option value="RETURNS">Returns</option>
+                </optgroup>
+                <optgroup label="Inventory">
+                  <option value="ADJUSTMENT">Adjustment</option>
+                  <option value="COUNT">Count</option>
+                </optgroup>
+                <optgroup label="Orders">
+                  <option value="ALLOCATION">Allocation</option>
+                  <option value="DEALLOCATION">Deallocation</option>
+                  <option value="SALE">Sale</option>
+                </optgroup>
+                <optgroup label="Transfers">
+                  <option value="TRANSFER">Transfer</option>
+                </optgroup>
+                <optgroup label="Legacy">
+                  <option value="RECEIPT">Receipt</option>
+                </optgroup>
               </select>
 
               <select
@@ -263,12 +271,11 @@ export default function ActivityPage() {
                 filteredActivities.map((activity) => (
                   <div
                     key={activity.id}
-                    className="p-6 hover:bg-gray-50 dark:hover:bg-accent transition-colors"
+                    onClick={() => handleActivityClick(activity)} // ← Add onClick handler
+                    className="p-6 hover:bg-gray-50 dark:hover:bg-accent transition-colors cursor-pointer"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="p-2 bg-gray-100 dark:bg-muted rounded-lg">
-                        {getActivityIcon(activity.type)}
-                      </div>
+                      <div>{getActivityIcon(activity.type, 5)}</div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4 mb-2">
@@ -278,9 +285,9 @@ export default function ActivityPage() {
                           <Badge
                             className={`${getActivityBadgeColor(
                               activity.type
-                            )} text-xs whitespace-nowrap`}
+                            )} text-xs rounded-4xl px-3 py-1 whitespace-nowrap`}
                           >
-                            {activity.type.toUpperCase()}
+                            {getTransactionTypeLabel(activity.type)}
                           </Badge>
                         </div>
 
@@ -342,6 +349,13 @@ export default function ActivityPage() {
           </div>
         )}
       </div>
+
+      {/* ← Add the Modal component at the bottom */}
+      <ActivityDetailModal
+        activity={selectedActivity}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }

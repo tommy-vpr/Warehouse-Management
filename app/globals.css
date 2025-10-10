@@ -129,3 +129,27 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ==== Custom select + option styling ==== */
+
+select {
+  @apply px-3 py-2 border border-gray-300 rounded-md text-gray-800 bg-white
+    focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+option {
+  @apply text-gray-800 bg-white;
+}
+
+/* 🌙 Dark mode overrides */
+.dark select {
+  @apply border-zinc-700 bg-zinc-900 text-gray-400;
+}
+
+.dark option {
+  @apply bg-zinc-900 text-gray-300;
+}
+
+button {
+  @apply cursor-pointer;
+}
