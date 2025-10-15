@@ -162,6 +162,7 @@ model ProductVariant {
 
   // Back orders
   backOrders        BackOrder[]
+  reservations          InventoryReservation[]
   
   // Relations
   product               Product                @relation(fields: [productId], references: [id])
@@ -209,6 +210,7 @@ model Location {
   inventoryTransactions InventoryTransaction[]
   pickListItems         PickListItem[]
   countTasks            CycleCountTask[]
+  reservations          InventoryReservation[]
   
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -278,6 +280,9 @@ model Order {
   labelUrl          String?     // Direct link to shipping label
   notes             String?     // Packing/shipping notes
 
+  shopifyFulfillmentIds String? 
+  shopifyLineItems      Json?
+
   // Back order
   hasBackOrders     Boolean     @default(false)
   backOrders        BackOrder[]
@@ -287,11 +292,42 @@ model Order {
   pickListItems   PickListItem[]
   packages        ShippingPackage[]
   statusHistory   OrderStatusHistory[]
+
+  reservations    InventoryReservation[]
+  shopifySyncs    ShopifySync[]
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@map("orders")
+}
+
+model InventoryReservation {
+  id               String         @id @default(cuid())
+  orderId          String
+  productVariantId String
+  locationId       String
+  quantity         Int
+  status           ReservationStatus @default(ACTIVE)
+  
+  // Relations
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  location         Location       @relation(fields: [locationId], references: [id])
+  
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  @@unique([orderId, productVariantId, locationId])
+  @@index([orderId])
+  @@index([productVariantId, locationId])
+  @@map("inventory_reservations")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  FULFILLED
+  CANCELLED
 }
 
 model OrderStatusHistory {
@@ -316,10 +352,33 @@ model OrderItem {
   quantity         Int
   unitPrice        Decimal        @db.Decimal(10, 2)
   totalPrice       Decimal        @db.Decimal(10, 2)
+
+  shopifyLineItemId                String?
+  shopifyFulfillmentOrderLineItemId String?
+
   order            Order          @relation(fields: [orderId], references: [id])
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@map("order_items")
+}
+
+model ShopifySync {
+  id          String   @id @default(cuid())
+  orderId     String
+  syncType    String   // "FULFILLMENT", "CANCELLATION", "REFUND", etc.
+  status      String   // "PENDING", "COMPLETED", "FAILED"
+  attempts    Int      @default(0)
+  data        Json     // Store sync details (tracking, items, etc.)
+  error       String?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status, syncType])
+  @@map("shopify_syncs")
 }
 
 enum OrderStatus {
@@ -838,8 +897,12 @@ model BackOrder {
 }
 
 enum BackOrderStatus {
-  PENDING           // Waiting for fulfillment
-  FULFILLED         // Fulfilled
+  PENDING           // Waiting for inventory
+  ALLOCATED         // Inventory reserved
+  PICKING           // ✅ Being picked
+  PICKED            // ✅ Picked from warehouse
+  PACKED            // ✅ Packed in box
+  FULFILLED         // Shipped to customer
   CANCELLED         // Cancelled
 }
 

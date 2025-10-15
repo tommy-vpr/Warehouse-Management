@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
       notes,
     } = await request.json();
 
-    // ✅ UPDATED: Use transaction to update order details AND status history
     const order = await prisma.$transaction(async (tx) => {
-      // Update order details (but NOT status here)
+      // Update order details
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: {
@@ -34,13 +33,24 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // ✅ UPDATE: Mark back orders as PACKED
+      await tx.backOrder.updateMany({
+        where: {
+          orderId: orderId,
+          status: "PICKED",
+        },
+        data: {
+          status: "PACKED",
+        },
+      });
+
       // Update status with history tracking
       await updateOrderStatus({
         orderId,
         newStatus: "PACKED",
         userId: session.user.id,
         notes: `Packed in ${boxType} box${notes ? ` - ${notes}` : ""}`,
-        tx, // ← Pass transaction client
+        tx,
       });
 
       return updatedOrder;
@@ -52,7 +62,7 @@ export async function POST(request: NextRequest) {
       order: {
         id: order.id,
         orderNumber: order.orderNumber,
-        status: "PACKED", // Status was updated via helper
+        status: "PACKED",
         shippingCarrier: order.shippingCarrier,
         shippingService: order.shippingService,
       },

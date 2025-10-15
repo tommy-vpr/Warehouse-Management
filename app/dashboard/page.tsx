@@ -304,7 +304,7 @@ export default function Dashboard() {
                     {displayLowStockItems.map((item: any) => (
                       <div
                         key={item.sku}
-                        className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800"
+                        className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-rose-200 dark:border-rose-800"
                       >
                         <div>
                           <p className="font-medium text-sm">{item.name}</p>

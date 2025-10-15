@@ -1,14 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  TrendingUp,
-  ShoppingCart,
-  Package,
-  AlertTriangle,
-  BarChart3,
-  FileText,
-} from "lucide-react";
+import { TrendingUp, ShoppingCart, Package, AlertTriangle } from "lucide-react";
+import Image from "next/image";
 
 export default function InventoryPlannerDashboard() {
   const router = useRouter();
@@ -82,7 +76,7 @@ export default function InventoryPlannerDashboard() {
                 >
                   <Icon className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <h3 className="text-lg font-semibold mb-2 text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-500 transition-colors">
                   {card.title}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
@@ -144,20 +138,20 @@ export default function InventoryPlannerDashboard() {
           </div>
 
           {/* Info Card */}
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-800 dark:to-blue-700 rounded-lg shadow dark:shadow-lg p-6 text-white">
-            <h2 className="text-lg font-semibold mb-4">
-              About Inventory Planner
-            </h2>
-            <p className="text-blue-100 dark:text-blue-200 mb-4">
-              Real-time inventory forecasting and purchase order management
-              powered by Inventory Planner API.
-            </p>
-            <ul className="space-y-2 text-sm text-blue-100 dark:text-blue-200">
-              <li>✓ Live data synchronization</li>
-              <li>✓ Automated replenishment suggestions</li>
-              <li>✓ Low stock alerts</li>
-              <li>✓ CSV export capabilities</li>
-            </ul>
+          <div className="relative overflow-hidden rounded-lg">
+            <Image
+              src="/images/inventory-planner-main.webp"
+              fill
+              className="object-cover"
+              alt="Inventory planning and forecasting"
+            />
+
+            {/* 🔹 Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-800 via-black/30 to-transparent flex items-end">
+              <p className="text-gray-200 text-md sm:text-lg font-semibold p-4">
+                Real-time updates from Inventory Planner
+              </p>
+            </div>
           </div>
         </div>
       </div>

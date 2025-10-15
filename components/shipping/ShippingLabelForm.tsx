@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Plus,
   Minus,
@@ -91,7 +97,12 @@ interface ShippingLabelFormProps {
   onSuccess?: (results: any[]) => void;
   onCancel?: () => void;
   embedded?: boolean;
-  initialWeight?: number; // Optional pre-filled weight from packing
+  initialWeight?: number;
+  initialDimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
 }
 
 export default function ShippingLabelForm({
@@ -100,6 +111,7 @@ export default function ShippingLabelForm({
   onCancel,
   embedded = false,
   initialWeight,
+  initialDimensions,
 }: ShippingLabelFormProps) {
   const [carriers, setCarriers] = useState<Carrier[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -112,6 +124,12 @@ export default function ShippingLabelForm({
   } | null>(null);
   const [splitQuantity, setSplitQuantity] = useState(1);
   const [splitMode, setSplitMode] = useState(false);
+
+  // Number of packages input for UPS
+  const [numberOfPackages, setNumberOfPackages] = useState("");
+
+  // ✅ NEW: Track if dimensions have been applied
+  const dimensionsAppliedRef = useRef(false);
 
   const generateId = useCallback(
     () => Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -154,6 +172,49 @@ export default function ShippingLabelForm({
     initializeShipment();
   }, []);
 
+  useEffect(() => {
+    if (
+      (initialDimensions || initialWeight) &&
+      shipments.length > 0 &&
+      !dimensionsAppliedRef.current
+    ) {
+      setShipments((prevShipments) => {
+        const updatedShipments = [...prevShipments];
+        const firstShipment = updatedShipments[0];
+
+        if (firstShipment && firstShipment.packages.length > 0) {
+          updatedShipments[0] = {
+            ...firstShipment,
+            packages: [
+              {
+                ...firstShipment.packages[0],
+                weight: initialWeight
+                  ? initialWeight.toString()
+                  : firstShipment.packages[0].weight,
+                dimensions: {
+                  length:
+                    initialDimensions?.length?.toString() ||
+                    firstShipment.packages[0].dimensions.length,
+                  width:
+                    initialDimensions?.width?.toString() ||
+                    firstShipment.packages[0].dimensions.width,
+                  height:
+                    initialDimensions?.height?.toString() ||
+                    firstShipment.packages[0].dimensions.height,
+                },
+              },
+              ...firstShipment.packages.slice(1),
+            ],
+          };
+        }
+
+        return updatedShipments;
+      });
+
+      dimensionsAppliedRef.current = true; // Mark as applied
+    }
+  }, [initialWeight, initialDimensions, shipments.length]);
+
   const loadCarriers = async () => {
     try {
       const response = await fetch("/api/carriers");
@@ -169,7 +230,6 @@ export default function ShippingLabelForm({
   };
 
   const initializeShipment = () => {
-    // Initialize with all items in one shipment
     const initialShipment: Shipment = {
       id: generateId(),
       name: "Shipment 1",
@@ -187,14 +247,26 @@ export default function ShippingLabelForm({
         {
           id: generateId(),
           packageCode: "",
+          // ✅ Use initialWeight from props
           weight: initialWeight ? initialWeight.toString() : "",
-          dimensions: { length: "12", width: "10", height: "6" },
+          dimensions: {
+            // ✅ Use initialDimensions from props
+            length: initialDimensions?.length?.toString() || "12",
+            width: initialDimensions?.width?.toString() || "10",
+            height: initialDimensions?.height?.toString() || "6",
+          },
         },
       ],
       notes: "",
     };
 
     setShipments([initialShipment]);
+    dimensionsAppliedRef.current = false; // Reset when initializing
+  };
+  // ✅ CHECK: Is current carrier Stamps.com?
+  const isStampsCarrier = (carrierId: string): boolean => {
+    const carrier = carriers.find((c) => c.carrier_id === carrierId);
+    return carrier?.carrier_code === "stamps_com" || false;
   };
 
   const enableSplitMode = () => {
@@ -263,6 +335,32 @@ export default function ShippingLabelForm({
           : shipment
       )
     );
+  };
+
+  // ✅ NEW: Add multiple packages at once (for UPS)
+  const addMultiplePackages = (shipmentId: string, count: number) => {
+    const newPackages: PackageConfig[] = [];
+    for (let i = 0; i < count; i++) {
+      newPackages.push({
+        id: generateId(),
+        packageCode: "",
+        weight: "",
+        dimensions: { length: "12", width: "10", height: "6" },
+      });
+    }
+
+    setShipments(
+      shipments.map((shipment) =>
+        shipment.id === shipmentId
+          ? {
+              ...shipment,
+              packages: [...shipment.packages, ...newPackages],
+            }
+          : shipment
+      )
+    );
+
+    setNumberOfPackages(""); // Clear input after adding
   };
 
   const removePackageFromShipment = (shipmentId: string, packageId: string) => {
@@ -542,7 +640,6 @@ export default function ShippingLabelForm({
           items: shipment.items,
         });
 
-        // Auto-download label
         if (result.label?.labelUrl) {
           window.open(result.label.labelUrl, "_blank");
         }
@@ -559,9 +656,59 @@ export default function ShippingLabelForm({
     }
   };
 
+  // ✅ FIXED: Smart package generation with weight distribution
+  const addMultiplePackagesWithWeightDistribution = (
+    shipmentId: string,
+    count: number
+  ) => {
+    const shipment = shipments.find((s) => s.id === shipmentId);
+    if (!shipment) return;
+
+    // Calculate total weight from SHIPMENT items (not all order items)
+    const totalWeightOz = shipment.items.reduce((sum, item) => {
+      return sum + (item.weightOz || 0) * item.quantity;
+    }, 0);
+    const totalWeightLbs = totalWeightOz / 16;
+
+    // Divide weight evenly across packages
+    const weightPerPackage = (totalWeightLbs / count).toFixed(2);
+
+    // Get the first package config to copy settings from
+    const firstPackage = shipment.packages[0];
+    const defaultPackageCode = firstPackage?.packageCode || "";
+    const defaultDimensions = firstPackage?.dimensions || {
+      length: "12",
+      width: "10",
+      height: "6",
+    };
+
+    // ✅ CREATE NEW PACKAGES (not add to existing)
+    const newPackages: PackageConfig[] = [];
+    for (let i = 0; i < count; i++) {
+      newPackages.push({
+        id: generateId(),
+        packageCode: defaultPackageCode, // Copy package type from first
+        weight: weightPerPackage,
+        dimensions: { ...defaultDimensions }, // Copy dimensions from first
+      });
+    }
+
+    // ✅ REPLACE packages instead of adding to existing
+    setShipments(
+      shipments.map((s) =>
+        s.id === shipmentId
+          ? {
+              ...s,
+              packages: newPackages, // Replace, not append
+            }
+          : s
+      )
+    );
+
+    setNumberOfPackages(""); // Clear input
+  };
   return (
     <div className={embedded ? "" : "p-6"}>
-      {/* Error Display */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
           <div className="flex items-center">
@@ -572,20 +719,23 @@ export default function ShippingLabelForm({
       )}
 
       <div className="space-y-6">
-        {/* Split Mode Toggle */}
-        {!splitMode && shipments.length === 1 && (
-          <div className="flex justify-end">
-            <button
-              onClick={enableSplitMode}
-              className="cursor-pointer px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Split into Multiple Shipments
-            </button>
-          </div>
-        )}
+        {/* ✅ UPDATED: Only show for Stamps.com in single shipment mode */}
+        {!splitMode &&
+          shipments.length === 1 &&
+          shipments[0].carrierId &&
+          isStampsCarrier(shipments[0].carrierId) && (
+            <div className="flex justify-end">
+              <button
+                onClick={enableSplitMode}
+                className="cursor-pointer px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                Split into Multiple Shipments
+              </button>
+            </div>
+          )}
 
-        {/* Split Mode Active */}
+        {/* Split Mode Active (Stamps.com only) */}
         {splitMode && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left: Available Items */}
@@ -771,7 +921,6 @@ export default function ShippingLabelForm({
                           Shipping Configuration
                         </h5>
 
-                        {/* Carrier & Service */}
                         <select
                           value={shipment.carrierId}
                           onChange={(e) =>
@@ -823,7 +972,7 @@ export default function ShippingLabelForm({
                           </select>
                         )}
 
-                        {/* Packages */}
+                        {/* Packages - compact for split mode */}
                         <div className="space-y-3 pt-2 border-t">
                           <div className="flex items-center justify-between">
                             <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400">
@@ -855,7 +1004,7 @@ export default function ShippingLabelForm({
                                         pkg.id
                                       )
                                     }
-                                    className="text-red-400 hover:text-red-500 cursor-pointer "
+                                    className="text-red-400 hover:text-red-500 cursor-pointer"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -1029,21 +1178,61 @@ export default function ShippingLabelForm({
                   )}
                 </div>
 
-                {/* Package Configuration */}
+                {/* ✅ UPDATED: Package Details with Quick Add for UPS */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium">
                       Package Details
                     </label>
-                    {shipment.packages.length < 5 && (
-                      <button
-                        onClick={() => addPackageToShipment(shipment.id)}
-                        className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
-                      >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Package
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {/* ✅ NEW: Quick add multiple packages (UPS only) */}
+                      {shipment.carrierId &&
+                        !isStampsCarrier(shipment.carrierId) && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="20"
+                              value={numberOfPackages}
+                              onChange={(e) =>
+                                setNumberOfPackages(e.target.value)
+                              }
+                              placeholder="# of packages"
+                              className="w-32 px-2 py-1 text-sm border rounded"
+                            />
+                            <button
+                              onClick={() => {
+                                const count = parseInt(numberOfPackages);
+                                if (count > 0 && count <= 20) {
+                                  // addMultiplePackages(shipment.id, count);
+                                  addMultiplePackagesWithWeightDistribution(
+                                    shipment.id,
+                                    count
+                                  );
+                                }
+                              }}
+                              disabled={
+                                !numberOfPackages ||
+                                parseInt(numberOfPackages) <= 0
+                              }
+                              className="cursor-pointer px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Add {numberOfPackages || "X"}
+                            </button>
+                          </div>
+                        )}
+
+                      {/* Manual add button */}
+                      {shipment.packages.length < 20 && (
+                        <button
+                          onClick={() => addPackageToShipment(shipment.id)}
+                          className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Package
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {shipment.packages.map((pkg, pkgIndex) => (
@@ -1060,7 +1249,7 @@ export default function ShippingLabelForm({
                             onClick={() =>
                               removePackageFromShipment(shipment.id, pkg.id)
                             }
-                            className="text-red-600 hover:text-red-800 cursor-pointer "
+                            className="text-red-600 hover:text-red-800 cursor-pointer"
                           >
                             <X className="w-5 h-5" />
                           </button>

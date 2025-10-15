@@ -1,3 +1,5 @@
+// app/api/webhooks/shopify/orders/create/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
@@ -7,7 +9,7 @@ import { getSystemUserIdInTransaction } from "@/lib/system-user";
 // Verify webhook signature for security
 function verifyShopifyWebhook(body: string, signature: string): boolean {
   const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET!;
-  if (!webhookSecret) return true; // Skip verification if no secret set
+  if (!webhookSecret) return true;
 
   const hash = crypto
     .createHmac("sha256", webhookSecret)
@@ -26,13 +28,11 @@ export async function POST(request: NextRequest) {
     console.log("📦 Shopify webhook received");
     console.log("🔧 Development mode:", isDevelopment);
 
-    // In development, allow requests without signature for testing
     if (!isDevelopment && !signature) {
       console.error("❌ Missing webhook signature");
       return NextResponse.json({ error: "Missing signature" }, { status: 401 });
     }
 
-    // Verify signature only if we have a secret and signature
     if (signature && process.env.SHOPIFY_WEBHOOK_SECRET) {
       if (!verifyShopifyWebhook(body, signature)) {
         console.error("❌ Invalid webhook signature");
@@ -52,12 +52,10 @@ export async function POST(request: NextRequest) {
       orderData.name || orderData.order_number
     );
 
-    // Process the order
     const order = await processShopifyOrder(orderData);
 
     console.log("✅ Order processed successfully:", order.orderNumber);
 
-    // Optionally auto-reserve inventory
     if (process.env.AUTO_RESERVE_ORDERS === "true") {
       try {
         await autoReserveOrder(order.id);
@@ -86,7 +84,6 @@ export async function POST(request: NextRequest) {
 
 async function processShopifyOrder(shopifyOrder: any) {
   return await prisma.$transaction(async (tx) => {
-    // Check if order already exists
     const existingOrder = await tx.order.findUnique({
       where: { shopifyOrderId: shopifyOrder.id.toString() },
     });
@@ -96,7 +93,6 @@ async function processShopifyOrder(shopifyOrder: any) {
       return existingOrder;
     }
 
-    // Determine customer name
     let customerName = "Unknown Customer";
     if (shopifyOrder.shipping_address) {
       customerName = `${shopifyOrder.shipping_address.first_name || ""} ${
@@ -112,6 +108,87 @@ async function processShopifyOrder(shopifyOrder: any) {
       }`.trim();
     }
 
+    // ✅ NEW: Fetch fulfillment orders to get line item IDs for modern API
+    const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
+    const ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+
+    let fulfillmentOrderLineItems: Map<string, string> = new Map(); // variantId -> fulfillmentOrderLineItemId
+
+    if (SHOPIFY_DOMAIN && ACCESS_TOKEN) {
+      try {
+        const query = `
+          query($orderId: ID!) {
+            order(id: $orderId) {
+              id
+              fulfillmentOrders(first: 5) {
+                edges {
+                  node {
+                    id
+                    lineItems(first: 50) {
+                      edges {
+                        node {
+                          id
+                          lineItem {
+                            id
+                            variant {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+
+        const orderGid = `gid://shopify/Order/${shopifyOrder.id}`;
+
+        const response = await fetch(
+          `https://${SHOPIFY_DOMAIN}/admin/api/2025-07/graphql.json`,
+          {
+            method: "POST",
+            headers: {
+              "X-Shopify-Access-Token": ACCESS_TOKEN,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query,
+              variables: { orderId: orderGid },
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          const fulfillmentOrders =
+            result.data?.order?.fulfillmentOrders?.edges || [];
+
+          for (const foEdge of fulfillmentOrders) {
+            const lineItems = foEdge.node.lineItems.edges || [];
+            for (const liEdge of lineItems) {
+              const variantGid = liEdge.node.lineItem.variant?.id;
+              const foLineItemGid = liEdge.node.id;
+              if (variantGid && foLineItemGid) {
+                fulfillmentOrderLineItems.set(variantGid, foLineItemGid);
+              }
+            }
+          }
+
+          console.log(
+            `✅ Fetched ${fulfillmentOrderLineItems.size} fulfillment order line items`
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "⚠️  Failed to fetch fulfillment order line items:",
+          error
+        );
+      }
+    }
+
     // Create the order
     const order = await tx.order.create({
       data: {
@@ -125,12 +202,18 @@ async function processShopifyOrder(shopifyOrder: any) {
         shippingAddress: shopifyOrder.shipping_address || {},
         billingAddress: shopifyOrder.billing_address || {},
         status: "PENDING",
+        // ✅ NEW: Store Shopify line items for reference
+        shopifyLineItems: shopifyOrder.line_items?.map((li: any) => ({
+          id: li.id?.toString(),
+          variantId: li.variant_id?.toString(),
+          sku: li.sku,
+          quantity: li.quantity,
+        })),
       },
     });
 
     console.log(`📋 Created order ${order.orderNumber}`);
 
-    // ✅ NEW: Create initial status history entry
     const systemUserId = await getSystemUserIdInTransaction(tx);
 
     await tx.orderStatusHistory.create({
@@ -164,7 +247,6 @@ async function processShopifyOrder(shopifyOrder: any) {
     let itemsSkipped = 0;
 
     for (const lineItem of lineItems) {
-      // Find product variant by SKU
       let productVariant = null;
 
       if (lineItem.sku) {
@@ -173,7 +255,6 @@ async function processShopifyOrder(shopifyOrder: any) {
         });
       }
 
-      // If not found by SKU, try by Shopify variant ID
       if (!productVariant && lineItem.variant_id) {
         productVariant = await tx.productVariant.findUnique({
           where: { shopifyVariantId: lineItem.variant_id.toString() },
@@ -185,7 +266,6 @@ async function processShopifyOrder(shopifyOrder: any) {
           `⚠️  Product variant not found for SKU: ${lineItem.sku} / Shopify ID: ${lineItem.variant_id}`
         );
 
-        // Optionally create a placeholder product
         if (process.env.CREATE_MISSING_PRODUCTS === "true") {
           try {
             const product = await tx.product.create({
@@ -217,9 +297,17 @@ async function processShopifyOrder(shopifyOrder: any) {
           }
         } else {
           itemsSkipped++;
-          continue; // Skip this item
+          continue;
         }
       }
+
+      // ✅ NEW: Get fulfillment order line item ID
+      const variantGid = lineItem.variant_id
+        ? `gid://shopify/ProductVariant/${lineItem.variant_id}`
+        : null;
+      const foLineItemId = variantGid
+        ? fulfillmentOrderLineItems.get(variantGid)
+        : null;
 
       await tx.orderItem.create({
         data: {
@@ -228,6 +316,9 @@ async function processShopifyOrder(shopifyOrder: any) {
           quantity: lineItem.quantity,
           unitPrice: parseFloat(lineItem.price || "0"),
           totalPrice: parseFloat(lineItem.price || "0") * lineItem.quantity,
+          // ✅ NEW: Store Shopify line item IDs
+          shopifyLineItemId: lineItem.id?.toString(),
+          shopifyFulfillmentOrderLineItemId: foLineItemId || undefined,
         },
       });
 
@@ -266,7 +357,6 @@ async function autoReserveOrder(orderId: string) {
 export async function GET(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  // (optional) reconstruct full URL behind proxies (ngrok/Vercel)
   const proto = request.headers.get("x-forwarded-proto") ?? "http";
   const host =
     request.headers.get("x-forwarded-host") ?? request.headers.get("host");
@@ -274,8 +364,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    path: pathname, // e.g. "/api/webhooks/shopify" or "/api/webhooks/shopify/orders/create"
-    url: fullUrl, // e.g. "https://xxxx.ngrok-free.app/api/webhooks/shopify"
+    path: pathname,
+    url: fullUrl,
     ts: new Date().toISOString(),
     env: process.env.NODE_ENV,
   });
@@ -285,6 +375,7 @@ export async function GET(request: NextRequest) {
 // import { prisma } from "@/lib/prisma";
 // import crypto from "crypto";
 // import { notifyRole } from "@/lib/ably-server";
+// import { getSystemUserIdInTransaction } from "@/lib/system-user";
 
 // // Verify webhook signature for security
 // function verifyShopifyWebhook(body: string, signature: string): boolean {
@@ -411,6 +502,24 @@ export async function GET(request: NextRequest) {
 //     });
 
 //     console.log(`📋 Created order ${order.orderNumber}`);
+
+//     // ✅ NEW: Create initial status history entry
+//     const systemUserId = await getSystemUserIdInTransaction(tx);
+
+//     await tx.orderStatusHistory.create({
+//       data: {
+//         orderId: order.id,
+//         previousStatus: "PENDING",
+//         newStatus: "PENDING",
+//         changedBy: systemUserId,
+//         changedAt: new Date(),
+//         notes: `Order created from Shopify - ${
+//           shopifyOrder.name || shopifyOrder.order_number
+//         }`,
+//       },
+//     });
+
+//     console.log(`📝 Created status history for order ${order.orderNumber}`);
 
 //     await notifyRole("STAFF", "new-order", {
 //       type: "NEW_ORDER",

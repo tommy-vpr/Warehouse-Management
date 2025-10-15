@@ -159,16 +159,28 @@ export async function generateSinglePickList({
       )
     );
 
-    // ✅ FIXED: Update order status with history for each order
+    // Update order status with history for each order
     const orderIdsToUpdate = [...new Set(optimizedItems.map((i) => i.orderId))];
 
     for (const orderId of orderIdsToUpdate) {
+      // Update order status
       await updateOrderStatus({
         orderId,
         newStatus: "PICKING",
         userId,
         notes: `Pick list ${batchNumber} generated`,
-        tx, // ← Pass transaction client
+        tx,
+      });
+
+      // ✅ NEW: Also update back orders to PICKING status
+      await tx.backOrder.updateMany({
+        where: {
+          orderId: orderId,
+          status: "ALLOCATED",
+        },
+        data: {
+          status: "PICKING",
+        },
       });
     }
 

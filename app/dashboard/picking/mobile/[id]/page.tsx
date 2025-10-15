@@ -367,7 +367,9 @@ export default function MobilePickingInterface() {
               <h1 className="font-semibold text-lg">
                 {pickList.pickList.batchNumber}
               </h1>
-              <p className="text-sm text-gray-600">Picking</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Picking
+              </p>
             </div>
             {isFetching && (
               <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />

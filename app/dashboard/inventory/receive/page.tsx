@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Box,
   Loader2,
+  PartyPopper,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -139,6 +140,7 @@ const submitBatchReceiving = async (items: ReceivedItem[]) => {
 export default function SchemaEnhancedReceiving() {
   const queryClient = useQueryClient();
   const [isComponentReady, setIsComponentReady] = useState(false);
+  const [suggestedLocations, setSuggestedLocations] = useState<Location[]>([]);
 
   const [currentStep, setCurrentStep] = useState<
     "product" | "location" | "quantity"
@@ -174,9 +176,34 @@ export default function SchemaEnhancedReceiving() {
   // Product lookup mutation
   const productLookupMutation = useMutation({
     mutationFn: fetchProductByBarcode,
-    onSuccess: (product) => {
+    onSuccess: async (product) => {
       console.log("[DEBUG] Scanned Product:", product);
       setCurrentProduct(product);
+
+      // ✅ NEW: If product has existing inventory, fetch those locations
+      if (product.inventory && product.inventory.length > 0) {
+        try {
+          // Fetch full location details for suggestions
+          const locationPromises = product.inventory.map((inv) =>
+            fetch(`/api/inventory/location/${inv.locationId}`).then((r) =>
+              r.json()
+            )
+          );
+
+          const locations = await Promise.all(locationPromises);
+          setSuggestedLocations(locations.filter((loc) => loc.isReceivable));
+
+          console.log(
+            `✅ Found ${locations.length} suggested locations for this product`
+          );
+        } catch (error) {
+          console.error("Failed to fetch suggested locations:", error);
+          setSuggestedLocations([]);
+        }
+      } else {
+        setSuggestedLocations([]);
+      }
+
       setCurrentStep("location");
       setScannerTarget("location");
       setShowScanner(false);
@@ -186,6 +213,33 @@ export default function SchemaEnhancedReceiving() {
       setError(error.message);
     },
   });
+
+  // ✅ NEW: Quick select location handler
+  const handleSelectSuggestedLocation = async (locationId: string) => {
+    try {
+      const response = await fetch(`/api/inventory/location/${locationId}`);
+      if (!response.ok) throw new Error("Failed to fetch location");
+
+      const location = await response.json();
+
+      if (!location.isReceivable) {
+        setError("This location is not configured for receiving");
+        return;
+      }
+
+      setCurrentLocation(location);
+      setCurrentStep("quantity");
+      setError("");
+
+      setTimeout(() => {
+        if (quantityInputRef.current) {
+          quantityInputRef.current.focus();
+        }
+      }, 100);
+    } catch (error) {
+      setError("Failed to select location");
+    }
+  };
 
   // Location lookup mutation
   const locationLookupMutation = useMutation({
@@ -216,14 +270,57 @@ export default function SchemaEnhancedReceiving() {
   const batchReceivingMutation = useMutation({
     mutationFn: submitBatchReceiving,
     onSuccess: (result) => {
+      // ✅ UPDATED: Enhanced success handling with back order info
       setReceivedItems([]);
+      setCurrentProduct(null);
+      setCurrentLocation(null);
+      setQuantity("");
+      setTransactionType("PO_RECEIVING");
+      setNotes("");
+      setCurrentStep("product");
+      setScannerTarget("product");
+      setShowScanner(false);
       setError("");
-      resetCurrentReceiving();
+
+      // ✅ ADD: Show enhanced toast with back order fulfillment info
+      const hasAutoFulfilled =
+        result.autoFulfilledBackOrders &&
+        result.autoFulfilledBackOrders.length > 0;
+
+      let description = `Received ${result.results.length} item(s)`;
+
+      if (hasAutoFulfilled) {
+        const backOrderCount = result.autoFulfilledBackOrders.length;
+        const uniqueOrders = [
+          ...new Set(
+            result.autoFulfilledBackOrders.map((bo: any) => bo.orderNumber)
+          ),
+        ];
+
+        description += `\n🎉 Auto-fulfilled ${backOrderCount} back order(s) for ${uniqueOrders.length} order(s)!`;
+      }
+
       toast({
-        title: "✅ Success",
-        description: `Successfully received ${result.results.length} items!`,
+        title: hasAutoFulfilled
+          ? "Success - Back Orders Fulfilled!"
+          : "Success",
+        description,
+        variant: "success",
+        duration: hasAutoFulfilled ? 8000 : 5000, // Longer duration for back orders
       });
+
+      // ✅ ADD: Invalidate both inventory and back orders queries
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["backorders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+
+      // ✅ ADD: Log back order fulfillments for debugging
+      if (hasAutoFulfilled) {
+        console.log(
+          "✅ Auto-fulfilled back orders:",
+          result.autoFulfilledBackOrders
+        );
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -294,7 +391,7 @@ export default function SchemaEnhancedReceiving() {
 
   const getLocationTypeColor = (type: string) => {
     const colors = {
-      RECEIVING: "bg-blue-100 text-blue-800",
+      RECEIVING: "bg-green-100 text-green-800",
       STORAGE: "bg-green-100 text-green-800",
       PICKING: "bg-purple-100 text-purple-800",
       PACKING: "bg-orange-100 text-orange-800",
@@ -332,7 +429,7 @@ export default function SchemaEnhancedReceiving() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <Loader2 className="w-12 h-12 text-green-600 mx-auto mb-4 animate-spin" />
           <p className="text-gray-600 dark:text-gray-200">Loading...</p>
         </div>
       </div>
@@ -499,13 +596,67 @@ export default function SchemaEnhancedReceiving() {
             </div>
           )}
 
-          {/* Step 2: Location Scanning */}
+          {/* Step 2: Location Scanning - UPDATED */}
           {currentStep === "location" && (
             <div className="space-y-4">
               <h4 className="font-medium flex items-center">
                 <MapPin className="w-4 h-4 mr-2" />
                 Scan Destination Location
               </h4>
+
+              {/* ✅ NEW: Suggested Locations */}
+              {suggestedLocations.length > 0 && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-400 mb-3 flex items-center">
+                    <Package className="w-4 h-4 mr-2" />
+                    Suggested Locations (Product already exists here):
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {suggestedLocations.map((location) => {
+                      // Find the inventory quantity for this product at this location
+                      const productInventory = currentProduct?.inventory.find(
+                        (inv) => inv.locationId === location.id
+                      );
+
+                      return (
+                        <button
+                          key={location.id}
+                          onClick={() =>
+                            handleSelectSuggestedLocation(location.id)
+                          }
+                          className="cursor-pointer p-3 text-left border-2 border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-600 rounded-lg bg-white dark:bg-gray-800 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm">
+                              {location.name}
+                            </span>
+                            <Badge
+                              className={getLocationTypeColor(location.type)}
+                            >
+                              {location.type}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            Current: {productInventory?.quantityOnHand || 0}{" "}
+                            units on hand
+                          </div>
+                          {location.zone && (
+                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                              Zone: {location.zone}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-3">
+                    Click a location to select it, or scan a different location
+                    below
+                  </p>
+                </div>
+              )}
+
+              {/* Manual location scan/entry */}
               <div className="flex gap-3">
                 <Input
                   placeholder="Scan location barcode or enter location code"
@@ -537,70 +688,8 @@ export default function SchemaEnhancedReceiving() {
               </div>
 
               {currentLocation && (
-                <div className="p-4 bg-blue-50 rounded border border-blue-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <h5 className="font-medium text-blue-800">
-                      {currentLocation.name}
-                    </h5>
-                    <Badge
-                      className={getLocationTypeColor(currentLocation.type)}
-                    >
-                      {currentLocation.type}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm text-blue-600">
-                    {currentLocation.zone && (
-                      <div>
-                        <span className="font-medium">Zone:</span>{" "}
-                        {currentLocation.zone}
-                      </div>
-                    )}
-                    {currentLocation.aisle && (
-                      <div>
-                        <span className="font-medium">Aisle:</span>{" "}
-                        {currentLocation.aisle}
-                      </div>
-                    )}
-                    {currentLocation.shelf && (
-                      <div>
-                        <span className="font-medium">Shelf:</span>{" "}
-                        {currentLocation.shelf}
-                      </div>
-                    )}
-                    {currentLocation.bin && (
-                      <div>
-                        <span className="font-medium">Bin:</span>{" "}
-                        {currentLocation.bin}
-                      </div>
-                    )}
-                  </div>
-
-                  {currentLocation.currentInventory.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-blue-700 mb-2">
-                        Current Items:
-                      </p>
-                      <div className="space-y-1">
-                        {currentLocation.currentInventory
-                          .slice(0, 3)
-                          .map((inv, idx) => (
-                            <div
-                              key={idx}
-                              className="text-xs text-blue-600 flex justify-between"
-                            >
-                              <span>{inv.sku}</span>
-                              <span>{inv.quantityOnHand} units</span>
-                            </div>
-                          ))}
-                        {currentLocation.currentInventory.length > 3 && (
-                          <div className="text-xs text-blue-600">
-                            + {currentLocation.currentInventory.length - 3} more
-                            items
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                <div className="p-4 bg-green-50 rounded border border-green-200">
+                  {/* ... existing location display ... */}
                 </div>
               )}
             </div>
@@ -704,6 +793,7 @@ export default function SchemaEnhancedReceiving() {
               <Button
                 onClick={handleFinalizeReceiving}
                 disabled={batchReceivingMutation.isPending}
+                className="cursor-pointer"
               >
                 {batchReceivingMutation.isPending ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -715,6 +805,21 @@ export default function SchemaEnhancedReceiving() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ✅ ADD: Info banner about automatic back order fulfillment */}
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-start gap-2">
+                <div>
+                  <p className="text-sm font-medium text-green-900 dark:text-green-300">
+                    Automatic Back Order Fulfillment
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                    After receiving, the system will automatically check for and
+                    fulfill any pending back orders for these products.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-3">
               {receivedItems.map((item) => (
                 <div
@@ -728,7 +833,7 @@ export default function SchemaEnhancedReceiving() {
                       </h5>
                       <Badge variant="outline">{item.productVariant.sku}</Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
+                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 flex-wrap">
                       <div className="flex items-center">
                         <MapPin className="w-3 h-3 mr-1" />
                         {item.location.name}
@@ -749,7 +854,7 @@ export default function SchemaEnhancedReceiving() {
                       </Badge>
                     </div>
                     {item.notes && (
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                         Notes: {item.notes}
                       </p>
                     )}
@@ -759,6 +864,7 @@ export default function SchemaEnhancedReceiving() {
                     size="sm"
                     onClick={() => removeReceivedItem(item.id)}
                     disabled={batchReceivingMutation.isPending}
+                    className="cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

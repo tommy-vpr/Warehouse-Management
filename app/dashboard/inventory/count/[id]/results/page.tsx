@@ -460,7 +460,7 @@ export default function CampaignResults() {
                 </thead>
                 <tbody>
                   {filteredTasks.map((task) => (
-                    <>
+                    <React.Fragment key={task.id}>
                       <tr
                         key={task.id}
                         className="border-b hover:bg-background cursor-pointer"
@@ -625,7 +625,7 @@ export default function CampaignResults() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

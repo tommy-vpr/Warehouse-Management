@@ -49,6 +49,26 @@ export interface BackOrder {
   createdAt: string;
 }
 
+// ✅ ADD: Shipping package interfaces
+export interface PackageDimensions {
+  length: number;
+  width: number;
+  height: number;
+  unit?: string;
+}
+
+export interface ShippingPackage {
+  id: string;
+  trackingNumber: string;
+  labelUrl: string | null;
+  cost: string;
+  carrierCode: string;
+  serviceCode: string;
+  weight: string;
+  dimensions: PackageDimensions;
+  createdAt: string;
+}
+
 export interface OrderDetailResponse {
   id: string;
   orderNumber: string;
@@ -101,4 +121,5 @@ export interface OrderDetailResponse {
   nextActions: NextAction[];
   statusHistory: StatusHistoryEntry[];
   backOrders: BackOrder[];
+  shippingPackages: ShippingPackage[]; // ✅ ADD THIS
 }

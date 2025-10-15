@@ -114,47 +114,47 @@ export async function POST(
         },
       });
 
-      if (action === "PICK" && actual > 0) {
-        const inventory = await tx.inventory.findUnique({
-          where: {
-            productVariantId_locationId: {
-              productVariantId: pickListItem.productVariantId,
-              locationId: pickListItem.locationId,
-            },
-          },
-        });
+      // if (action === "PICK" && actual > 0) {
+      //   const inventory = await tx.inventory.findUnique({
+      //     where: {
+      //       productVariantId_locationId: {
+      //         productVariantId: pickListItem.productVariantId,
+      //         locationId: pickListItem.locationId,
+      //       },
+      //     },
+      //   });
 
-        if (inventory) {
-          await tx.inventory.update({
-            where: { id: inventory.id },
-            data: {
-              quantityReserved: {
-                decrement: Math.min(actual, inventory.quantityReserved),
-              },
-              quantityOnHand: {
-                decrement: Math.min(actual, inventory.quantityOnHand),
-              },
-            },
-          });
+      //   if (inventory) {
+      //     await tx.inventory.update({
+      //       where: { id: inventory.id },
+      //       data: {
+      //         quantityReserved: {
+      //           decrement: Math.min(actual, inventory.quantityReserved),
+      //         },
+      //         quantityOnHand: {
+      //           decrement: Math.min(actual, inventory.quantityOnHand),
+      //         },
+      //       },
+      //     });
 
-          await tx.inventoryTransaction.create({
-            data: {
-              productVariantId: pickListItem.productVariantId,
-              locationId: pickListItem.locationId,
-              transactionType: "SALE",
-              quantityChange: -actual,
-              referenceId: pickListItem.pickListId,
-              referenceType: "PICK_LIST",
-              userId: session.user.id,
-              notes: `Picked for order ${pickListItem.order.orderNumber}`,
-            },
-          });
-        } else {
-          console.warn(
-            `No inventory for variant ${pickListItem.productVariantId} at location ${pickListItem.locationId}`
-          );
-        }
-      }
+      //     await tx.inventoryTransaction.create({
+      //       data: {
+      //         productVariantId: pickListItem.productVariantId,
+      //         locationId: pickListItem.locationId,
+      //         transactionType: "SALE",
+      //         quantityChange: -actual,
+      //         referenceId: pickListItem.pickListId,
+      //         referenceType: "PICK_LIST",
+      //         userId: session.user.id,
+      //         notes: `Picked for order ${pickListItem.order.orderNumber}`,
+      //       },
+      //     });
+      //   } else {
+      //     console.warn(
+      //       `No inventory for variant ${pickListItem.productVariantId} at location ${pickListItem.locationId}`
+      //     );
+      //   }
+      // }
 
       const allItems = await tx.pickListItem.findMany({
         where: { pickListId: pickListItem.pickListId },

@@ -113,6 +113,7 @@ export default function TransferDetailsPage() {
       toast({
         title: "Transfer Approved",
         description: "Inventory has been updated successfully",
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["transfer-details"] });
       queryClient.invalidateQueries({ queryKey: ["transfers"] });
@@ -150,6 +151,7 @@ export default function TransferDetailsPage() {
       toast({
         title: "Transfer Rejected",
         description: "The requester has been notified",
+        variant: "destructive",
       });
       queryClient.invalidateQueries({ queryKey: ["transfer-details"] });
       queryClient.invalidateQueries({ queryKey: ["transfers"] });
@@ -473,7 +475,7 @@ export default function TransferDetailsPage() {
 
               <div className="flex gap-3">
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-400 hover:bg-green-500"
                   onClick={() => approveMutation.mutate()}
                   disabled={
                     approveMutation.isPending || rejectMutation.isPending
@@ -493,8 +495,7 @@ export default function TransferDetailsPage() {
                 </Button>
 
                 <Button
-                  variant="destructive"
-                  className="flex-1"
+                  className="flex-1 bg-red-400 hover:bg-red-500"
                   onClick={() => rejectMutation.mutate()}
                   disabled={
                     approveMutation.isPending || rejectMutation.isPending

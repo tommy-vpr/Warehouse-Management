@@ -180,6 +180,7 @@ export default function CycleCountDashboard() {
       toast({
         title: "Campaign Deleted",
         description: "The campaign has been successfully deleted.",
+        variant: "success",
       });
       setDeleteDialogOpen(false);
       setCampaignToDelete(null);
@@ -204,27 +205,74 @@ export default function CycleCountDashboard() {
     }
   };
 
+  // const handleStartCampaign = (campaignId: string, campaignName: string) => {
+  //   toast({
+  //     title: "Confirm Action",
+  //     description: `Start campaign "${campaignName}"?`,
+  //     action: (
+  //       <Button
+  //         variant="secondary"
+  //         size="sm"
+  //         onClick={() => {
+  //           updateStatusMutation.mutate(
+  //             { campaignId, status: "ACTIVE" },
+  //             {
+  //               onSuccess: () => {
+  //                 toast({
+  //                   title: "Campaign Started",
+  //                   description: `${campaignName} is now active and ready for counting.`,
+  //                   variant: "success",
+  //                 });
+  //               },
+  //               onError: (error) => {
+  //                 toast({
+  //                   title: "Error",
+  //                   description: error.message,
+  //                   variant: "destructive",
+  //                 });
+  //               },
+  //             }
+  //           );
+  //         }}
+  //       >
+  //         Yes, Start
+  //       </Button>
+  //     ),
+  //   });
+  // };
   const handleStartCampaign = (campaignId: string, campaignName: string) => {
     toast({
-      title: "Confirm Action",
-      description: `Start campaign "${campaignName}"?`,
+      title: "⚠️ Confirm Action",
+      description: (
+        <div className="space-y-3">
+          <p className="text-base font-medium">
+            Are you sure you want to start campaign:
+          </p>
+          <p className="text-lg font-bold text-foreground">"{campaignName}"?</p>
+          <p className="text-sm text-muted-foreground">
+            This will make the campaign active and ready for counting.
+          </p>
+        </div>
+      ),
       action: (
         <Button
-          variant="outline"
-          size="sm"
+          variant="default"
+          size="lg"
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 px-6"
           onClick={() => {
             updateStatusMutation.mutate(
               { campaignId, status: "ACTIVE" },
               {
                 onSuccess: () => {
                   toast({
-                    title: "Campaign Started",
+                    title: "✅ Campaign Started",
                     description: `${campaignName} is now active and ready for counting.`,
+                    variant: "success",
                   });
                 },
                 onError: (error) => {
                   toast({
-                    title: "Error",
+                    title: "❌ Error",
                     description: error.message,
                     variant: "destructive",
                   });
@@ -233,9 +281,10 @@ export default function CycleCountDashboard() {
             );
           }}
         >
-          Yes, Start
+          ✓ Yes, Start Campaign
         </Button>
       ),
+      duration: 10000, // Longer duration so user has time to read and act
     });
   };
 
@@ -253,6 +302,7 @@ export default function CycleCountDashboard() {
           toast({
             title: "Campaign Paused",
             description: `${campaignName} has been paused. You can resume it later.`,
+            variant: "warning",
           });
         },
         onError: (error) => {
@@ -516,8 +566,7 @@ export default function CycleCountDashboard() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-zinc-400"
+                className="text-xs px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="PLANNED">Planned</option>
@@ -530,8 +579,7 @@ export default function CycleCountDashboard() {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 
-                dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-xs px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Types</option>
                 <option value="FULL">Full Count</option>
@@ -672,7 +720,7 @@ export default function CycleCountDashboard() {
                         {campaign.status === "ACTIVE" &&
                           campaign.totalTasks > 0 && (
                             <div className="mt-3">
-                              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-500 mb-1">
                                 <span>Progress</span>
                                 <span>
                                   {Math.round(
@@ -842,6 +890,7 @@ export default function CycleCountDashboard() {
                                 toast({
                                   title: "Export Started",
                                   description: `Exporting ${campaign.name}...`,
+                                  variant: "success",
                                 });
                               }}
                             >

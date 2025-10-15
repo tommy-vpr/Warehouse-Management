@@ -282,6 +282,19 @@ export async function GET(
       createdAt: backOrder.createdAt.toISOString(),
     }));
 
+    // Format shipping packages
+    const formattedShippingPackages = order.packages.map((pkg) => ({
+      id: pkg.id,
+      trackingNumber: pkg.trackingNumber,
+      labelUrl: pkg.labelUrl,
+      cost: pkg.cost.toString(),
+      carrierCode: pkg.carrierCode,
+      serviceCode: pkg.serviceCode,
+      weight: pkg.weight ? pkg.weight.toString() : "0",
+      dimensions: pkg.dimensions, // This is already Json type
+      createdAt: pkg.createdAt.toISOString(),
+    }));
+
     // Calculate priority
     const priority = calculatePriority(order);
 
@@ -312,7 +325,7 @@ export async function GET(
       trackingUrl: order.trackingUrl,
       shippingCarrier: order.shippingCarrier,
       shippingService: order.shippingService,
-      shippingCost: order.shippingCost, // Already stored as string in schema
+      shippingCost: order.shippingCost,
       labelUrl: order.labelUrl,
       notes: order.notes,
       pickListInfo: pickListInfo,
@@ -320,6 +333,7 @@ export async function GET(
       nextActions: nextActions,
       statusHistory: formattedHistory,
       backOrders: formattedBackOrders,
+      shippingPackages: formattedShippingPackages, // Backorder shipment
     };
 
     return NextResponse.json(response);

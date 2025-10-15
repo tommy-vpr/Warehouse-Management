@@ -23,7 +23,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 import { useOrderDetail, useOrderAction } from "@/hooks/use-order";
-import { OrderDetailResponse } from "@/types/order";
+import { OrderDetailResponse, ShippingPackage } from "@/types/order";
 
 interface OrderDetailViewProps {
   orderId: string;
@@ -50,18 +50,6 @@ export default function OrderDetailView({
   const [activeTab, setActiveTab] = useState<
     "items" | "history" | "shipping" | "backorders"
   >("items");
-
-  //   const handleOrderAction = async (action: string) => {
-  //     try {
-  //       await orderActionMutation.mutateAsync({ action, orderId });
-  //       toast({
-  //         title: "Success",
-  //         description: "Action completed successfully",
-  //       });
-  //     } catch (error) {
-  //       console.error(`Failed to perform ${action}:`, error);
-  //     }
-  //   };
 
   const handleOrderAction = async (action: string) => {
     try {
@@ -750,14 +738,119 @@ export default function OrderDetailView({
                   </div>
                 </div>
 
-                {order.notes && (
+                {/* ✅ ADD: All Shipments Section - INSERT HERE */}
+                {order.shippingPackages &&
+                  order.shippingPackages.length > 0 && (
+                    <div className="border-t pt-6">
+                      <h3 className="font-medium mb-4 flex items-center gap-2">
+                        <Package className="w-5 h-5" />
+                        All Shipments ({order.shippingPackages.length})
+                      </h3>
+
+                      <div className="space-y-4">
+                        {order.shippingPackages.map(
+                          (pkg: ShippingPackage, index: number) => (
+                            <div
+                              key={pkg.id}
+                              className="border rounded-lg p-4 bg-gray-50 dark:bg-zinc-800"
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div>
+                                  <h4 className="font-medium flex items-center gap-2">
+                                    <span className="bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200 px-2 py-1 rounded text-xs">
+                                      Shipment {index + 1}
+                                      {/* {index > 0 && " (Back Order)"} */}
+                                    </span>
+                                  </h4>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {new Date(pkg.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Cost
+                                  </p>
+                                  <p className="font-medium">${pkg.cost}</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    Carrier
+                                  </p>
+                                  <p className="font-medium text-sm uppercase">
+                                    {pkg.carrierCode}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    Service
+                                  </p>
+                                  <p className="font-medium text-sm">
+                                    {pkg.serviceCode.replace(/_/g, " ")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    Weight
+                                  </p>
+                                  <p className="font-medium text-sm">
+                                    {pkg.weight} lbs
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    Tracking
+                                  </p>
+                                  <p className="font-medium text-sm font-mono">
+                                    {pkg.trackingNumber}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    navigator.clipboard.writeText(
+                                      pkg.trackingNumber
+                                    )
+                                  }
+                                  className="cursor-pointer"
+                                >
+                                  Copy Tracking
+                                </Button>
+                                {pkg.labelUrl && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      window.open(pkg.labelUrl!, "_blank")
+                                    }
+                                    className="cursor-pointer"
+                                  >
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    View Label
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                {/* {order.notes && (
                   <div>
                     <h3 className="font-medium mb-2">Order Notes</h3>
                     <p className="text-sm bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                       {order.notes}
                     </p>
                   </div>
-                )}
+                )} */}
               </div>
             )}
 

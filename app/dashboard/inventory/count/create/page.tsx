@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import {
   Save,
   AlertCircle,
   Info,
+  Search, // ✅ Add this
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -34,6 +35,9 @@ export default function CreateCampaign() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const productVariantId = searchParams.get("product");
+
+  // ✅ Add location search state
+  const [locationSearch, setLocationSearch] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -68,6 +72,22 @@ export default function CreateCampaign() {
     staleTime: 300000, // 5 minutes - locations don't change often
   });
 
+  // ✅ Filter locations based on search
+  const filteredLocations = useMemo(() => {
+    if (!locationSearch.trim()) {
+      return locations;
+    }
+
+    const search = locationSearch.toLowerCase();
+    return locations.filter(
+      (location) =>
+        location.name.toLowerCase().includes(search) ||
+        location.zone?.toLowerCase().includes(search) ||
+        location.aisle?.toLowerCase().includes(search) ||
+        location.bin?.toLowerCase().includes(search)
+    );
+  }, [locations, locationSearch]);
+
   // Create campaign mutation
   const createCampaignMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -91,12 +111,12 @@ export default function CreateCampaign() {
       return response.json();
     },
     onSuccess: (campaign) => {
-      // Invalidate campaigns list
       queryClient.invalidateQueries({ queryKey: ["cycle-count-campaigns"] });
 
       toast({
         title: "Campaign Created",
         description: `"${formData.name}" was created successfully.`,
+        variant: "success",
       });
 
       router.push(`/dashboard/inventory/count`);
@@ -206,6 +226,11 @@ export default function CreateCampaign() {
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Set up a new inventory counting campaign
+              {productVariantId && (
+                <Badge variant="outline" className="ml-2">
+                  Product Specific
+                </Badge>
+              )}
             </p>
           </div>
         </div>
@@ -474,7 +499,18 @@ export default function CreateCampaign() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
+                {/* ✅ Search Input */}
+                <div className="mb-4 space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Search locations by name, zone, aisle..."
+                      value={locationSearch}
+                      onChange={(e) => setLocationSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -483,11 +519,11 @@ export default function CreateCampaign() {
                       onClick={() =>
                         setFormData((prev) => ({
                           ...prev,
-                          locationIds: locations.map((l) => l.id),
+                          locationIds: filteredLocations.map((l) => l.id),
                         }))
                       }
                     >
-                      Select All
+                      Select {locationSearch ? "Filtered" : "All"}
                     </Button>
                     <Button
                       type="button"
@@ -500,13 +536,42 @@ export default function CreateCampaign() {
                       Clear All
                     </Button>
                   </div>
+
+                  {/* ✅ Results counter */}
+                  {locationSearch && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Showing {filteredLocations.length} of {locations.length}{" "}
+                      locations
+                    </p>
+                  )}
                 </div>
 
                 {isLoading ? (
                   <SpinningLoader />
+                ) : filteredLocations.length === 0 ? (
+                  /* ✅ No results message */
+                  <div className="text-center py-8 text-gray-500">
+                    <MapPin className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">
+                      {locationSearch
+                        ? "No locations match your search"
+                        : "No locations available"}
+                    </p>
+                    {locationSearch && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => setLocationSearch("")}
+                        className="mt-2"
+                      >
+                        Clear search
+                      </Button>
+                    )}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                    {locations.map((location) => (
+                    {filteredLocations.map((location) => (
                       <div
                         key={location.id}
                         className={`p-3 border rounded-md cursor-pointer transition-colors ${

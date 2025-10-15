@@ -107,6 +107,7 @@ export default function PendingTransferPage() {
       toast({
         title: "Transfer Approved",
         description: "Inventory has been updated successfully",
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["pending-transfer"] });
       router.push("/dashboard/inventory");
@@ -143,6 +144,7 @@ export default function PendingTransferPage() {
       toast({
         title: "Transfer Rejected",
         description: "The requester has been notified",
+        variant: "destructive",
       });
       queryClient.invalidateQueries({ queryKey: ["pending-transfer"] });
       router.push("/dashboard/inventory");

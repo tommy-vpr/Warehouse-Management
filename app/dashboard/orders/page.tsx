@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { InsufficientInventoryItem } from "@/lib/reserveInventory";
+import InsufficientInventoryModal from "@/components/InsufficientInventoryModal";
+import { useRouter } from "next/navigation";
 // Types - inline until you create the types file
 export enum OrderStatus {
   PENDING = "PENDING",
@@ -190,6 +193,12 @@ export default function OrdersManagementDashboard() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
+  // ✅ NEW: Track which order action is currently loading
+  const [loadingAction, setLoadingAction] = useState<{
+    orderId: string;
+    action: string;
+  } | null>(null);
+
   // TanStack Query hooks
   const { data, isLoading, isError, error, isFetching, refetch } = useOrders({
     status: statusFilter,
@@ -199,98 +208,185 @@ export default function OrdersManagementDashboard() {
 
   const orderActionMutation = useOrderAction();
 
+  const router = useRouter();
+
+  const [insufficientModal, setInsufficientModal] = useState<{
+    items: InsufficientInventoryItem[];
+    orderNumber: string;
+    orderId: string;
+  } | null>(null);
+
   // Extract data with defaults
   const orders = data?.orders ?? [];
   const stats = data?.stats;
 
   const handleOrderAction = async (action: string, orderId: string) => {
-    const order = orders.find((o) => o.id === orderId);
+    setLoadingAction({ orderId, action });
 
     try {
-      switch (action) {
-        case "ALLOCATE":
-        case "GENERATE_SINGLE_PICK":
-        case "MARK_FULFILLED":
-          await orderActionMutation.mutateAsync({ action, orderId });
-          break;
+      if (action === "ALLOCATE") {
+        // Allocate inventory
+        const response = await fetch("/api/orders/allocate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, action: "check" }),
+        });
 
-        case "VIEW_PICK_PROGRESS":
-          window.location.href = `/dashboard/picking`;
-          break;
+        const data = await response.json();
 
-        case "MOBILE_PICK":
-          if (order?.pickListInfo) {
-            window.open(
-              `/dashboard/picking/mobile/${order.pickListInfo.pickListId}`,
-              "_blank"
-            );
-          }
-          break;
+        if (!response.ok && data.error === "INSUFFICIENT_INVENTORY") {
+          const order = orders.find((o) => o.id === orderId);
+          setInsufficientModal({
+            items: data.insufficientItems,
+            orderNumber: order?.orderNumber || "",
+            orderId,
+          });
+          setLoadingAction(null);
+          return;
+        }
 
-        case "START_PICKING":
-          if (order?.pickListInfo?.pickListId) {
-            await fetch(`/api/picking/${order.pickListInfo.pickListId}/start`, {
-              method: "POST",
-            });
-            refetch(); // Manual refetch for external API calls
-          }
-          break;
+        await refetch();
+        toast({
+          title: "Success",
+          description: "Inventory allocated successfully",
+          variant: "success",
+        });
+      }
+      // ✅ SIMPLIFIED: Call /api/picking/generate directly
+      else if (action === "GENERATE_SINGLE_PICK") {
+        const response = await fetch("/api/picking/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderIds: [orderId],
+            pickingStrategy: "SINGLE",
+            priority: "FIFO",
+          }),
+        });
 
-        case "PAUSE_PICKING":
-          if (order?.pickListInfo?.pickListId) {
-            const reason = prompt("Reason for pausing?");
-            if (reason) {
-              await fetch(
-                `/api/picking/list/${order.pickListInfo.pickListId}/pause`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ reason }),
-                }
-              );
-              refetch();
-            }
-          }
-          break;
+        const data = await response.json();
 
-        case "COMPLETE_PICKING":
-          if (order?.pickListInfo?.pickListId) {
-            await fetch(
-              `/api/picking/list/${order.pickListInfo.pickListId}/complete`,
-              {
-                method: "POST",
-              }
-            );
-            refetch();
-          }
-          break;
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to generate pick list");
+        }
 
-        case "PACK_ORDER":
-          window.location.href = `/dashboard/packing/pack/${orderId}`;
-          break;
+        await refetch();
+        toast({
+          title: "Success",
+          description: `Pick list ${data.pickList.batchNumber} generated`,
+          variant: "success",
+        });
+      } else if (action === "VIEW_PICK_PROGRESS") {
+        // Navigate to picking dashboard
+        window.location.href = "/dashboard/picking";
+        return;
+      } else if (action === "MOBILE_PICK") {
+        const order = orders.find((o) => o.id === orderId);
+        if (order?.pickListInfo?.pickListId) {
+          router.push(
+            `/dashboard/picking/mobile/${order.pickListInfo.pickListId}`
+          );
+        } else {
+          toast({
+            title: "Error",
+            description: "No pick list found for this order",
+            variant: "destructive",
+          });
+        }
+        return;
+      } else if (action === "PACK_ORDER") {
+        // Navigate to packing page
+        window.location.href = `/dashboard/packing/pack/${orderId}`;
+        return;
+      } else if (action === "CREATE_LABEL") {
+        // Navigate to shipping label creation
+        window.location.href = `/dashboard/shipping/create-label/${orderId}`;
+        return;
+      } else if (action === "MARK_FULFILLED") {
+        // Mark order as fulfilled
+        const response = await fetch("/api/orders/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "MARK_FULFILLED", orderId }),
+        });
 
-        case "CREATE_LABEL":
-          window.location.href = `/dashboard/shipping/create-label/${orderId}`;
-          break;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to mark as fulfilled");
+        }
 
-        case "SPLIT_ORDER":
-          window.location.href = `/dashboard/shipping/split/${orderId}`;
-          break;
-
-        case "VIEW_TRACKING":
-          window.location.href = `/dashboard/shipping/tracking/${orderId}`;
-          break;
-
-        case "VIEW_DETAILS":
-          setExpandedOrder(expandedOrder === orderId ? null : orderId);
-          break;
-
-        default:
-          console.log(`Action ${action} not implemented yet`);
+        await refetch();
+        toast({
+          title: "Success",
+          description: "Order marked as fulfilled",
+          variant: "success",
+        });
+      } else if (action === "VIEW_DETAILS" || action === "VIEW_TRACKING") {
+        // Navigate to order details
+        window.location.href = `/dashboard/orders/${orderId}`;
+        return;
+      } else {
+        console.warn(`Unhandled action: ${action}`);
+        toast({
+          title: "Info",
+          description: "This action is not yet implemented",
+          variant: "warning",
+        });
       }
     } catch (error) {
       console.error(`Failed to perform ${action}:`, error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : `Failed to perform ${action}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAction(null);
     }
+  };
+
+  const handleInsufficientAction = async (
+    action: "count" | "backorder" | "cancel"
+  ) => {
+    // If cancel, just close the modal
+    if (action === "cancel") {
+      setInsufficientModal(null);
+      return;
+    }
+
+    try {
+      const apiAction =
+        action === "count" ? "ALLOCATE_WITH_COUNT" : "ALLOCATE_WITH_BACKORDER";
+      await orderActionMutation.mutateAsync({
+        action: apiAction,
+        orderId: insufficientModal!.orderId,
+      });
+
+      setInsufficientModal(null);
+      toast({
+        title: "Success",
+        description:
+          action === "count"
+            ? "Cycle count tasks created"
+            : "Back orders created and available inventory allocated",
+        variant: "success",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isActionLoading = (orderId: string, action: string) => {
+    return (
+      loadingAction?.orderId === orderId && loadingAction?.action === action
+    );
   };
 
   const toggleOrderSelection = (orderId: string) => {
@@ -326,7 +422,7 @@ export default function OrdersManagementDashboard() {
       case OrderStatus.RETURNED:
         return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-500/30 dark:text-gray-300";
     }
   };
 
@@ -525,7 +621,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setStatusFilter(e.target.value as OrderFilters["status"])
               }
-              className="px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-xs px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Status</option>
               <option value={OrderStatus.PENDING}>Pending</option>
@@ -543,7 +639,7 @@ export default function OrdersManagementDashboard() {
               onChange={(e) =>
                 setPriorityFilter(e.target.value as OrderFilters["priority"])
               }
-              className="px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-xs px-3 py-2 border border-gray-300 dark:border-zinc-700 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Priorities</option>
               <option value="URGENT">Urgent</option>
@@ -742,20 +838,39 @@ export default function OrdersManagementDashboard() {
                           <div className="flex gap-1 flex-wrap">
                             {order.nextActions
                               .slice(0, 2)
-                              .map((action, index) => (
-                                <Button
-                                  key={index}
-                                  variant={action.variant}
-                                  size="sm"
-                                  onClick={() =>
-                                    handleOrderAction(action.action, order.id)
-                                  }
-                                  disabled={orderActionMutation.isPending}
-                                  className="text-xs px-2 py-1 cursor-pointer"
-                                >
-                                  {action.label}
-                                </Button>
-                              ))}
+                              .map((action, index) => {
+                                const isLoading = isActionLoading(
+                                  order.id,
+                                  action.action
+                                );
+
+                                return (
+                                  <Button
+                                    key={index}
+                                    variant={action.variant}
+                                    size="sm"
+                                    onClick={() =>
+                                      handleOrderAction(action.action, order.id)
+                                    }
+                                    disabled={
+                                      isLoading ||
+                                      loadingAction !== null || // Disable all if any is loading
+                                      orderActionMutation.isPending
+                                    }
+                                    className="text-xs px-2 py-1 cursor-pointer"
+                                  >
+                                    {/* ✅ Show spinner if this specific button is loading */}
+                                    {isLoading ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                        {action.label}...
+                                      </>
+                                    ) : (
+                                      action.label
+                                    )}
+                                  </Button>
+                                );
+                              })}
                             {order.nextActions.length > 2 && (
                               <Button
                                 variant="outline"
@@ -917,6 +1032,16 @@ export default function OrdersManagementDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {insufficientModal && (
+        <InsufficientInventoryModal
+          items={insufficientModal.items}
+          orderNumber={insufficientModal.orderNumber}
+          orderId={insufficientModal.orderId}
+          onClose={() => setInsufficientModal(null)}
+          onAction={handleInsufficientAction}
+        />
+      )}
     </div>
   );
 }

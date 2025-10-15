@@ -15,6 +15,7 @@ import {
   Truck,
   Box,
   Check,
+  Loader2,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import ShippingLabelForm from "@/components/shipping/ShippingLabelForm";
@@ -23,7 +24,9 @@ interface OrderItem {
   id: string;
   productName: string;
   sku: string;
-  quantity: number;
+  quantity: number; // quantityToPack (reduced amount)
+  originalQuantity?: number; // ✅ ADD: original order quantity
+  quantityBackOrdered?: number; // ✅ ADD: back ordered amount
   unitPrice: string;
   totalPrice: string;
   weightGrams: number;
@@ -240,7 +243,7 @@ export default function EnhancedPackingInterface() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
           <p className="text-gray-600 dark:text-gray-200">
             Loading order details...
           </p>
@@ -305,6 +308,52 @@ export default function EnhancedPackingInterface() {
     );
   }
 
+  // ✅ CORRECT - These calculations are right!
+  const totalPackingValue = order.items.reduce((sum, item) => {
+    return sum + parseFloat(item.totalPrice);
+  }, 0);
+
+  // Items being packed (this is already the reduced quantity from API)
+  const totalItemsToPack = order.items.reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  );
+
+  // Back ordered items (from the API response)
+  const totalItemsBackOrdered = order.items.reduce((sum, item) => {
+    return sum + (item.quantityBackOrdered || 0);
+  }, 0);
+
+  // Original order total
+  const totalOriginalItems = order.items.reduce((sum, item) => {
+    return sum + (item.originalQuantity || item.quantity); // Use originalQuantity if available
+  }, 0);
+
+  // Get the selected box details
+  const getSelectedBoxDetails = () => {
+    if (selectedBox === "CUSTOM") {
+      return {
+        length: parseFloat(customDimensions.length) || 10,
+        width: parseFloat(customDimensions.width) || 8,
+        height: parseFloat(customDimensions.height) || 6,
+      };
+    }
+
+    const box = BOX_TYPES.find((b) => b.id === selectedBox);
+    if (!box) return { length: 10, width: 8, height: 6 };
+
+    // Parse dimensions string like "10x8x4" into individual values
+    const [length, width, height] = box.dimensions
+      .split("x")
+      .map((d) => parseFloat(d));
+
+    return {
+      length: length || 10,
+      width: width || 8,
+      height: height || 6,
+    };
+  };
+
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-6xl mx-auto">
@@ -321,13 +370,74 @@ export default function EnhancedPackingInterface() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Pack Order
+                {/* ✅ NEW: Badge for back orders */}
+                {totalItemsBackOrdered > 0 &&
+                  totalItemsToPack < totalOriginalItems && (
+                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                      Back Order
+                    </Badge>
+                  )}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
                 {order.orderNumber}
+                {totalItemsBackOrdered > 0 &&
+                  totalItemsToPack < totalOriginalItems && (
+                    <span className="ml-2 text-sm text-amber-600 dark:text-amber-400">
+                      (Partial Fulfillment)
+                    </span>
+                  )}
               </p>
             </div>
           </div>
         </div>
+
+        {/* ✅ NEW: Context Banner */}
+        {order && (
+          <div className="mb-6">
+            {totalItemsBackOrdered > 0 &&
+            totalItemsToPack < totalOriginalItems ? (
+              // Back Order Context
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-300">
+                      Back Order Fulfillment
+                    </h3>
+                    <p className="text-sm text-amber-800 dark:text-amber-400 mt-1">
+                      Packing {totalItemsToPack} of {totalOriginalItems} items.
+                      The remaining {totalItemsBackOrdered} item(s) were
+                      previously back-ordered and will ship separately.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-amber-700 dark:text-amber-500">
+                      <span>Items to Pack: {totalItemsToPack}</span>
+                      <span>Back Ordered: {totalItemsBackOrdered}</span>
+                      <span>
+                        This Shipment: ${totalPackingValue.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Full Order Context
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-green-900 dark:text-green-300">
+                      Full Order - All {totalItemsToPack} items available
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                      Complete fulfillment • Order Value: $
+                      {totalPackingValue.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Progress Steps */}
         <Card className="mb-6">
@@ -453,11 +563,27 @@ export default function EnhancedPackingInterface() {
                           <div className="text-xs text-gray-600 dark:text-gray-400">
                             {item.sku} • {item.weightOz.toFixed(2)} oz each
                           </div>
+                          {/* ✅ NEW: Show if this item was back-ordered */}
+                          {item.quantityBackOrdered &&
+                            item.quantityBackOrdered > 0 && (
+                              <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                {item.quantityBackOrdered} unit(s) previously
+                                back-ordered
+                              </div>
+                            )}
                         </div>
                         <div className="text-right ml-4">
                           <div className="font-semibold">×{item.quantity}</div>
+                          {/* ✅ NEW: Show original quantity if different */}
+                          {item.originalQuantity &&
+                            item.originalQuantity !== item.quantity && (
+                              <div className="text-xs text-gray-500">
+                                of {item.originalQuantity}
+                              </div>
+                            )}
                           {verifiedItems.has(item.id) && (
-                            <CheckCircle className="w-4 h-4 text-green-600 ml-auto" />
+                            <CheckCircle className="w-4 h-4 text-green-600 ml-auto mt-1" />
                           )}
                         </div>
                       </div>
@@ -472,10 +598,35 @@ export default function EnhancedPackingInterface() {
                       {calculatedWeightOz.toFixed(2)} oz)
                     </span>
                   </div>
+
+                  {/* Show item count summary */}
+                  <div className="flex justify-between text-sm mt-1">
+                    <span>Items to box:</span>
+                    <span className="font-medium">
+                      {totalItemsToPack}
+                      {totalItemsBackOrdered > 0 && ` of ${totalOriginalItems}`}
+                    </span>
+                  </div>
+
                   <div className="flex justify-between font-semibold mt-1">
                     <span>Total Value:</span>
-                    <span>${order.totalAmount}</span>
+                    <span>${totalPackingValue.toFixed(2)}</span>
                   </div>
+
+                  {totalPackingValue < parseFloat(order.totalAmount) && (
+                    <div className="flex justify-between text-sm text-amber-600 mt-1">
+                      <span className="flex items-center gap-1">
+                        <AlertTriangle /> Back Ordered:
+                      </span>
+                      <span>
+                        {totalItemsBackOrdered} items ($
+                        {(
+                          parseFloat(order.totalAmount) - totalPackingValue
+                        ).toFixed(2)}
+                        )
+                      </span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -675,6 +826,7 @@ export default function EnhancedPackingInterface() {
                     order={order}
                     embedded={true}
                     initialWeight={calculatedWeightLbs}
+                    initialDimensions={getSelectedBoxDetails()}
                     onSuccess={handleLabelSuccess}
                     onCancel={() => setCurrentStep(2)}
                   />
@@ -687,309 +839,3 @@ export default function EnhancedPackingInterface() {
     </div>
   );
 }
-
-// "use client";
-
-// import React, { useState, useEffect } from "react";
-// import { Button } from "@/components/ui/button";
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// import {
-//   Package,
-//   ArrowLeft,
-//   CheckCircle,
-//   User,
-//   MapPin,
-//   AlertTriangle,
-//   Truck,
-// } from "lucide-react";
-// import { useParams } from "next/navigation";
-
-// interface OrderItem {
-//   id: string;
-//   productName: string;
-//   sku: string;
-//   quantity: number;
-//   unitPrice: string;
-//   totalPrice: string;
-//   weight: number;
-// }
-
-// interface OrderDetails {
-//   id: string;
-//   orderNumber: string;
-//   customerName: string;
-//   customerEmail: string;
-//   status: string;
-//   totalAmount: string;
-//   shippingAddress: any;
-//   items: OrderItem[];
-// }
-
-// export default function PackingInterface() {
-//   const params = useParams<{ id: string }>();
-//   const id = params.id;
-
-//   const [order, setOrder] = useState<OrderDetails | null>(null);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [isPacking, setIsPacking] = useState(false);
-//   const [isPackingComplete, setIsPackingComplete] = useState(false);
-
-//   useEffect(() => {
-//     loadOrderDetails();
-//   }, []);
-
-//   const loadOrderDetails = async () => {
-//     try {
-//       const response = await fetch(`/api/packing/pack/${id}`);
-//       if (response.ok) {
-//         const data = await response.json();
-//         setOrder(data.order);
-//       }
-//     } catch (error) {
-//       console.error("Failed to load order:", error);
-//     }
-//     setIsLoading(false);
-//   };
-
-//   const markOrderAsPacked = async () => {
-//     if (!order) return;
-
-//     setIsPacking(true);
-//     try {
-//       const response = await fetch(`/api/packing/complete`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({
-//           orderId: order.id,
-//         }),
-//       });
-
-//       if (!response.ok) {
-//         const errorData = await response.json();
-//         throw new Error(errorData.error || "Failed to mark as packed");
-//       }
-
-//       const data = await response.json();
-//       if (data.success) {
-//         setIsPackingComplete(true);
-//         setOrder({ ...order, status: "PACKED" });
-//       }
-//     } catch (error) {
-//       console.error("Failed to mark order as packed:", error);
-//       alert(
-//         `Failed to pack order: ${
-//           error instanceof Error ? error.message : "Unknown error"
-//         }`
-//       );
-//     }
-//     setIsPacking(false);
-//   };
-
-//   // Loading state
-//   if (isLoading) {
-//     return (
-//       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-//         <div className="text-center">
-//           <Package className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
-//           <p className="text-gray-600 dark:text-gray-200">
-//             Loading order details...
-//           </p>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   // Error state
-//   if (!order) {
-//     return (
-//       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-//         <div className="text-center">
-//           <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-//           <p className="text-gray-600">
-//             Order not found or not ready for packing
-//           </p>
-//           <Button
-//             variant="outline"
-//             className="mt-4"
-//             onClick={() => window.history.back()}
-//           >
-//             <ArrowLeft className="w-4 h-4 mr-2" />
-//             Go Back
-//           </Button>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   // Success state
-//   if (isPackingComplete || order.status === "PACKED") {
-//     return (
-//       <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
-//         <div className="text-center max-w-md">
-//           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-//           <h2 className="text-2xl font-bold text-green-800 mb-2">
-//             Order Packed Successfully!
-//           </h2>
-//           <p className="text-green-700 mb-6">
-//             {order.orderNumber} has been marked as packed and is ready for
-//             shipping
-//           </p>
-
-//           <div className="space-y-3">
-//             <Button
-//               onClick={() =>
-//                 (window.location.href = `/dashboard/shipping/create-label/${order.id}`)
-//               }
-//               className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
-//             >
-//               <Truck className="w-5 h-5 mr-2" />
-//               Ship Now
-//             </Button>
-//             <Button
-//               variant="outline"
-//               onClick={() => (window.location.href = "/dashboard/packing")}
-//               className="w-full"
-//             >
-//               <ArrowLeft className="w-4 h-4 mr-2" />
-//               Back to Pack Station
-//             </Button>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="min-h-screen bg-background p-4">
-//       <div className="max-w-4xl mx-auto">
-//         {/* Header */}
-//         <div className="flex items-center justify-between mb-6">
-//           <div className="flex items-center">
-//             <Button
-//               variant="ghost"
-//               onClick={() => window.history.back()}
-//               className="mr-4"
-//             >
-//               <ArrowLeft className="w-4 h-4" />
-//             </Button>
-//             <div>
-//               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-//                 Pack Order
-//               </h1>
-//               <p className="text-gray-600 dark:text-gray-400">
-//                 {order.orderNumber}
-//               </p>
-//             </div>
-//           </div>
-//         </div>
-
-//         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-//           {/* Customer Info */}
-//           <Card>
-//             <CardHeader>
-//               <CardTitle className="flex items-center">
-//                 <User className="w-5 h-5 mr-2" />
-//                 Customer Information
-//               </CardTitle>
-//             </CardHeader>
-//             <CardContent>
-//               <div className="space-y-2">
-//                 <div>
-//                   <span className="font-medium">{order.customerName}</span>
-//                 </div>
-//                 <div className="text-sm text-gray-600 dark:text-gray-400">
-//                   {order.customerEmail}
-//                 </div>
-//                 <div className="pt-2">
-//                   <div className="flex items-start">
-//                     <MapPin className="w-4 h-4 mr-2 mt-0.5 text-gray-500" />
-//                     <div className="text-sm">
-//                       <div>{order.shippingAddress.address1}</div>
-//                       {order.shippingAddress.address2 && (
-//                         <div>{order.shippingAddress.address2}</div>
-//                       )}
-//                       <div>
-//                         {order.shippingAddress.city},{" "}
-//                         {order.shippingAddress.province}{" "}
-//                         {order.shippingAddress.zip}
-//                       </div>
-//                       <div>{order.shippingAddress.country}</div>
-//                     </div>
-//                   </div>
-//                 </div>
-//               </div>
-//             </CardContent>
-//           </Card>
-
-//           {/* Items to Pack */}
-//           <Card>
-//             <CardHeader>
-//               <CardTitle className="flex items-center">
-//                 <Package className="w-5 h-5 mr-2" />
-//                 Items to Pack ({order.items.length})
-//               </CardTitle>
-//             </CardHeader>
-//             <CardContent>
-//               <div className="space-y-3">
-//                 {order.items.map((item) => (
-//                   <div
-//                     key={item.id}
-//                     className="flex justify-between items-center p-3 bg-background rounded-lg"
-//                   >
-//                     <div>
-//                       <div className="font-medium">{item.productName}</div>
-//                       <div className="text-sm text-gray-600 dark:text-gray-400">
-//                         SKU: {item.sku}
-//                       </div>
-//                       <div className="text-sm text-gray-600 dark:text-gray-400">
-//                         Weight: {item.weight} lbs each
-//                       </div>
-//                     </div>
-//                     <div className="text-right">
-//                       <div className="font-semibold">×{item.quantity}</div>
-//                       {/* <div className="text-sm text-gray-600 dark:text-gray-400">
-//                         ${item.totalPrice}
-//                       </div> */}
-//                     </div>
-//                   </div>
-//                 ))}
-//               </div>
-//               <div className="border-t pt-3 mt-3">
-//                 <div className="flex justify-between font-semibold">
-//                   <span>Total Value:</span>
-//                   <span>${order.totalAmount}</span>
-//                 </div>
-//               </div>
-//             </CardContent>
-//           </Card>
-//         </div>
-
-//         {/* Pack Button */}
-//         <div className="mt-8 flex justify-center">
-//           <div className="w-full max-w-md space-y-3">
-//             <Button
-//               onClick={markOrderAsPacked}
-//               disabled={isPacking}
-//               className="w-full h-12 text-lg bg-green-600 hover:bg-green-700 cursor-pointer"
-//             >
-//               {isPacking ? (
-//                 <>
-//                   <Package className="w-5 h-5 mr-2 animate-pulse" />
-//                   Marking as Packed...
-//                 </>
-//               ) : (
-//                 <>
-//                   <CheckCircle className="w-5 h-5 mr-2" />
-//                   Mark as Packed
-//                 </>
-//               )}
-//             </Button>
-//             <p className="text-sm text-gray-600 text-center">
-//               This will mark the order as packed and ready for shipping
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }

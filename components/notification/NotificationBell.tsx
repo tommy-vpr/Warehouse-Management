@@ -184,7 +184,7 @@ export default function NotificationBell() {
             notifications.map((notification: Notification) => (
               <DropdownMenuItem
                 key={notification.id}
-                className={`flex flex-col items-start p-3 cursor-pointer ${
+                className={`flex flex-col items-start m-1 p-3 cursor-pointer ${
                   !notification.read ? "bg-blue-50 dark:bg-zinc-800" : ""
                 }`}
                 onClick={() => handleNotificationClick(notification)}

@@ -17,6 +17,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { CarrierBadge } from "@/components/CarrierBadge";
+import { stat } from "fs";
 
 interface ShippedOrder {
   id: string;
@@ -72,6 +73,8 @@ export default function ShippingDashboard() {
     totalCost:
       orders?.reduce((sum, o) => sum + o.totalCost, 0).toFixed(2) || "0.00",
   };
+
+  console.log("STATS: ", stats);
 
   if (isLoading) {
     return (
@@ -172,7 +175,7 @@ export default function ShippingDashboard() {
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="px-4 py-2 border rounded-md"
+                className="text-xs px-4 py-2 border rounded-md"
               >
                 <option value="all" className="text-gray-400">
                   All Time
@@ -202,10 +205,7 @@ export default function ShippingDashboard() {
             {filteredOrders && filteredOrders.length > 0 ? (
               <div className="space-y-4">
                 {filteredOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-zinc-900"
-                  >
+                  <div key={order.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="font-semibold text-lg">

@@ -14,6 +14,16 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // ✅ Enforce ADMIN MANAGER only
+    const role = session.user?.role;
+
+    if (!role || !["ADMIN", "MANAGER"].includes(role)) {
+      return NextResponse.json(
+        { error: "Forbidden: Approved by admin or manager only" },
+        { status: 403 }
+      );
+    }
+
     const { notes } = await request.json();
     const transferId = params.id;
 

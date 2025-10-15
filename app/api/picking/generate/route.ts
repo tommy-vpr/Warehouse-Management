@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { updateOrderStatus } from "@/lib/order-status-helper"; // ✅ ADD THIS IMPORT
+import { updateOrderStatus } from "@/lib/order-status-helper";
 
 interface GeneratePickListRequest {
   orderIds?: string[];
@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
     console.log(
       `📋 Generating pick list - Strategy: ${pickingStrategy}, Max items: ${maxItems}`
     );
+    if (orderIds) {
+      console.log(`📋 Specific orders requested: ${orderIds.join(", ")}`);
+    }
 
     // Get allocated orders ready for picking
     const whereClause = {
@@ -58,9 +61,8 @@ export async function POST(request: NextRequest) {
             productVariant: {
               include: {
                 inventory: {
-                  where: {
-                    quantityReserved: { gt: 0 },
-                  },
+                  // ✅ FIX: Remove the where clause to get ALL inventory locations
+                  // We'll filter for quantityReserved > 0 in JavaScript instead
                   include: {
                     location: true,
                   },
@@ -85,15 +87,50 @@ export async function POST(request: NextRequest) {
     console.log(`📦 Found ${allocatedOrders.length} allocated orders`);
 
     // Collect all items that need to be picked
-    const pickItems = [];
+    const pickItems: PickItem[] = [];
     let totalItems = 0;
+    const skippedItems: Array<{ sku: string; reason: string }> = [];
 
     for (const order of allocatedOrders) {
+      console.log(`\n📦 Processing order ${order.orderNumber} (${order.id})`);
+      console.log(`   Order has ${order.items.length} line items`);
+
       for (const orderItem of order.items) {
-        // Find inventory locations with reserved stock
-        const reservedInventory = orderItem.productVariant.inventory
-          .filter((inv) => inv.quantityReserved > 0)
+        console.log(
+          `\n  📄 Item: ${orderItem.productVariant.sku} - ${orderItem.productVariant.name}`
+        );
+        console.log(`     Quantity needed: ${orderItem.quantity}`);
+        console.log(
+          `     Inventory locations available: ${orderItem.productVariant.inventory.length}`
+        );
+
+        // ✅ FIX: Filter for reserved inventory in JavaScript with detailed logging
+        const allInventory = orderItem.productVariant.inventory;
+        const reservedInventory = allInventory
+          .filter((inv) => {
+            const hasReserved = inv.quantityReserved > 0;
+            console.log(
+              `     - Location ${inv.location.name}: OnHand=${
+                inv.quantityOnHand
+              }, Reserved=${inv.quantityReserved} ${hasReserved ? "✅" : "❌"}`
+            );
+            return hasReserved;
+          })
           .sort((a, b) => b.quantityReserved - a.quantityReserved);
+
+        if (reservedInventory.length === 0) {
+          const errorMsg = `No reserved inventory for SKU ${orderItem.productVariant.sku}`;
+          console.error(`     ❌ ERROR: ${errorMsg}`);
+          skippedItems.push({
+            sku: orderItem.productVariant.sku,
+            reason: errorMsg,
+          });
+          continue; // Skip this item but continue processing
+        }
+
+        console.log(
+          `     ✅ Found ${reservedInventory.length} location(s) with reserved inventory`
+        );
 
         let remainingToPick = orderItem.quantity;
 
@@ -103,6 +140,10 @@ export async function POST(request: NextRequest) {
           const quantityFromThisLocation = Math.min(
             remainingToPick,
             inventory.quantityReserved
+          );
+
+          console.log(
+            `     📍 Adding pick task: ${quantityFromThisLocation} units from ${inventory.location.name}`
           );
 
           pickItems.push({
@@ -120,7 +161,19 @@ export async function POST(request: NextRequest) {
           remainingToPick -= quantityFromThisLocation;
           totalItems += quantityFromThisLocation;
 
-          if (totalItems >= maxItems) break;
+          if (totalItems >= maxItems) {
+            console.log(`⚠️ Reached maxItems limit (${maxItems})`);
+            break;
+          }
+        }
+
+        if (remainingToPick > 0) {
+          const errorMsg = `Insufficient reserved inventory for SKU ${orderItem.productVariant.sku}. Short by ${remainingToPick} units`;
+          console.error(`     ❌ ERROR: ${errorMsg}`);
+          skippedItems.push({
+            sku: orderItem.productVariant.sku,
+            reason: errorMsg,
+          });
         }
 
         if (totalItems >= maxItems) break;
@@ -128,8 +181,29 @@ export async function POST(request: NextRequest) {
       if (totalItems >= maxItems) break;
     }
 
+    // ✅ ERROR HANDLING: If items were skipped, include warning in response
+    if (skippedItems.length > 0) {
+      console.error(`\n❌ WARNING: ${skippedItems.length} item(s) skipped:`);
+      skippedItems.forEach((item) => {
+        console.error(`   - ${item.sku}: ${item.reason}`);
+      });
+    }
+
+    if (pickItems.length === 0) {
+      return NextResponse.json(
+        {
+          error: "No pick items could be generated",
+          details: skippedItems,
+        },
+        { status: 400 }
+      );
+    }
+
     console.log(
-      `📊 Collected ${pickItems.length} pick items, ${totalItems} total quantity`
+      `\n📊 Collected ${pickItems.length} pick items, ${totalItems} total quantity`
+    );
+    console.log(
+      `📊 Unique SKUs: ${[...new Set(pickItems.map((i) => i.sku))].join(", ")}`
     );
 
     // Optimize pick sequence based on location zones and paths
@@ -148,14 +222,25 @@ export async function POST(request: NextRequest) {
           assignedTo: assignTo || null,
           priority: 0,
           totalItems: optimizedItems.length,
-          notes: `Generated with ${pickingStrategy} strategy`,
+          notes: `Generated with ${pickingStrategy} strategy${
+            skippedItems.length > 0
+              ? ` (${skippedItems.length} item(s) skipped)`
+              : ""
+          }`,
         },
       });
 
+      console.log(`\n✅ Created pick list ${batchNumber}`);
+
       // Create pick list items
       const pickListItems = await Promise.all(
-        optimizedItems.map((item, index) =>
-          tx.pickListItem.create({
+        optimizedItems.map((item, index) => {
+          console.log(
+            `   ${index + 1}. ${item.sku} x${item.quantityToPick} @ ${
+              item.locationName
+            }`
+          );
+          return tx.pickListItem.create({
             data: {
               pickListId: newPickList.id,
               orderId: item.orderId,
@@ -164,23 +249,38 @@ export async function POST(request: NextRequest) {
               quantityToPick: item.quantityToPick,
               pickSequence: index + 1,
             },
-          })
-        )
+          });
+        })
       );
 
-      // ✅ FIXED: Update orders to PICKING status WITH status history
+      // Update orders to PICKING status WITH status history
       const orderIdsToUpdate = [
         ...new Set(optimizedItems.map((item) => item.orderId)),
       ];
 
-      // Update each order individually with status history
+      console.log(
+        `\n📝 Updating ${orderIdsToUpdate.length} order(s) to PICKING status`
+      );
+
       for (const orderId of orderIdsToUpdate) {
+        // Update order status
         await updateOrderStatus({
           orderId,
           newStatus: "PICKING",
           userId: session.user.id,
           notes: `Pick list ${batchNumber} generated`,
-          tx, // ✅ Pass transaction client
+          tx,
+        });
+
+        // ✅ UPDATE: Also update any ALLOCATED back orders for this order to PICKING
+        await tx.backOrder.updateMany({
+          where: {
+            orderId: orderId,
+            status: "ALLOCATED",
+          },
+          data: {
+            status: "PICKING",
+          },
         });
       }
 
@@ -190,7 +290,11 @@ export async function POST(request: NextRequest) {
           pickListId: newPickList.id,
           eventType: "PICK_STARTED",
           userId: session.user.id,
-          notes: `Pick list generated with ${optimizedItems.length} items`,
+          notes: `Pick list generated with ${optimizedItems.length} items${
+            skippedItems.length > 0
+              ? `. Skipped items: ${skippedItems.map((i) => i.sku).join(", ")}`
+              : ""
+          }`,
         },
       });
 
@@ -198,7 +302,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(
-      `✅ Created pick list ${batchNumber} with ${optimizedItems.length} items`
+      `\n✅ Successfully created pick list ${batchNumber} with ${optimizedItems.length} items`
     );
 
     return NextResponse.json({
@@ -225,6 +329,13 @@ export async function POST(request: NextRequest) {
         estimatedPickTime: Math.ceil(optimizedItems.length * 1.5),
         zones: [...new Set(optimizedItems.map((item) => item.zone))],
       },
+      // ✅ Include warnings if items were skipped
+      ...(skippedItems.length > 0 && {
+        warnings: {
+          skippedItems,
+          message: `${skippedItems.length} item(s) could not be added to pick list`,
+        },
+      }),
     });
   } catch (error) {
     console.error("❌ Pick list generation error:", error);

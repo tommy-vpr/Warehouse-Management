@@ -18,6 +18,7 @@ import {
   MapPin,
   CalendarDays,
   ArrowLeftRight,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +35,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const checkActive = (id: string) => {
-    if (id === "dashboard") return pathname === "/dashboard";
-    return pathname === `/dashboard/${id}`;
-  };
+  // const checkActive = (id: string) => {
+  //   if (id === "dashboard") return pathname === "/dashboard";
+  //   return pathname === `/dashboard/${id}`;
+  // };
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
@@ -46,6 +47,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
     { id: "inventory/transfers", label: "Transfers", icon: ArrowLeftRight },
+    { id: "backorders", label: "Backorders", icon: ShoppingBag },
     {
       id: "inventory-planner",
       label: "Inventory Planner",
@@ -56,6 +58,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const activeItem = menuItems
+    .filter((item) => pathname.startsWith(`/dashboard/${item.id}`))
+    .sort((a, b) => b.id.length - a.id.length)[0]?.id;
+
+  const checkActive = (id: string) => id === activeItem;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
