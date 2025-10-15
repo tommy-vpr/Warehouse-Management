@@ -1180,60 +1180,73 @@ export default function ShippingLabelForm({
 
                 {/* ✅ UPDATED: Package Details with Quick Add for UPS */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium">
-                      Package Details
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {/* ✅ NEW: Quick add multiple packages (UPS only) */}
-                      {shipment.carrierId &&
-                        !isStampsCarrier(shipment.carrierId) && (
+                  {shipment.carrierId &&
+                    !isStampsCarrier(shipment.carrierId) && (
+                      <>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="text-sm font-medium">
+                            Package Details
+                          </label>
                           <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={numberOfPackages}
-                              onChange={(e) =>
-                                setNumberOfPackages(e.target.value)
-                              }
-                              placeholder="# of packages"
-                              className="w-32 px-2 py-1 text-sm border rounded"
-                            />
-                            <button
-                              onClick={() => {
-                                const count = parseInt(numberOfPackages);
-                                if (count > 0 && count <= 20) {
-                                  // addMultiplePackages(shipment.id, count);
-                                  addMultiplePackagesWithWeightDistribution(
-                                    shipment.id,
-                                    count
-                                  );
+                            {/* Quick Add Multiple Packages */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={numberOfPackages}
+                                onChange={(e) =>
+                                  setNumberOfPackages(e.target.value)
                                 }
-                              }}
-                              disabled={
-                                !numberOfPackages ||
-                                parseInt(numberOfPackages) <= 0
-                              }
-                              className="cursor-pointer px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Add {numberOfPackages || "X"}
-                            </button>
-                          </div>
-                        )}
+                                placeholder="# of packages"
+                                className="w-32 px-2 py-1 text-sm border rounded"
+                              />
+                              <button
+                                onClick={() => {
+                                  const count = parseInt(numberOfPackages);
+                                  if (count > 0 && count <= 20) {
+                                    addMultiplePackagesWithWeightDistribution(
+                                      shipment.id,
+                                      count
+                                    );
+                                  }
+                                }}
+                                disabled={
+                                  !numberOfPackages ||
+                                  parseInt(numberOfPackages) <= 0
+                                }
+                                className="cursor-pointer px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Add {numberOfPackages || "X"}
+                              </button>
+                            </div>
 
-                      {/* Manual add button */}
-                      {shipment.packages.length < 20 && (
-                        <button
-                          onClick={() => addPackageToShipment(shipment.id)}
-                          className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Package
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                            {/* Manual Add Button */}
+                            {shipment.packages.length < 20 && (
+                              <button
+                                onClick={() =>
+                                  addPackageToShipment(shipment.id)
+                                }
+                                className="cursor-pointer px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Package
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Package List */}
+                        {shipment.packages.map((pkg, pkgIndex) => (
+                          <div
+                            key={pkg.id}
+                            className="border p-4 rounded bg-gray-50 dark:bg-zinc-800 space-y-3 mb-3"
+                          >
+                            {/* ...package fields here... */}
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                   {shipment.packages.map((pkg, pkgIndex) => (
                     <div

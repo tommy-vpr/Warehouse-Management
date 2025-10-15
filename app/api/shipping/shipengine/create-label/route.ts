@@ -1,16 +1,89 @@
 // app/api/shipping/create-label/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { shipengine } from "@/lib/shipengine";
+import { shipengine } from "@/lib/shipengine"; // kept if you use elsewhere
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { Prisma } from "@prisma/client";
+import { InventoryReservation, Prisma } from "@prisma/client";
 import { updateOrderStatus } from "@/lib/order-status-helper";
 
 import {
   updateShopifyFulfillment,
   getShopifyCarrierName,
 } from "@/lib/shopify-fulfillment";
+
+type ReleasedReservationSummary = {
+  productVariantId: string;
+  quantityReleased: number;
+};
+
+type BackOrderFulfilledSummary = {
+  productVariantId: string;
+  quantityBackOrdered: number;
+};
+
+function truncateReference(text: string, carrierCode: string): string {
+  let maxLength = 35; // default UPS
+  switch (carrierCode.toLowerCase()) {
+    case "ups":
+      maxLength = 35;
+      break;
+    case "fedex":
+      maxLength = 30;
+      break;
+    case "stamps_com":
+    case "usps":
+      maxLength = 50;
+      break;
+    default:
+      maxLength = 30;
+  }
+  if (!text) return "";
+  return text.length <= maxLength
+    ? text
+    : text.substring(0, maxLength - 3) + "...";
+}
+
+function validateCarrierService(carrier: string, service: string) {
+  const validations = [
+    {
+      condition: carrier === "stamps_com" && service?.startsWith("ups_"),
+      error: "Service code mismatch: UPS service selected with USPS carrier",
+    },
+    {
+      condition: carrier === "ups" && service?.startsWith("usps_"),
+      error: "Service code mismatch: USPS service selected with UPS carrier",
+    },
+    {
+      condition:
+        carrier === "fedex" &&
+        (service?.startsWith("usps_") || service?.startsWith("ups_")),
+      error:
+        "Service code mismatch: Non-FedEx service selected with FedEx carrier",
+    },
+  ];
+  for (const v of validations) if (v.condition) return v.error;
+  return null;
+}
+
+function joinDedup(existing: string | null | undefined, next: string) {
+  const parts = [existing, next]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(p);
+    }
+  }
+  return deduped.join(", ");
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,24 +101,21 @@ export async function POST(request: NextRequest) {
       notes,
     } = await request.json();
 
-    // Enhanced validation
+    // Basic validation
     if (!orderId || !packages || packages.length === 0) {
       return NextResponse.json(
         { error: "Order ID and at least one package are required" },
         { status: 400 }
       );
     }
-
     if (!carrierCode || !serviceCode) {
       return NextResponse.json(
         { error: "Carrier code and service code are required" },
         { status: 400 }
       );
     }
-
-    // Validate package structure
     for (const [idx, pkg] of packages.entries()) {
-      if (!pkg.weight || pkg.weight <= 0) {
+      if (!pkg?.weight || pkg.weight <= 0) {
         return NextResponse.json(
           { error: `Package ${idx + 1} must have a valid weight` },
           { status: 400 }
@@ -58,7 +128,6 @@ export async function POST(request: NextRequest) {
     console.log("Carrier Code:", carrierCode);
     console.log("Service Code:", serviceCode);
 
-    // Get order with better error handling
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -69,20 +138,18 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     // Allow shipping if order is PACKED or already partially SHIPPED
-    if (!["PACKED", "SHIPPED"].includes(order.status)) {
+    if (!["PACKED", "SHIPPED", "PARTIALLY_SHIPPED"].includes(order.status)) {
       return NextResponse.json(
         { error: "Order must be packed before shipping" },
         { status: 400 }
       );
     }
 
-    // Warehouse address with validation
     const warehouseAddress = {
       name: process.env.WAREHOUSE_NAME || "WMS Warehouse",
       company_name: process.env.WAREHOUSE_COMPANY || "Your Company",
@@ -94,7 +161,6 @@ export async function POST(request: NextRequest) {
       phone: process.env.WAREHOUSE_PHONE || "555-123-4567",
     };
 
-    // Better address handling
     const addr = shippingAddress || order.shippingAddress;
     if (!addr) {
       return NextResponse.json(
@@ -116,7 +182,6 @@ export async function POST(request: NextRequest) {
       address_residential_indicator: "yes" as const,
     };
 
-    // Validate required address fields
     if (
       !customerAddress.address_line1 ||
       !customerAddress.city_locality ||
@@ -129,30 +194,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Helper function to truncate reference messages based on carrier
-    const truncateReference = (text: string, carrierCode: string): string => {
-      let maxLength = 35; // Default UPS limit
+    // Carrier/service compatibility
+    const validationError = validateCarrierService(carrierCode, serviceCode);
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
 
-      switch (carrierCode.toLowerCase()) {
-        case "ups":
-          maxLength = 35;
-          break;
-        case "fedex":
-          maxLength = 30;
-          break;
-        case "stamps_com":
-        case "usps":
-          maxLength = 50;
-          break;
-        default:
-          maxLength = 30;
-      }
-
-      if (text.length <= maxLength) return text;
-      return text.substring(0, maxLength - 3) + "...";
-    };
-
-    // Build shipment with proper carrier code
+    // Build ShipEngine shipment payload
     const shipment = {
       carrier_code: carrierCode,
       service_code: serviceCode,
@@ -162,7 +210,6 @@ export async function POST(request: NextRequest) {
         const baseReference1 = order.orderNumber;
         const baseReference2 =
           notes || `Package ${idx + 1} of ${packages.length}`;
-
         return {
           package_code: pkg.packageCode || "package",
           weight: {
@@ -185,43 +232,8 @@ export async function POST(request: NextRequest) {
 
     console.log("Final shipment payload:", JSON.stringify(shipment, null, 2));
 
-    // Enhanced carrier/service compatibility validation
-    const validateCarrierService = (carrier: string, service: string) => {
-      const validations = [
-        {
-          condition: carrier === "stamps_com" && service.startsWith("ups_"),
-          error:
-            "Service code mismatch: UPS service selected with USPS carrier",
-        },
-        {
-          condition: carrier === "ups" && service.startsWith("usps_"),
-          error:
-            "Service code mismatch: USPS service selected with UPS carrier",
-        },
-        {
-          condition:
-            carrier === "fedex" &&
-            (service.startsWith("usps_") || service.startsWith("ups_")),
-          error:
-            "Service code mismatch: Non-FedEx service selected with FedEx carrier",
-        },
-      ];
-
-      for (const validation of validations) {
-        if (validation.condition) {
-          return validation.error;
-        }
-      }
-      return null;
-    };
-
-    const validationError = validateCarrierService(carrierCode, serviceCode);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
-
-    // Create labels with better error handling
-    let label;
+    // Create label via ShipEngine (outside any DB transaction)
+    let label: any;
     try {
       const response = await fetch("https://api.shipengine.com/v1/labels", {
         method: "POST",
@@ -230,7 +242,7 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          shipment: shipment,
+          shipment,
           label_format: "pdf",
           label_layout: "4x6",
           label_download_type: "url",
@@ -238,14 +250,14 @@ export async function POST(request: NextRequest) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         console.error(
           "ShipEngine API Error:",
           JSON.stringify(errorData, null, 2)
         );
         throw new Error(
           `ShipEngine API Error: ${response.status} - ${
-            errorData.message || response.statusText
+            errorData?.message || response.statusText
           }`
         );
       }
@@ -253,25 +265,6 @@ export async function POST(request: NextRequest) {
       label = await response.json();
     } catch (shipEngineError: unknown) {
       console.error("ShipEngine API Error:", shipEngineError);
-      console.error("🚨 SHIPENGINE ERROR DETAILS:");
-      console.error("Error message:", (shipEngineError as any).message);
-
-      if ((shipEngineError as any).response?.data) {
-        console.error("ShipEngine Error Details:");
-        console.error(
-          JSON.stringify((shipEngineError as any).response.data, null, 2)
-        );
-
-        if ((shipEngineError as any).response.data.errors) {
-          console.error("Specific Errors:");
-          (shipEngineError as any).response.data.errors.forEach(
-            (err: any, idx: number) => {
-              console.error(`Error ${idx + 1}:`, JSON.stringify(err, null, 2));
-            }
-          );
-        }
-      }
-
       const errorMessage =
         shipEngineError instanceof Error
           ? shipEngineError.message
@@ -282,7 +275,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate label response
     if (!label || !label.tracking_number) {
       return NextResponse.json(
         { error: "Invalid response from ShipEngine - no tracking number" },
@@ -292,11 +284,10 @@ export async function POST(request: NextRequest) {
 
     console.log("ShipEngine label response:", JSON.stringify(label, null, 2));
 
-    // ShipEngine returns a single label object with packages array inside
-    let labelPackages = label.packages || [];
-
-    // For single package shipments, create a package entry from the main label
+    // Handle multi-package responses robustly
+    let labelPackages = label.packages || label.children || [];
     if (labelPackages.length === 0 && label.tracking_number) {
+      // Single-package fallback
       labelPackages = [
         {
           package_id: label.label_id,
@@ -313,9 +304,14 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // ✅ UPDATED: Use database transaction with back order detection
-    const result = await prisma.$transaction(async (tx) => {
-      // ✅ NEW: Calculate per-package cost
+    // ===== DB TRANSACTION START (NO NETWORK CALLS INSIDE) =====
+    const {
+      updatedOrderAfterTxn,
+      hasPendingBackOrders,
+      reservationsReleasedDetails,
+      backOrderFulfilledDetails,
+      shippingPackages,
+    } = await prisma.$transaction(async (tx) => {
       const totalShipmentCost = label.shipment_cost?.amount || 0;
       const numberOfPackages = labelPackages.length;
       const costPerPackage =
@@ -327,20 +323,19 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Number of packages: ${numberOfPackages}`);
       console.log(`💵 Cost per package: $${costPerPackage}`);
 
-      // Create shipping packages
+      // Create shippingPackages rows
       const shippingPackages = await Promise.all(
         labelPackages.map((pkg: any, idx: number) => {
           const originalPackage = packages[Math.min(idx, packages.length - 1)];
-
           return tx.shippingPackage.create({
             data: {
               orderId: order.id,
-              carrierCode: carrierCode,
-              serviceCode: serviceCode,
+              carrierCode,
+              serviceCode,
               packageCode: originalPackage?.packageCode || "package",
               trackingNumber: pkg.tracking_number,
               labelUrl: pkg.label_download?.pdf || pkg.label_download?.href,
-              cost: new Prisma.Decimal(costPerPackage), // ✅ FIXED: Use divided cost
+              cost: new Prisma.Decimal(costPerPackage),
               currency: label.shipment_cost?.currency || "USD",
               weight: new Prisma.Decimal(
                 pkg.weight?.value || originalPackage?.weight || 1
@@ -356,24 +351,16 @@ export async function POST(request: NextRequest) {
         })
       );
 
-      // ✅ CHECK: Are we shipping a back order?
-      // ✅ CHECK: Are we shipping a back order?
+      // Find active back orders
       const activeBackOrders = await tx.backOrder.findMany({
         where: {
-          orderId: orderId,
-          status: {
-            in: ["ALLOCATED", "PICKING", "PICKED", "PACKED"],
-          },
+          orderId,
+          status: { in: ["ALLOCATED", "PICKING", "PICKED", "PACKED"] },
         },
         include: {
-          productVariant: {
-            select: {
-              sku: true,
-            },
-          },
+          productVariant: { select: { sku: true } },
         },
       });
-
       const isBackOrderShipment = activeBackOrders.length > 0;
 
       console.log(
@@ -382,64 +369,71 @@ export async function POST(request: NextRequest) {
         }`
       );
 
-      if (isBackOrderShipment) {
-        console.log(
-          `📦 Found ${activeBackOrders.length} active back order(s):`
-        );
-        activeBackOrders.forEach((bo) => {
-          console.log(
-            `   - ${bo.productVariant?.sku}: ${bo.quantityBackOrdered} units (${bo.status})`
-          );
-        });
-      }
-
-      // ✅ Get ONLY the reservations for items we're shipping now
-      let reservationsToRelease;
+      // Determine reservations to release
+      let reservationsToRelease: Array<
+        InventoryReservation & { quantityToRelease?: number }
+      > = [];
 
       if (isBackOrderShipment) {
-        // ✅ BACK ORDER: Only release reservations created for back orders
         const backOrderProductIds = activeBackOrders.map(
           (bo) => bo.productVariantId
         );
 
-        reservationsToRelease = await tx.inventoryReservation.findMany({
+        const allActiveReservations = await tx.inventoryReservation.findMany({
           where: {
-            orderId: orderId,
+            orderId,
             productVariantId: { in: backOrderProductIds },
             status: "ACTIVE",
           },
+          orderBy: { createdAt: "desc" }, // prefer newer reservations
         });
 
-        console.log(
-          `📦 Back order shipment: Found ${reservationsToRelease.length} reservations to release`
-        );
-        console.log(`   Products: ${backOrderProductIds.join(", ")}`);
+        const neededQuantities = new Map<string, number>();
+        for (const bo of activeBackOrders) {
+          neededQuantities.set(bo.productVariantId, bo.quantityBackOrdered);
+        }
+
+        for (const [
+          productVariantId,
+          neededQty,
+        ] of neededQuantities.entries()) {
+          const productReservations = allActiveReservations.filter(
+            (r) => r.productVariantId === productVariantId
+          );
+
+          let remaining = neededQty;
+          for (const reservation of productReservations) {
+            if (remaining <= 0) break;
+            const take = Math.min(reservation.quantity, remaining);
+            reservationsToRelease.push({
+              ...reservation,
+              quantityToRelease: take,
+            });
+            remaining -= take;
+          }
+          if (remaining > 0) {
+            throw new Error(
+              `Not enough reservations for back order. Need ${neededQty} units of product ${productVariantId} but insufficient reserved.`
+            );
+          }
+        }
       } else {
-        // ✅ INITIAL ORDER: Release all active reservations
         reservationsToRelease = await tx.inventoryReservation.findMany({
-          where: {
-            orderId: orderId,
-            status: "ACTIVE",
-          },
+          where: { orderId, status: "ACTIVE" },
         });
-
-        console.log(
-          `📦 Initial order shipment: Found ${reservationsToRelease.length} reservations to release`
-        );
       }
 
-      // ✅ Verify we found the right amount
-      const totalToRelease = reservationsToRelease.reduce(
-        (sum, r) => sum + r.quantity,
+      const totalUnitsToRelease = reservationsToRelease.reduce(
+        (sum, r) => sum + (r.quantityToRelease ?? r.quantity),
         0
       );
-      console.log(`📦 Total units to release: ${totalToRelease}`);
+      console.log(`📦 Total units to release: ${totalUnitsToRelease}`);
 
-      // ✅ Release inventory for ONLY the reservations we found (SINGLE LOOP)
+      // Release inventory (single loop, handle partials)
+      const releasedSummaries: ReleasedReservationSummary[] = [];
       for (const reservation of reservationsToRelease) {
-        console.log(
-          `   - Releasing ${reservation.quantity} units of product ${reservation.productVariantId} from location ${reservation.locationId}`
-        );
+        const qtyToRelease =
+          reservation.quantityToRelease ?? reservation.quantity;
 
         // Update inventory
         await tx.inventory.update({
@@ -450,211 +444,78 @@ export async function POST(request: NextRequest) {
             },
           },
           data: {
-            quantityReserved: { decrement: reservation.quantity },
-            quantityOnHand: { decrement: reservation.quantity },
+            quantityReserved: { decrement: qtyToRelease },
+            quantityOnHand: { decrement: qtyToRelease },
           },
         });
 
-        // Create inventory transaction
+        // Inventory transaction
         await tx.inventoryTransaction.create({
           data: {
             productVariantId: reservation.productVariantId,
             locationId: reservation.locationId,
             transactionType: "SALE",
-            quantityChange: -reservation.quantity,
+            quantityChange: -qtyToRelease,
             referenceId: orderId,
             referenceType: "SHIPMENT_LABEL_CREATED",
             userId: session.user.id,
-            notes: `Released ${reservation.quantity} units for order ${
+            notes: `Released ${qtyToRelease} units for order ${
               order.orderNumber
             } - Tracking: ${label.tracking_number}${
               isBackOrderShipment ? " (Back Order)" : ""
             }`,
           },
         });
+
+        // Reservation state
+        if (qtyToRelease < reservation.quantity) {
+          await tx.inventoryReservation.update({
+            where: { id: reservation.id },
+            data: { quantity: reservation.quantity - qtyToRelease },
+          });
+        } else {
+          await tx.inventoryReservation.update({
+            where: { id: reservation.id },
+            data: { status: "FULFILLED" },
+          });
+        }
+
+        // capture summary for Shopify quantities
+        releasedSummaries.push({
+          productVariantId: reservation.productVariantId,
+          quantityReleased: qtyToRelease,
+        });
       }
 
-      // ✅ Mark ONLY these reservations as FULFILLED
-      await tx.inventoryReservation.updateMany({
-        where: {
-          id: { in: reservationsToRelease.map((r) => r.id) },
-          status: "ACTIVE",
-        },
-        data: {
-          status: "FULFILLED",
-        },
-      });
-
-      // ✅ Mark back orders as FULFILLED
+      // Mark back orders fulfilled if applicable
+      const backOrderFulfilledDetails: BackOrderFulfilledSummary[] = [];
       if (isBackOrderShipment) {
-        for (const backOrder of activeBackOrders) {
+        for (const bo of activeBackOrders) {
           await tx.backOrder.update({
-            where: { id: backOrder.id },
+            where: { id: bo.id },
             data: {
               status: "FULFILLED",
               fulfilledAt: new Date(),
-              quantityFulfilled: backOrder.quantityBackOrdered,
+              quantityFulfilled: bo.quantityBackOrdered,
             },
           });
-        }
-        console.log(
-          `✅ Marked ${activeBackOrders.length} back order(s) as fulfilled`
-        );
-      }
-
-      // ✅ NEW: Create Shopify fulfillment
-      if (order.shopifyOrderId) {
-        // ✅ MOVE: Declare outside try block so it's available in catch
-        let itemsToFulfill: Array<{
-          variantId?: string;
-          sku: string;
-          quantity: number;
-        }> = [];
-
-        try {
-          console.log(
-            `📦 Creating Shopify fulfillment for order ${order.shopifyOrderId}`
-          );
-
-          // Determine which items are being shipped
-          if (isBackOrderShipment) {
-            // Back order shipment - fulfill only back-ordered items
-            console.log(`📦 This is a BACK ORDER shipment`);
-
-            const backOrderProductIds = activeBackOrders.map(
-              (bo) => bo.productVariantId
-            );
-
-            for (const item of order.items) {
-              if (backOrderProductIds.includes(item.productVariantId)) {
-                const backOrder = activeBackOrders.find(
-                  (bo) => bo.productVariantId === item.productVariantId
-                );
-
-                itemsToFulfill.push({
-                  variantId: item.productVariant.shopifyVariantId
-                    ? `gid://shopify/ProductVariant/${item.productVariant.shopifyVariantId}`
-                    : undefined,
-                  sku: item.productVariant.sku,
-                  quantity: backOrder?.quantityBackOrdered || item.quantity,
-                });
-              }
-            }
-          } else {
-            // ✅ FIXED: Initial shipment - fulfill only what we ACTUALLY shipped
-            console.log(`📦 This is an INITIAL shipment`);
-
-            // ✅ Build map of what we actually shipped (from reservations released)
-            const shippedQuantities = new Map<string, number>();
-
-            for (const reservation of reservationsToRelease) {
-              const currentQty =
-                shippedQuantities.get(reservation.productVariantId) || 0;
-              shippedQuantities.set(
-                reservation.productVariantId,
-                currentQty + reservation.quantity
-              );
-            }
-
-            console.log(
-              `📦 Actually shipped quantities:`,
-              Object.fromEntries(shippedQuantities)
-            );
-
-            // ✅ Only fulfill items we actually shipped with correct quantities
-            itemsToFulfill = order.items
-              .filter((item) => shippedQuantities.has(item.productVariantId))
-              .map((item) => {
-                const shippedQty =
-                  shippedQuantities.get(item.productVariantId) || 0;
-
-                return {
-                  variantId: item.productVariant.shopifyVariantId
-                    ? `gid://shopify/ProductVariant/${item.productVariant.shopifyVariantId}`
-                    : undefined,
-                  sku: item.productVariant.sku,
-                  quantity: shippedQty, // ✅ Use ACTUAL shipped quantity
-                };
-              });
-
-            const totalShipping = itemsToFulfill.reduce(
-              (sum, i) => sum + i.quantity,
-              0
-            );
-            console.log(
-              `📦 Fulfilling ${totalShipping} units in Shopify (may be partial)`
-            );
-          }
-
-          // Create fulfillment in Shopify
-          const fulfillmentResult = await updateShopifyFulfillment({
-            orderId: order.shopifyOrderId,
-            trackingNumber: label.tracking_number,
-            trackingUrl: label.tracking_url,
-            trackingCompany: getShopifyCarrierName(carrierCode),
-            lineItems: itemsToFulfill,
-            notifyCustomer: true,
-            isBackOrder: isBackOrderShipment,
+          backOrderFulfilledDetails.push({
+            productVariantId: bo.productVariantId,
+            quantityBackOrdered: bo.quantityBackOrdered,
           });
-
-          console.log(
-            `✅ Shopify fulfillment created: ${fulfillmentResult.fulfillmentId}`
-          );
-
-          // Store Shopify fulfillment ID
-          await tx.order.update({
-            where: { id: order.id },
-            data: {
-              shopifyFulfillmentIds: order.shopifyFulfillmentIds
-                ? `${order.shopifyFulfillmentIds},${fulfillmentResult.fulfillmentId}`
-                : fulfillmentResult.fulfillmentId,
-            },
-          });
-        } catch (shopifyError) {
-          // ⚠️ Log but don't fail the entire shipment if Shopify update fails
-          console.error(
-            "⚠️ Failed to create Shopify fulfillment:",
-            shopifyError
-          );
-
-          // ✅ Create a sync task for manual retry later (no cron job needed)
-          await tx.shopifySync.create({
-            data: {
-              orderId: order.id,
-              syncType: "FULFILLMENT",
-              status: "PENDING",
-              attempts: 0,
-              data: {
-                trackingNumber: label.tracking_number,
-                trackingUrl: label.tracking_url,
-                carrier: carrierCode,
-                isBackOrder: isBackOrderShipment,
-                itemsToFulfill, // ✅ Now accessible here
-              },
-              error:
-                shopifyError instanceof Error
-                  ? shopifyError.message
-                  : "Unknown error",
-            },
-          });
-
-          console.log("📝 Shopify sync task created for manual retry");
         }
       }
 
-      // ✅ CHECK: Are there still pending back orders?
+      // Are there still pending back orders?
       const pendingBackOrders = await tx.backOrder.findMany({
         where: {
-          orderId: orderId,
-          status: {
-            in: ["PENDING", "ALLOCATED", "PICKING", "PICKED"], // Not yet shipped
-          },
+          orderId,
+          status: { in: ["PENDING", "ALLOCATED", "PICKING", "PICKED"] },
         },
       });
-
       const hasPendingBackOrders = pendingBackOrders.length > 0;
 
-      // Update order details
+      // Update order fields
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
@@ -672,12 +533,8 @@ export async function POST(request: NextRequest) {
                 (label.shipment_cost?.amount || 0)
               ).toString()
             : label.shipment_cost?.amount?.toString(),
-          shippingCarrier: order.shippingCarrier
-            ? `${order.shippingCarrier}, ${carrierCode}`
-            : carrierCode,
-          shippingService: order.shippingService
-            ? `${order.shippingService}, ${serviceCode}`
-            : serviceCode,
+          shippingCarrier: joinDedup(order.shippingCarrier, carrierCode),
+          shippingService: joinDedup(order.shippingService, serviceCode),
           labelUrl: order.labelUrl
             ? `${order.labelUrl}, ${
                 label.label_download?.pdf || label.label_download?.href
@@ -689,7 +546,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // ✅ CRITICAL: Set correct status based on back orders
       const newStatus = hasPendingBackOrders ? "PARTIALLY_SHIPPED" : "SHIPPED";
       const statusNotes = hasPendingBackOrders
         ? `Partially shipped via ${carrierCode.toUpperCase()} - ${
@@ -708,14 +564,140 @@ export async function POST(request: NextRequest) {
       });
 
       return {
-        shippingPackages,
-        updatedOrder,
+        updatedOrderAfterTxn: updatedOrder,
         hasPendingBackOrders,
-        reservationsReleased: reservationsToRelease.length,
-        totalUnitsReleased: totalToRelease,
+        reservationsReleasedDetails: releasedSummaries,
+        backOrderFulfilledDetails,
+        shippingPackages,
       };
     });
+    // ===== DB TRANSACTION END =====
 
+    // ===== SHOPIFY FULFILLMENT (OUTSIDE TRANSACTION) =====
+    // Build items to fulfill based on what we ACTUALLY released
+    if (order.shopifyOrderId) {
+      const isBackOrderShipment = (backOrderFulfilledDetails?.length ?? 0) > 0;
+
+      // Map released quantities by productVariantId
+      const releasedMap = new Map<string, number>();
+      for (const r of reservationsReleasedDetails) {
+        releasedMap.set(
+          r.productVariantId,
+          (releasedMap.get(r.productVariantId) || 0) + r.quantityReleased
+        );
+      }
+
+      let itemsToFulfill: Array<{
+        variantId?: string;
+        sku: string;
+        quantity: number;
+      }> = [];
+
+      if (isBackOrderShipment) {
+        // Only back-ordered items with their fulfilled qty
+        for (const bo of backOrderFulfilledDetails) {
+          const orderItem = order.items.find(
+            (it) => it.productVariantId === bo.productVariantId
+          );
+          if (!orderItem) continue;
+
+          const qty =
+            releasedMap.get(bo.productVariantId) || bo.quantityBackOrdered || 0;
+          if (qty <= 0) continue;
+
+          itemsToFulfill.push({
+            variantId: orderItem.productVariant.shopifyVariantId
+              ? `gid://shopify/ProductVariant/${orderItem.productVariant.shopifyVariantId}`
+              : undefined,
+            sku: orderItem.productVariant.sku,
+            quantity: qty,
+          });
+        }
+      } else {
+        // Initial/regular shipment — fulfill exactly what was released
+        for (const [productVariantId, qty] of releasedMap) {
+          if (qty <= 0) continue;
+          const orderItem = order.items.find(
+            (it) => it.productVariantId === productVariantId
+          );
+          if (!orderItem) continue;
+
+          itemsToFulfill.push({
+            variantId: orderItem.productVariant.shopifyVariantId
+              ? `gid://shopify/ProductVariant/${orderItem.productVariant.shopifyVariantId}`
+              : undefined,
+            sku: orderItem.productVariant.sku,
+            quantity: qty,
+          });
+        }
+      }
+
+      try {
+        console.log(
+          `📦 Creating Shopify fulfillment for order ${
+            order.shopifyOrderId
+          } with ${itemsToFulfill.reduce(
+            (s, i) => s + i.quantity,
+            0
+          )} total units`
+        );
+
+        if (itemsToFulfill.length > 0) {
+          const fulfillmentResult = await updateShopifyFulfillment({
+            orderId: order.shopifyOrderId,
+            trackingNumber: label.tracking_number,
+            trackingUrl: label.tracking_url,
+            trackingCompany: getShopifyCarrierName(carrierCode),
+            lineItems: itemsToFulfill,
+            notifyCustomer: true,
+            isBackOrder: isBackOrderShipment,
+          });
+
+          console.log(
+            `✅ Shopify fulfillment created: ${fulfillmentResult.fulfillmentId}`
+          );
+
+          // Store Shopify fulfillment ID (post-transaction update)
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              shopifyFulfillmentIds: order.shopifyFulfillmentIds
+                ? `${order.shopifyFulfillmentIds},${fulfillmentResult.fulfillmentId}`
+                : fulfillmentResult.fulfillmentId,
+            },
+          });
+        } else {
+          console.warn(
+            "⚠️ No Shopify line items to fulfill for this shipment."
+          );
+        }
+      } catch (shopifyError) {
+        console.error("⚠️ Failed to create Shopify fulfillment:", shopifyError);
+        // Record a sync task for manual retry
+        await prisma.shopifySync.create({
+          data: {
+            orderId: order.id,
+            syncType: "FULFILLMENT",
+            status: "PENDING",
+            attempts: 0,
+            data: {
+              trackingNumber: label.tracking_number,
+              trackingUrl: label.tracking_url,
+              carrier: carrierCode,
+              isBackOrder: isBackOrderShipment,
+              itemsToFulfill,
+            },
+            error:
+              shopifyError instanceof Error
+                ? shopifyError.message
+                : "Unknown error",
+          },
+        });
+        console.log("📝 Shopify sync task created for manual retry");
+      }
+    }
+
+    // Final response
     return NextResponse.json({
       success: true,
       label: {
@@ -758,8 +740,13 @@ export async function POST(request: NextRequest) {
 // import { prisma } from "@/lib/prisma";
 // import { getServerSession } from "next-auth";
 // import { authOptions } from "@/lib/auth";
-// import { Prisma } from "@prisma/client";
+// import { InventoryReservation, Prisma } from "@prisma/client";
 // import { updateOrderStatus } from "@/lib/order-status-helper";
+
+// import {
+//   updateShopifyFulfillment,
+//   getShopifyCarrierName,
+// } from "@/lib/shopify-fulfillment";
 
 // export async function POST(request: NextRequest) {
 //   try {
@@ -1064,6 +1051,18 @@ export async function POST(request: NextRequest) {
 
 //     // ✅ UPDATED: Use database transaction with back order detection
 //     const result = await prisma.$transaction(async (tx) => {
+//       // ✅ NEW: Calculate per-package cost
+//       const totalShipmentCost = label.shipment_cost?.amount || 0;
+//       const numberOfPackages = labelPackages.length;
+//       const costPerPackage =
+//         numberOfPackages > 0
+//           ? totalShipmentCost / numberOfPackages
+//           : totalShipmentCost;
+
+//       console.log(`💰 Total shipment cost: $${totalShipmentCost}`);
+//       console.log(`📦 Number of packages: ${numberOfPackages}`);
+//       console.log(`💵 Cost per package: $${costPerPackage}`);
+
 //       // Create shipping packages
 //       const shippingPackages = await Promise.all(
 //         labelPackages.map((pkg: any, idx: number) => {
@@ -1077,7 +1076,7 @@ export async function POST(request: NextRequest) {
 //               packageCode: originalPackage?.packageCode || "package",
 //               trackingNumber: pkg.tracking_number,
 //               labelUrl: pkg.label_download?.pdf || pkg.label_download?.href,
-//               cost: new Prisma.Decimal(label.shipment_cost?.amount || 0),
+//               cost: new Prisma.Decimal(costPerPackage), // ✅ FIXED: Use divided cost
 //               currency: label.shipment_cost?.currency || "USD",
 //               weight: new Prisma.Decimal(
 //                 pkg.weight?.value || originalPackage?.weight || 1
@@ -1131,26 +1130,100 @@ export async function POST(request: NextRequest) {
 //       }
 
 //       // ✅ Get ONLY the reservations for items we're shipping now
-//       let reservationsToRelease;
+//       let reservationsToRelease: Array<
+//         InventoryReservation & { quantityToRelease?: number }
+//       >;
 
 //       if (isBackOrderShipment) {
-//         // ✅ BACK ORDER: Only release reservations created for back orders
+//         // ✅ BACK ORDER: Get ALL active reservations for back order products
 //         const backOrderProductIds = activeBackOrders.map(
 //           (bo) => bo.productVariantId
 //         );
 
-//         reservationsToRelease = await tx.inventoryReservation.findMany({
+//         // ✅ Get all active reservations (no date filter)
+//         const allActiveReservations = await tx.inventoryReservation.findMany({
 //           where: {
 //             orderId: orderId,
 //             productVariantId: { in: backOrderProductIds },
 //             status: "ACTIVE",
 //           },
+//           orderBy: {
+//             createdAt: "desc", // Newest first - prefer back order reservations
+//           },
 //         });
 
 //         console.log(
-//           `📦 Back order shipment: Found ${reservationsToRelease.length} reservations to release`
+//           `📦 Back order shipment: Found ${allActiveReservations.length} active reservations`
 //         );
 //         console.log(`   Products: ${backOrderProductIds.join(", ")}`);
+
+//         // ✅ Calculate how much we need to release based on back orders
+//         const neededQuantities = new Map<string, number>();
+//         for (const bo of activeBackOrders) {
+//           neededQuantities.set(bo.productVariantId, bo.quantityBackOrdered);
+//         }
+
+//         // ✅ Take only what we need from the reservations
+//         reservationsToRelease = [];
+
+//         for (const [
+//           productVariantId,
+//           neededQty,
+//         ] of neededQuantities.entries()) {
+//           const productReservations = allActiveReservations.filter(
+//             (r) => r.productVariantId === productVariantId
+//           );
+
+//           let remaining = neededQty;
+
+//           console.log(
+//             `📦 Need to release ${neededQty} units for product ${productVariantId}`
+//           );
+//           console.log(
+//             `📦 Found ${productReservations.length} reservation(s):`,
+//             productReservations.map(
+//               (r) => `${r.quantity} units (${r.id.substring(0, 8)}...)`
+//             )
+//           );
+
+//           for (const reservation of productReservations) {
+//             if (remaining <= 0) break;
+
+//             const qtyToTake = Math.min(reservation.quantity, remaining);
+
+//             console.log(
+//               `📦 Taking ${qtyToTake} units from reservation ${reservation.id.substring(
+//                 0,
+//                 8
+//               )}...`
+//             );
+
+//             // Add to release list with the quantity to actually release
+//             reservationsToRelease.push({
+//               ...reservation,
+//               quantityToRelease: qtyToTake,
+//             });
+
+//             remaining -= qtyToTake;
+//           }
+
+//           if (remaining > 0) {
+//             throw new Error(
+//               `Not enough reservations for back order. Need ${neededQty} units of product ${productVariantId} but only found ${
+//                 neededQty - remaining
+//               } reserved.`
+//             );
+//           }
+//         }
+
+//         const totalToRelease = reservationsToRelease.reduce(
+//           (sum, r) => sum + (r.quantityToRelease || r.quantity),
+//           0
+//         );
+
+//         console.log(
+//           `✅ Will release ${reservationsToRelease.length} reservation(s) totaling ${totalToRelease} units`
+//         );
 //       } else {
 //         // ✅ INITIAL ORDER: Release all active reservations
 //         reservationsToRelease = await tx.inventoryReservation.findMany({
@@ -1174,8 +1247,11 @@ export async function POST(request: NextRequest) {
 
 //       // ✅ Release inventory for ONLY the reservations we found (SINGLE LOOP)
 //       for (const reservation of reservationsToRelease) {
+//         const qtyToRelease =
+//           reservation.quantityToRelease || reservation.quantity;
+
 //         console.log(
-//           `   - Releasing ${reservation.quantity} units of product ${reservation.productVariantId} from location ${reservation.locationId}`
+//           `   - Releasing ${qtyToRelease} units of product ${reservation.productVariantId} from location ${reservation.locationId}`
 //         );
 
 //         // Update inventory
@@ -1187,8 +1263,8 @@ export async function POST(request: NextRequest) {
 //             },
 //           },
 //           data: {
-//             quantityReserved: { decrement: reservation.quantity },
-//             quantityOnHand: { decrement: reservation.quantity },
+//             quantityReserved: { decrement: qtyToRelease },
+//             quantityOnHand: { decrement: qtyToRelease },
 //           },
 //         });
 
@@ -1198,29 +1274,54 @@ export async function POST(request: NextRequest) {
 //             productVariantId: reservation.productVariantId,
 //             locationId: reservation.locationId,
 //             transactionType: "SALE",
-//             quantityChange: -reservation.quantity,
+//             quantityChange: -qtyToRelease,
 //             referenceId: orderId,
 //             referenceType: "SHIPMENT_LABEL_CREATED",
 //             userId: session.user.id,
-//             notes: `Released ${reservation.quantity} units for order ${
+//             notes: `Released ${qtyToRelease} units for order ${
 //               order.orderNumber
 //             } - Tracking: ${label.tracking_number}${
 //               isBackOrderShipment ? " (Back Order)" : ""
 //             }`,
 //           },
 //         });
+
+//         // ✅ Handle partial reservation fulfillment
+//         if (qtyToRelease < reservation.quantity) {
+//           // Split the reservation: fulfill part, keep rest active
+//           await tx.inventoryReservation.update({
+//             where: { id: reservation.id },
+//             data: {
+//               quantity: reservation.quantity - qtyToRelease, // Reduce by amount released
+//             },
+//           });
+
+//           console.log(
+//             `   ⚠️  Partial fulfillment: Reduced reservation by ${qtyToRelease}, ${
+//               reservation.quantity - qtyToRelease
+//             } units remain reserved`
+//           );
+//         } else {
+//           // Full fulfillment: mark as fulfilled
+//           await tx.inventoryReservation.update({
+//             where: { id: reservation.id },
+//             data: {
+//               status: "FULFILLED",
+//             },
+//           });
+//         }
 //       }
 
 //       // ✅ Mark ONLY these reservations as FULFILLED
-//       await tx.inventoryReservation.updateMany({
-//         where: {
-//           id: { in: reservationsToRelease.map((r) => r.id) },
-//           status: "ACTIVE",
-//         },
-//         data: {
-//           status: "FULFILLED",
-//         },
-//       });
+//       // await tx.inventoryReservation.updateMany({
+//       //   where: {
+//       //     id: { in: reservationsToRelease.map((r) => r.id) },
+//       //     status: "ACTIVE",
+//       //   },
+//       //   data: {
+//       //     status: "FULFILLED",
+//       //   },
+//       // });
 
 //       // ✅ Mark back orders as FULFILLED
 //       if (isBackOrderShipment) {
@@ -1237,6 +1338,146 @@ export async function POST(request: NextRequest) {
 //         console.log(
 //           `✅ Marked ${activeBackOrders.length} back order(s) as fulfilled`
 //         );
+//       }
+
+//       // ✅ NEW: Create Shopify fulfillment
+//       if (order.shopifyOrderId) {
+//         // ✅ MOVE: Declare outside try block so it's available in catch
+//         let itemsToFulfill: Array<{
+//           variantId?: string;
+//           sku: string;
+//           quantity: number;
+//         }> = [];
+
+//         try {
+//           console.log(
+//             `📦 Creating Shopify fulfillment for order ${order.shopifyOrderId}`
+//           );
+
+//           // Determine which items are being shipped
+//           if (isBackOrderShipment) {
+//             // Back order shipment - fulfill only back-ordered items
+//             console.log(`📦 This is a BACK ORDER shipment`);
+
+//             const backOrderProductIds = activeBackOrders.map(
+//               (bo) => bo.productVariantId
+//             );
+
+//             for (const item of order.items) {
+//               if (backOrderProductIds.includes(item.productVariantId)) {
+//                 const backOrder = activeBackOrders.find(
+//                   (bo) => bo.productVariantId === item.productVariantId
+//                 );
+
+//                 itemsToFulfill.push({
+//                   variantId: item.productVariant.shopifyVariantId
+//                     ? `gid://shopify/ProductVariant/${item.productVariant.shopifyVariantId}`
+//                     : undefined,
+//                   sku: item.productVariant.sku,
+//                   quantity: backOrder?.quantityBackOrdered || item.quantity,
+//                 });
+//               }
+//             }
+//           } else {
+//             // ✅ FIXED: Initial shipment - fulfill only what we ACTUALLY shipped
+//             console.log(`📦 This is an INITIAL shipment`);
+
+//             // ✅ Build map of what we actually shipped (from reservations released)
+//             const shippedQuantities = new Map<string, number>();
+
+//             for (const reservation of reservationsToRelease) {
+//               const currentQty =
+//                 shippedQuantities.get(reservation.productVariantId) || 0;
+//               shippedQuantities.set(
+//                 reservation.productVariantId,
+//                 currentQty + reservation.quantity
+//               );
+//             }
+
+//             console.log(
+//               `📦 Actually shipped quantities:`,
+//               Object.fromEntries(shippedQuantities)
+//             );
+
+//             // ✅ Only fulfill items we actually shipped with correct quantities
+//             itemsToFulfill = order.items
+//               .filter((item) => shippedQuantities.has(item.productVariantId))
+//               .map((item) => {
+//                 const shippedQty =
+//                   shippedQuantities.get(item.productVariantId) || 0;
+
+//                 return {
+//                   variantId: item.productVariant.shopifyVariantId
+//                     ? `gid://shopify/ProductVariant/${item.productVariant.shopifyVariantId}`
+//                     : undefined,
+//                   sku: item.productVariant.sku,
+//                   quantity: shippedQty, // ✅ Use ACTUAL shipped quantity
+//                 };
+//               });
+
+//             const totalShipping = itemsToFulfill.reduce(
+//               (sum, i) => sum + i.quantity,
+//               0
+//             );
+//             console.log(
+//               `📦 Fulfilling ${totalShipping} units in Shopify (may be partial)`
+//             );
+//           }
+
+//           // Create fulfillment in Shopify
+//           const fulfillmentResult = await updateShopifyFulfillment({
+//             orderId: order.shopifyOrderId,
+//             trackingNumber: label.tracking_number,
+//             trackingUrl: label.tracking_url,
+//             trackingCompany: getShopifyCarrierName(carrierCode),
+//             lineItems: itemsToFulfill,
+//             notifyCustomer: true,
+//             isBackOrder: isBackOrderShipment,
+//           });
+
+//           console.log(
+//             `✅ Shopify fulfillment created: ${fulfillmentResult.fulfillmentId}`
+//           );
+
+//           // Store Shopify fulfillment ID
+//           await tx.order.update({
+//             where: { id: order.id },
+//             data: {
+//               shopifyFulfillmentIds: order.shopifyFulfillmentIds
+//                 ? `${order.shopifyFulfillmentIds},${fulfillmentResult.fulfillmentId}`
+//                 : fulfillmentResult.fulfillmentId,
+//             },
+//           });
+//         } catch (shopifyError) {
+//           // ⚠️ Log but don't fail the entire shipment if Shopify update fails
+//           console.error(
+//             "⚠️ Failed to create Shopify fulfillment:",
+//             shopifyError
+//           );
+
+//           // ✅ Create a sync task for manual retry later (no cron job needed)
+//           await tx.shopifySync.create({
+//             data: {
+//               orderId: order.id,
+//               syncType: "FULFILLMENT",
+//               status: "PENDING",
+//               attempts: 0,
+//               data: {
+//                 trackingNumber: label.tracking_number,
+//                 trackingUrl: label.tracking_url,
+//                 carrier: carrierCode,
+//                 isBackOrder: isBackOrderShipment,
+//                 itemsToFulfill, // ✅ Now accessible here
+//               },
+//               error:
+//                 shopifyError instanceof Error
+//                   ? shopifyError.message
+//                   : "Unknown error",
+//             },
+//           });
+
+//           console.log("📝 Shopify sync task created for manual retry");
+//         }
 //       }
 
 //       // ✅ CHECK: Are there still pending back orders?

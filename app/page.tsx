@@ -15,7 +15,7 @@ const Page = () => {
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-tr from-[#1c0c70] to-[#160a2a] flex justify-center items-center overflow-hidden">
+    <div className="relative min-h-screen w-full bg-gradient-to-tr from-blue-800 to-[#160a2a] flex justify-center items-center overflow-hidden">
       {/* Logo */}
       <Image
         src={"/images/headquarter-logo.webp"}

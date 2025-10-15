@@ -564,14 +564,14 @@ export default function EnhancedPackingInterface() {
                             {item.sku} • {item.weightOz.toFixed(2)} oz each
                           </div>
                           {/* ✅ NEW: Show if this item was back-ordered */}
-                          {item.quantityBackOrdered &&
+                          {/* {item.quantityBackOrdered &&
                             item.quantityBackOrdered > 0 && (
                               <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3" />
                                 {item.quantityBackOrdered} unit(s) previously
                                 back-ordered
                               </div>
-                            )}
+                            )} */}
                         </div>
                         <div className="text-right ml-4">
                           <div className="font-semibold">×{item.quantity}</div>
@@ -582,9 +582,9 @@ export default function EnhancedPackingInterface() {
                                 of {item.originalQuantity}
                               </div>
                             )}
-                          {verifiedItems.has(item.id) && (
+                          {/* {verifiedItems.has(item.id) && (
                             <CheckCircle className="w-4 h-4 text-green-600 ml-auto mt-1" />
-                          )}
+                          )} */}
                         </div>
                       </div>
                     </div>

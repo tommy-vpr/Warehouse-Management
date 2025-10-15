@@ -222,6 +222,22 @@ export async function reserveOrderInventory({
         data: backOrdersToCreate,
       });
 
+      // Create inventory transaction for each back order created
+      for (const backOrderData of backOrdersToCreate) {
+        await tx.inventoryTransaction.create({
+          data: {
+            productVariantId: backOrderData.productVariantId,
+            locationId: null, // No specific location yet
+            transactionType: "ADJUSTMENT",
+            quantityChange: 0, // Informational only
+            referenceId: orderId,
+            referenceType: "BACKORDER_CREATED",
+            userId,
+            notes: `Back order created: ${backOrderData.quantityBackOrdered} units - ${backOrderData.reason} - ${backOrderData.reasonDetails}`,
+          },
+        });
+      }
+
       // Update order to indicate it has back orders
       await tx.order.update({
         where: { id: orderId },
