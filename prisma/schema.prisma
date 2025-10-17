@@ -582,12 +582,29 @@ model ShippingPackage {
   weight         Decimal? @db.Decimal(8,2)
   dimensions     Json?
 
+  items          PackageItem[]
+
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@map("shipping_packages")
+}
+
+model PackageItem {
+  id              String          @id @default(cuid())
+  packageId       String
+  productName     String
+  sku             String
+  quantity        Int
+  unitPrice       Decimal         @db.Decimal(10,2)
+  
+  package         ShippingPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime        @default(now())
+  
+  @@map("package_items")
 }
 
 // ---------------------------------------------------

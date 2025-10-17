@@ -13,21 +13,19 @@ export const InventorySkeleton = () => (
         <td className="px-4 py-4">
           <div className="h-6 bg-gray-200 dark:bg-zinc-700 rounded-full w-20"></div>
         </td>
-        <td className="px-4 py-4">
-          <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-24"></div>
-        </td>
+
         <td className="px-4 py-4">
           <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-16"></div>
         </td>
         <td className="px-4 py-4">
           <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-24"></div>
         </td>
-        <td className="px-4 py-4">
+        {/* <td className="px-4 py-4">
           <div className="flex gap-1">
             <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
             <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
           </div>
-        </td>
+        </td> */}
       </tr>
     ))}
   </tbody>

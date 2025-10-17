@@ -313,7 +313,8 @@ export default function BackOrdersDashboard() {
       case "PACKED":
         return {
           label: "Create Label",
-          action: `/dashboard/shipping/create-label/${backOrder.orderId}`,
+          // action: `/dashboard/shipping/create-label/${backOrder.orderId}`,
+          action: `/dashboard/packing/pack/${backOrder.orderId}`,
           disabled: false,
           colorClass: "bg-background",
           isLink: true,

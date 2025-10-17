@@ -69,7 +69,8 @@ export default function OrderDetailView({
       const navigationMap: Record<string, string> = {
         VIEW_PICK_PROGRESS: "/dashboard/picking",
         PACK_ORDER: `/dashboard/packing/pack/${orderId}`,
-        CREATE_LABEL: `/dashboard/shipping/create-label/${orderId}`,
+        CREATE_LABEL: `/dashboard/packing/pack/${orderId}`,
+        // action: `/dashboard/packing/pack/${backOrder.orderId}`,
         SPLIT_ORDER: `/dashboard/shipping/split/${orderId}`,
         VIEW_TRACKING: `/dashboard/shipping/tracking/${orderId}`,
       };
@@ -759,7 +760,6 @@ export default function OrderDetailView({
                                   <h4 className="font-medium flex items-center gap-2">
                                     <span className="bg-violet-100 dark:bg-violet-900 text-violet-800 dark:text-violet-200 px-2 py-1 rounded text-xs">
                                       Shipment {index + 1}
-                                      {/* {index > 0 && " (Back Order)"} */}
                                     </span>
                                   </h4>
                                   <p className="text-xs text-gray-500 mt-1">
@@ -808,6 +808,40 @@ export default function OrderDetailView({
                                   </p>
                                 </div>
                               </div>
+
+                              {/* ✅ ADD: Package Contents */}
+                              {pkg.items && pkg.items.length > 0 && (
+                                <div className="mb-3 border-t pt-3">
+                                  <h5 className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-2">
+                                    Package Contents ({pkg.items.length} items)
+                                  </h5>
+                                  <div className="space-y-1">
+                                    {pkg.items.map((item) => (
+                                      <div
+                                        key={item.id}
+                                        className="flex justify-between items-center text-xs border border-gray-200 dark:border-zinc-600 p-2 px-4 rounded w-fit"
+                                      >
+                                        <div className="flex-1">
+                                          <p className="font-medium">
+                                            {item.productName}{" "}
+                                            <span className="ml-4">
+                                              ×{item.quantity}
+                                            </span>
+                                          </p>
+                                          <p className="text-gray-500">
+                                            SKU: {item.sku}
+                                          </p>
+                                        </div>
+                                        {/* <div className="text-right ml-4">
+                                          <p className="font-medium text-[16px]">
+                                            ×{item.quantity}
+                                          </p>
+                                        </div> */}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
                               <div className="flex gap-2">
                                 <Button

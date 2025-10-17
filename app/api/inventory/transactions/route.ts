@@ -105,18 +105,18 @@ export async function POST(request: NextRequest) {
         });
 
         // Notify the confirmer via Ably
-        await notifyUser(confirmerId, {
-          type: "TRANSFER_CONFIRMATION",
-          title: "Transfer Confirmation Required",
-          message: `${
-            requestingUser?.name || "Someone"
-          } requests transfer of ${quantityChange} ${
-            product?.product.name
-          } from ${fromLocation?.name} to ${toLocation?.name}`,
-          // link: `/dashboard/inventory/transfers/pending/${transferRequest.id}`,
-          link: `/dashboard/inventory/transfers/${transferRequest.id}`,
-          timestamp: new Date().toISOString(),
-        });
+        // await notifyUser(confirmerId, {
+        //   type: "TRANSFER_CONFIRMATION",
+        //   title: "Transfer Confirmation Required",
+        //   message: `${
+        //     requestingUser?.name || "Someone"
+        //   } requests transfer of ${quantityChange} ${
+        //     product?.product.name
+        //   } from ${fromLocation?.name} to ${toLocation?.name}`,
+        //   // link: `/dashboard/inventory/transfers/pending/${transferRequest.id}`,
+        //   link: `/dashboard/inventory/transfers/${transferRequest.id}`,
+        //   timestamp: new Date().toISOString(),
+        // });
 
         // Create database notification
         await tx.notification.create({

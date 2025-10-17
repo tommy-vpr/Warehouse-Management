@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
       packages,
       shippingAddress,
       notes,
+      items,
     } = await request.json();
 
     // Basic validation
@@ -323,10 +324,11 @@ export async function POST(request: NextRequest) {
       console.log(`📦 Number of packages: ${numberOfPackages}`);
       console.log(`💵 Cost per package: $${costPerPackage}`);
 
-      // Create shippingPackages rows
+      // Create shipping packages WITH ITEMS
       const shippingPackages = await Promise.all(
         labelPackages.map((pkg: any, idx: number) => {
           const originalPackage = packages[Math.min(idx, packages.length - 1)];
+
           return tx.shippingPackage.create({
             data: {
               orderId: order.id,
@@ -345,6 +347,15 @@ export async function POST(request: NextRequest) {
                 width: pkg.dimensions?.width || originalPackage?.width || 8,
                 height: pkg.dimensions?.height || originalPackage?.height || 6,
                 unit: "inch",
+              },
+              // ✅ NEW: Create package items from the items array sent by frontend
+              items: {
+                create: (items || []).map((item: any) => ({
+                  productName: item.productName,
+                  sku: item.sku,
+                  quantity: item.quantity,
+                  unitPrice: new Prisma.Decimal(item.unitPrice),
+                })),
               },
             },
           });
@@ -643,6 +654,11 @@ export async function POST(request: NextRequest) {
         );
 
         if (itemsToFulfill.length > 0) {
+          console.log(
+            "Items to fulfill:",
+            JSON.stringify(itemsToFulfill, null, 2)
+          );
+
           const fulfillmentResult = await updateShopifyFulfillment({
             orderId: order.shopifyOrderId,
             trackingNumber: label.tracking_number,
@@ -670,9 +686,25 @@ export async function POST(request: NextRequest) {
           console.warn(
             "⚠️ No Shopify line items to fulfill for this shipment."
           );
+          console.warn("itemsToFulfill was empty!");
+          console.warn(
+            "backOrderFulfilledDetails:",
+            JSON.stringify(backOrderFulfilledDetails, null, 2)
+          );
+          console.warn(
+            "reservationsReleasedDetails:",
+            JSON.stringify(reservationsReleasedDetails, null, 2)
+          );
         }
       } catch (shopifyError) {
         console.error("⚠️ Failed to create Shopify fulfillment:", shopifyError);
+        console.error("Error details:", {
+          message:
+            shopifyError instanceof Error
+              ? shopifyError.message
+              : String(shopifyError),
+          stack: shopifyError instanceof Error ? shopifyError.stack : undefined,
+        });
         // Record a sync task for manual retry
         await prisma.shopifySync.create({
           data: {

@@ -300,7 +300,8 @@ export default function OrdersManagementDashboard() {
         return;
       } else if (action === "CREATE_LABEL") {
         // Navigate to shipping label creation
-        window.location.href = `/dashboard/shipping/create-label/${orderId}`;
+        // window.location.href = `/dashboard/shipping/create-label/${orderId}`;
+        window.location.href = `/dashboard/packing/pack/${orderId}`;
         return;
       } else if (action === "MARK_FULFILLED") {
         // Mark order as fulfilled
@@ -888,8 +889,8 @@ export default function OrdersManagementDashboard() {
                         <td className="px-4 py-4">
                           <Link
                             href={`/dashboard/orders/${order.id}`}
-                            className="cursor-pointer text-xs text-gray-400 dark:text-gray-400 
-                            hover:text-gray-500 dark:hover:text-gray-200 transition flex items-center gap-2"
+                            className="cursor-pointer text-xs dark:text-gray-200 
+                             dark:hover:text-gray-100 transition flex items-center gap-2"
                           >
                             View
                             <SquareArrowOutUpRight size={12} />

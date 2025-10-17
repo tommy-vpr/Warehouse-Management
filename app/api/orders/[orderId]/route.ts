@@ -207,7 +207,11 @@ export async function GET(
             },
           },
         },
-        packages: true, // Include shipping packages
+        packages: {
+          include: {
+            items: true, // ✅ ADD THIS
+          },
+        },
       },
     });
 
@@ -293,6 +297,13 @@ export async function GET(
       weight: pkg.weight ? pkg.weight.toString() : "0",
       dimensions: pkg.dimensions, // This is already Json type
       createdAt: pkg.createdAt.toISOString(),
+      items: pkg.items.map((item) => ({
+        id: item.id,
+        productName: item.productName,
+        sku: item.sku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+      })),
     }));
 
     // Calculate priority

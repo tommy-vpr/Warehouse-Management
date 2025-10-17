@@ -1,3 +1,4 @@
+// app/api/notifications/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
@@ -10,20 +11,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const notifications = await prisma.notification.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") || "0");
 
-    const unreadCount = await prisma.notification.count({
-      where: {
-        userId: session.user.id,
-        read: false,
-      },
-    });
+    const skip = page * limit;
 
-    return NextResponse.json({ notifications, unreadCount });
+    const [notifications, unreadCount, total] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: skip,
+      }),
+      prisma.notification.count({
+        where: {
+          userId: session.user.id,
+          read: false,
+        },
+      }),
+      prisma.notification.count({
+        where: { userId: session.user.id },
+      }),
+    ]);
+
+    return NextResponse.json({ notifications, unreadCount, total });
   } catch (error) {
     console.error("Error fetching notifications:", error);
     return NextResponse.json(

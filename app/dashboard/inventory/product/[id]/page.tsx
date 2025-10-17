@@ -7,32 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
-  Package,
   MapPin,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  DollarSign,
   Weight,
-  Ruler,
-  BarChart3,
-  History,
+  Activity,
+  Waves,
   AlertTriangle,
   Edit,
   Save,
   X,
-  Plus,
-  Minus,
   RefreshCw,
-  Camera,
-  FileText,
   ShoppingCart,
-  Archive,
-  Activity,
-  Waves,
   ArrowRightLeft,
   Check,
   Loader2,
+  Search,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -107,9 +95,9 @@ type SimpleLocation = {
   id: string;
   name: string;
   type: string;
-  zone: string | null;
-  isPickable: boolean;
-  isReceivable: boolean;
+  zone?: string | null;
+  isPickable?: boolean;
+  isReceivable?: boolean;
 };
 
 export default function ProductDetailPage() {
@@ -134,6 +122,22 @@ export default function ProductDetailPage() {
     reason: "",
     confirmerId: "",
   });
+
+  // New state for destination location search
+  const [showDestinationSearch, setShowDestinationSearch] = useState(false);
+  const [destinationSearchQuery, setDestinationSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [selectedNewLocation, setSelectedNewLocation] =
+    useState<SimpleLocation | null>(null);
+
+  // Debounce search query
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(destinationSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [destinationSearchQuery]);
 
   // Query to fetch users
   const { data: confirmUsers } = useQuery({
@@ -161,22 +165,36 @@ export default function ProductDetailPage() {
       }
       return response.json();
     },
-    enabled: !!productVariantId && typeof window !== "undefined", // Only run on client
+    enabled: !!productVariantId && typeof window !== "undefined",
     staleTime: 30000,
     retry: 1,
   });
 
-  const { data: allLocations } = useQuery<SimpleLocation[]>({
-    queryKey: ["locations", "simple"],
+  // Fetch all locations once when searching starts
+  const { data: allLocations, isLoading: isSearchingLocations } = useQuery<
+    SimpleLocation[]
+  >({
+    queryKey: ["locations"],
     queryFn: async () => {
-      const response = await fetch(
-        "/api/inventory/locations/transfer?simple=true"
-      ); // Add simple=true
+      const response = await fetch("/api/locations");
       if (!response.ok) throw new Error("Failed to fetch locations");
       return response.json();
     },
+    enabled: debouncedSearchQuery.length >= 2,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Filter locations on client side based on search query
+  const searchedLocations = React.useMemo(() => {
+    if (!allLocations || debouncedSearchQuery.length < 2) return [];
+
+    const query = debouncedSearchQuery.toLowerCase();
+    return allLocations.filter(
+      (loc) =>
+        loc.name.toLowerCase().includes(query) ||
+        loc.type.toLowerCase().includes(query)
+    );
+  }, [allLocations, debouncedSearchQuery]);
 
   // Update product mutation
   const updateMutation = useMutation({
@@ -207,7 +225,6 @@ export default function ProductDetailPage() {
     },
   });
 
-  // Transaction mutation
   // Transaction mutation
   const transactionMutation = useMutation({
     mutationFn: async (data: {
@@ -245,6 +262,8 @@ export default function ProductDetailPage() {
         reason: "",
         confirmerId: "",
       });
+      setShowDestinationSearch(false);
+      setDestinationSearchQuery("");
     },
     onError: (error: Error) => {
       alert(`Error creating transaction: ${error.message}`);
@@ -273,7 +292,7 @@ export default function ProductDetailPage() {
             toLocationId: transactionData.toLocationId,
             notes: transactionData.notes,
             referenceType: "MANUAL",
-            confirmerId: transactionData.confirmerId, // ⭐ Add this
+            confirmerId: transactionData.confirmerId,
           }
         : {
             productVariantId,
@@ -424,7 +443,7 @@ export default function ProductDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       Product Name
                     </label>
                     {isEditing ? (
@@ -441,7 +460,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       SKU
                     </label>
                     <p className="text-gray-900 dark:text-gray-200 font-mono">
@@ -449,7 +468,7 @@ export default function ProductDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       UPC
                     </label>
                     {isEditing ? (
@@ -466,7 +485,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       Category
                     </label>
                     {isEditing ? (
@@ -486,7 +505,7 @@ export default function ProductDetailPage() {
 
                 {product.description && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       Description
                     </label>
                     {isEditing ? (
@@ -510,58 +529,8 @@ export default function ProductDetailPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
-                      <DollarSign className="w-4 h-4 inline mr-1 dark:text-emerald-500" />
-                      Cost Price
-                    </label>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editForm.costPrice || ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            costPrice: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    ) : (
-                      <p className="text-gray-900 dark:text-gray-200">
-                        {product.costPrice
-                          ? `${product.costPrice.toFixed(2)}`
-                          : "Not set"}
-                      </p>
-                    )}
-                  </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
-                      <DollarSign className="w-4 h-4 inline mr-1" />
-                      Selling Price
-                    </label>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editForm.sellingPrice || ""}
-                        onChange={(e) =>
-                          setEditForm({
-                            ...editForm,
-                            sellingPrice: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    ) : (
-                      <p className="text-gray-900 dark:text-gray-200">
-                        {product.sellingPrice
-                          ? `${product.sellingPrice.toFixed(2)}`
-                          : "Not set"}
-                      </p>
-                    )}
-                  </div> */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       <Weight className="w-4 h-4 inline mr-1" />
                       Weight (oz)
                     </label>
@@ -590,7 +559,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       <Waves className="w-4 h-4 inline mr-1" />
                       Volume
                     </label>
@@ -613,7 +582,7 @@ export default function ProductDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-500 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-500 mb-1">
                       <Activity className="w-4 h-4 inline mr-1" />
                       Strength
                     </label>
@@ -646,7 +615,7 @@ export default function ProductDetailPage() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold">
                       {product.totalQuantity}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -654,7 +623,7 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
+                    <div className="text-2xl font-bold">
                       {product.totalReserved}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -839,7 +808,6 @@ export default function ProductDetailPage() {
                   <ArrowRightLeft className="w-4 h-4 mr-2" />
                   Transfer Stock
                 </Button>
-                {/* Only show if CRITICAL AND no recent reorder request */}
                 {product.reorderStatus === "CRITICAL" &&
                   !hasRecentReorderRequest && (
                     <Button
@@ -894,7 +862,6 @@ export default function ProductDetailPage() {
                       )}
                     </Button>
                   )}
-                {/* Optional: Show a message if reorder already requested */}
                 {product.reorderStatus === "CRITICAL" &&
                   hasRecentReorderRequest && (
                     <div className="p-2 bg-green-200 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
@@ -918,10 +885,9 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Transaction Modal */}
-        {/* Transaction Modal */}
         {showTransactionModal && (
           <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50">
-            <div className="bg-background rounded-lg border border-gray-200 dark:border-zinc-800 p-6 w-full max-w-md">
+            <div className="bg-background rounded-lg border border-gray-200 dark:border-zinc-800 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-medium mb-4">Stock Adjustment</h3>
 
               <div className="space-y-4">
@@ -936,7 +902,6 @@ export default function ProductDetailPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="ADJUSTMENT">Adjustment</option>
-                    {/* <option value="COUNT">Cycle Count</option> */}
                     <option value="TRANSFER">Transfer</option>
                   </select>
                 </div>
@@ -944,6 +909,7 @@ export default function ProductDetailPage() {
                 {/* Conditional Location Inputs */}
                 {transactionType === "TRANSFER" ? (
                   <>
+                    {/* FROM LOCATION - Only locations with stock */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         From Location
@@ -956,7 +922,7 @@ export default function ProductDetailPage() {
                             locationId: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-200"
                       >
                         <option value="">Select source location</option>
                         {product.locations.map((location) => (
@@ -967,33 +933,178 @@ export default function ProductDetailPage() {
                       </select>
                     </div>
 
+                    {/* TO LOCATION - Always show locations with SKU + search for new */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                         To Location
                       </label>
-                      <select
-                        value={transactionData.toLocationId}
-                        onChange={(e) =>
-                          setTransactionData({
-                            ...transactionData,
-                            toLocationId: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
-                      >
-                        <option value="">Select destination location</option>
-                        {allLocations?.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.name}
-                          </option>
-                        ))}
-                      </select>
+
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Select from existing locations or search to add new.
+                      </p>
+
+                      {/* Always visible dropdown showing locations with SKU */}
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-md mb-2 max-h-48 overflow-y-auto bg-white dark:bg-gray-800">
+                        {product?.locations && product.locations.length > 0 ? (
+                          product.locations.map((location) => (
+                            <button
+                              key={location.id}
+                              type="button"
+                              onClick={() => {
+                                setTransactionData({
+                                  ...transactionData,
+                                  toLocationId: location.id,
+                                });
+                                setSelectedNewLocation(null); // Clear since it's from existing locations
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 ${
+                                transactionData.toLocationId === location.id
+                                  ? "bg-blue-50 dark:bg-blue-900/20"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                  {location.name}
+                                </div>
+                                <Badge
+                                  variant="default"
+                                  className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                >
+                                  {location.quantity} units
+                                </Badge>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {location.type}
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                            No locations with this SKU yet
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Search to add new location */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                          Or Add New Location
+                        </label>
+                        <div className="relative mb-2">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <Input
+                            type="text"
+                            placeholder="Search for new location..."
+                            value={destinationSearchQuery}
+                            onChange={(e) => {
+                              setDestinationSearchQuery(e.target.value);
+                              if (!showDestinationSearch) {
+                                setShowDestinationSearch(true);
+                              }
+                            }}
+                            onFocus={() => setShowDestinationSearch(true)}
+                            className="pl-10"
+                          />
+                          {isSearchingLocations && (
+                            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+                          )}
+                        </div>
+
+                        {/* Search Results Dropdown */}
+                        {showDestinationSearch &&
+                          debouncedSearchQuery.length >= 2 && (
+                            <div className="border border-gray-300 dark:border-gray-600 rounded-md max-h-48 overflow-y-auto bg-white dark:bg-gray-800">
+                              {isSearchingLocations ? (
+                                <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                                  Searching...
+                                </div>
+                              ) : searchedLocations &&
+                                searchedLocations.length > 0 ? (
+                                searchedLocations
+                                  .filter(
+                                    (loc) =>
+                                      !product?.locations.some(
+                                        (pLoc) => pLoc.id === loc.id
+                                      )
+                                  )
+                                  .map((location) => (
+                                    <button
+                                      key={location.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setTransactionData({
+                                          ...transactionData,
+                                          toLocationId: location.id,
+                                        });
+                                        setSelectedNewLocation(location);
+                                        setDestinationSearchQuery("");
+                                        setShowDestinationSearch(false);
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                                          {location.name}
+                                        </div>
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          New Location
+                                        </Badge>
+                                      </div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        {location.type}
+                                      </div>
+                                    </button>
+                                  ))
+                              ) : (
+                                <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                                  No additional locations found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                      </div>
+
+                      {/* Selected Location Display */}
+                      {transactionData.toLocationId && (
+                        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-center justify-between">
+                          <div className="flex-1">
+                            <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                              Selected Location:
+                            </span>
+                            <div className="text-sm text-blue-900 dark:text-blue-200 font-medium">
+                              {product?.locations.find(
+                                (l) => l.id === transactionData.toLocationId
+                              )?.name ||
+                                selectedNewLocation?.name ||
+                                "Unknown Location"}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransactionData({
+                                ...transactionData,
+                                toLocationId: "",
+                              });
+                              setSelectedNewLocation(null);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* ⭐ Add Confirmer Dropdown */}
+                    {/* Confirmer Dropdown */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                        Assign Confirmer <span className="text-red-500">*</span>
+                        Assign Confirmer <span className="text-red-400">*</span>
                       </label>
                       <select
                         value={transactionData.confirmerId}
@@ -1003,7 +1114,7 @@ export default function ProductDetailPage() {
                             confirmerId: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-200"
                         required
                       >
                         <option value="">Select a confirmer...</option>
@@ -1021,8 +1132,6 @@ export default function ProductDetailPage() {
                 ) : (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                      {/* Location{" "}
-                      {transactionType === "ADJUSTMENT" && "(Optional)"} */}
                       Location
                     </label>
                     <select
@@ -1090,7 +1199,7 @@ export default function ProductDetailPage() {
                         notes: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-200"
                     rows={3}
                     placeholder="Reason for adjustment..."
                   />
@@ -1100,7 +1209,12 @@ export default function ProductDetailPage() {
               <div className="flex gap-3 mt-6">
                 <Button
                   variant="outline"
-                  onClick={() => setShowTransactionModal(false)}
+                  onClick={() => {
+                    setShowTransactionModal(false);
+                    setShowDestinationSearch(false);
+                    setDestinationSearchQuery("");
+                    setSelectedNewLocation(null);
+                  }}
                   className="flex-1 cursor-pointer"
                 >
                   Cancel
@@ -1113,14 +1227,14 @@ export default function ProductDetailPage() {
                     (transactionType === "TRANSFER" &&
                       (!transactionData.locationId ||
                         !transactionData.toLocationId ||
-                        !transactionData.confirmerId)) // Add confirmerId check
+                        !transactionData.confirmerId))
                   }
                   className="flex-1 cursor-pointer"
                 >
                   {transactionMutation.isPending
                     ? "Processing..."
                     : transactionType === "TRANSFER"
-                    ? "Request Transfer" // Change button text
+                    ? "Request Transfer"
                     : "Apply Change"}
                 </Button>
               </div>

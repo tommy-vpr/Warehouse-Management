@@ -67,6 +67,13 @@ export interface ShippingPackage {
   weight: string;
   dimensions: PackageDimensions;
   createdAt: string;
+  items: Array<{
+    id: string;
+    productName: string;
+    sku: string;
+    quantity: number;
+    unitPrice: string;
+  }>;
 }
 
 export interface OrderDetailResponse {

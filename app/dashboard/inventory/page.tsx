@@ -21,6 +21,7 @@ import {
   History,
   Repeat2,
   Loader2,
+  CloudDownload,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { InventorySkeleton } from "@/components/skeleton/Inventory";
@@ -28,6 +29,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
 import { CreateItemModal } from "@/components/modal/CreateItemModal";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useSession } from "next-auth/react";
 
 interface InventoryItem {
   inventoryId: string;
@@ -93,6 +107,21 @@ export default function InventoryDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  const { data: session, status } = useSession();
+
+  // Add state for sync status
+  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
+  const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const isAdmin =
+    session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER";
+
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchTerm]);
@@ -130,6 +159,46 @@ export default function InventoryDashboard() {
   const inventory = data?.inventory || [];
   const stats = data?.stats;
   const totalPages = data?.totalPages || 1;
+
+  // Add sync mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/inventory-planner/sync-inventory", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Sync failed");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        variant: "success",
+        title: "✅ Sync Successful!",
+        description: `Updated ${data.updated} items, ${data.unchanged} unchanged.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "❌ Sync Failed",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleSyncClick = () => {
+    setConfirmSyncOpen(true);
+  };
+
+  const handleSyncConfirm = () => {
+    setConfirmSyncOpen(false);
+    syncMutation.mutate();
+  };
 
   // Mutation for inventory actions
   const actionMutation = useMutation({
@@ -258,6 +327,27 @@ export default function InventoryDashboard() {
               </p>
             </div>
             <div className="flex gap-3">
+              {/* Sync Inventory from inventory planner */}
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  onClick={handleSyncClick}
+                  disabled={syncMutation.isPending}
+                  className="cursor-pointer transition bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 border-green-200 dark:border-green-800"
+                >
+                  {syncMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <CloudDownload className="w-4 h-4 mr-2 text-green-400" />
+                      Sync from IP
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() =>
@@ -474,15 +564,15 @@ export default function InventoryDashboard() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Location(s)
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Value
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Last Count
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
-                    </th>
+                    </th> */}
                   </tr>
                 </thead>
                 {isFiltering ? (
@@ -575,7 +665,7 @@ export default function InventoryDashboard() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-4">
+                          {/* <td className="px-4 py-4">
                             <div>
                               {item.costPrice ? (
                                 <div className="text-sm">
@@ -599,7 +689,7 @@ export default function InventoryDashboard() {
                                 </div>
                               )}
                             </div>
-                          </td>
+                          </td> */}
                           <td className="px-4 py-4">
                             <div className="text-sm">
                               {mounted && item.lastCounted ? (
@@ -623,7 +713,7 @@ export default function InventoryDashboard() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-4">
+                          {/* <td className="px-4 py-4">
                             <div className="flex gap-1">
                               <Button
                                 className="cursor-pointer"
@@ -670,7 +760,7 @@ export default function InventoryDashboard() {
                                   </Button>
                                 )}
                             </div>
-                          </td>
+                          </td> */}
                         </tr>
 
                         {/* Expanded Location Details */}
@@ -783,6 +873,25 @@ export default function InventoryDashboard() {
         )}
       </div>
       <CreateItemModal open={createOpen} onOpenChange={setCreateOpen} />
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmSyncOpen} onOpenChange={setConfirmSyncOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sync from Inventory Planner?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update all inventory quantities from Inventory Planner.
+              The process may take a few minutes depending on the number of
+              products.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSyncConfirm}>
+              Yes, Sync Now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

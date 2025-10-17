@@ -211,7 +211,7 @@ export default function ShippingLabelForm({
         return updatedShipments;
       });
 
-      dimensionsAppliedRef.current = true;
+      dimensionsAppliedRef.current = true; // Mark as applied
     }
   }, [initialWeight, initialDimensions, shipments.length]);
 
@@ -247,8 +247,10 @@ export default function ShippingLabelForm({
         {
           id: generateId(),
           packageCode: "",
+          // ✅ Use initialWeight from props
           weight: initialWeight ? initialWeight.toString() : "",
           dimensions: {
+            // ✅ Use initialDimensions from props
             length: initialDimensions?.length?.toString() || "12",
             width: initialDimensions?.width?.toString() || "10",
             height: initialDimensions?.height?.toString() || "6",
@@ -259,9 +261,9 @@ export default function ShippingLabelForm({
     };
 
     setShipments([initialShipment]);
-    dimensionsAppliedRef.current = false;
+    dimensionsAppliedRef.current = false; // Reset when initializing
   };
-
+  // ✅ CHECK: Is current carrier Stamps.com?
   const isStampsCarrier = (carrierId: string): boolean => {
     const carrier = carriers.find((c) => c.carrier_id === carrierId);
     return carrier?.carrier_code === "stamps_com" || false;
@@ -276,7 +278,7 @@ export default function ShippingLabelForm({
           id: generateId(),
           name: "Shipment 2",
           items: [],
-          carrierId: shipments[0].carrierId,
+          carrierId: "",
           serviceCode: "",
           packages: [
             {
@@ -293,19 +295,13 @@ export default function ShippingLabelForm({
   };
 
   const createNewShipment = () => {
-    const firstShipment = shipments[0];
-    const inheritedCarrierId = splitMode ? firstShipment?.carrierId || "" : "";
-
-    // ✅ For Stamps.com in split mode, ensure only 1 package per shipment
-    const isStamps = inheritedCarrierId && isStampsCarrier(inheritedCarrierId);
-
     setShipments([
       ...shipments,
       {
         id: generateId(),
         name: `Shipment ${shipments.length + 1}`,
         items: [],
-        carrierId: inheritedCarrierId,
+        carrierId: "",
         serviceCode: "",
         packages: [
           {
@@ -341,6 +337,7 @@ export default function ShippingLabelForm({
     );
   };
 
+  // ✅ NEW: Add multiple packages at once (for UPS)
   const addMultiplePackages = (shipmentId: string, count: number) => {
     const newPackages: PackageConfig[] = [];
     for (let i = 0; i < count; i++) {
@@ -363,7 +360,7 @@ export default function ShippingLabelForm({
       )
     );
 
-    setNumberOfPackages("");
+    setNumberOfPackages(""); // Clear input after adding
   };
 
   const removePackageFromShipment = (shipmentId: string, packageId: string) => {
@@ -410,15 +407,7 @@ export default function ShippingLabelForm({
 
   const removeShipment = (shipmentId: string) => {
     if (shipments.length <= 1) return;
-
-    const updatedShipments = shipments.filter((s) => s.id !== shipmentId);
-
-    const renumberedShipments = updatedShipments.map((shipment, index) => ({
-      ...shipment,
-      name: `Shipment ${index + 1}`,
-    }));
-
-    setShipments(renumberedShipments);
+    setShipments(shipments.filter((s) => s.id !== shipmentId));
   };
 
   const addItemToShipment = (
@@ -624,12 +613,6 @@ export default function ShippingLabelForm({
             `${shipment.name} - Items: ${shipment.items
               .map((i) => `${i.sku}(${i.quantity})`)
               .join(", ")}`,
-          items: shipment.items.map((item) => ({
-            productName: item.productName,
-            sku: item.sku,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-          })),
         };
 
         const response = await fetch("/api/shipping/shipengine/create-label", {
@@ -673,6 +656,7 @@ export default function ShippingLabelForm({
     }
   };
 
+  // ✅ FIXED: Smart package generation with weight distribution
   const addMultiplePackagesWithWeightDistribution = (
     shipmentId: string,
     count: number
@@ -680,13 +664,16 @@ export default function ShippingLabelForm({
     const shipment = shipments.find((s) => s.id === shipmentId);
     if (!shipment) return;
 
+    // Calculate total weight from SHIPMENT items (not all order items)
     const totalWeightOz = shipment.items.reduce((sum, item) => {
       return sum + (item.weightOz || 0) * item.quantity;
     }, 0);
     const totalWeightLbs = totalWeightOz / 16;
 
+    // Divide weight evenly across packages
     const weightPerPackage = (totalWeightLbs / count).toFixed(2);
 
+    // Get the first package config to copy settings from
     const firstPackage = shipment.packages[0];
     const defaultPackageCode = firstPackage?.packageCode || "";
     const defaultDimensions = firstPackage?.dimensions || {
@@ -695,30 +682,31 @@ export default function ShippingLabelForm({
       height: "6",
     };
 
+    // ✅ CREATE NEW PACKAGES (not add to existing)
     const newPackages: PackageConfig[] = [];
     for (let i = 0; i < count; i++) {
       newPackages.push({
         id: generateId(),
-        packageCode: defaultPackageCode,
+        packageCode: defaultPackageCode, // Copy package type from first
         weight: weightPerPackage,
-        dimensions: { ...defaultDimensions },
+        dimensions: { ...defaultDimensions }, // Copy dimensions from first
       });
     }
 
+    // ✅ REPLACE packages instead of adding to existing
     setShipments(
       shipments.map((s) =>
         s.id === shipmentId
           ? {
               ...s,
-              packages: newPackages,
+              packages: newPackages, // Replace, not append
             }
           : s
       )
     );
 
-    setNumberOfPackages("");
+    setNumberOfPackages(""); // Clear input
   };
-
   return (
     <div className={embedded ? "" : "p-6"}>
       {error && (
@@ -731,6 +719,7 @@ export default function ShippingLabelForm({
       )}
 
       <div className="space-y-6">
+        {/* ✅ UPDATED: Only show for Stamps.com in single shipment mode */}
         {!splitMode &&
           shipments.length === 1 &&
           shipments[0].carrierId &&
@@ -746,8 +735,10 @@ export default function ShippingLabelForm({
             </div>
           )}
 
+        {/* Split Mode Active (Stamps.com only) */}
         {splitMode && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Available Items */}
             <div>
               <h3 className="font-semibold mb-3 flex items-center">
                 <Package className="w-5 h-5 mr-2" />
@@ -821,6 +812,7 @@ export default function ShippingLabelForm({
               </div>
             </div>
 
+            {/* Right: Shipments */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold flex items-center">
@@ -854,6 +846,7 @@ export default function ShippingLabelForm({
                       )}
                     </div>
 
+                    {/* Items in shipment */}
                     <div className="mb-4">
                       <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400 mb-2">
                         Items ({shipment.items.length})
@@ -888,20 +881,9 @@ export default function ShippingLabelForm({
                                 >
                                   <Minus className="w-3 h-3" />
                                 </button>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value) || 1;
-                                    updateItemQuantityInShipment(
-                                      shipment.id,
-                                      item.itemId,
-                                      value
-                                    );
-                                  }}
-                                  className="w-12 text-center px-1 py-0.5 border rounded text-xs"
-                                />
+                                <span className="w-8 text-center">
+                                  {item.quantity}
+                                </span>
                                 <button
                                   onClick={() =>
                                     updateItemQuantityInShipment(
@@ -932,40 +914,37 @@ export default function ShippingLabelForm({
                       )}
                     </div>
 
+                    {/* Shipping Configuration */}
                     {shipment.items.length > 0 && (
                       <div className="space-y-3">
                         <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400">
                           Shipping Configuration
                         </h5>
 
-                        {!splitMode && (
-                          <select
-                            value={shipment.carrierId}
-                            onChange={(e) =>
-                              updateShippingConfig(
-                                shipment.id,
-                                "carrierId",
-                                e.target.value
-                              )
-                            }
-                            disabled={carriersLoading}
-                            className="w-full px-2 py-1 border rounded text-xs"
-                          >
-                            <option value="">
-                              {carriersLoading
-                                ? "Loading..."
-                                : "Select Carrier"}
+                        <select
+                          value={shipment.carrierId}
+                          onChange={(e) =>
+                            updateShippingConfig(
+                              shipment.id,
+                              "carrierId",
+                              e.target.value
+                            )
+                          }
+                          disabled={carriersLoading}
+                          className="w-full px-2 py-1 border rounded text-xs"
+                        >
+                          <option value="">
+                            {carriersLoading ? "Loading..." : "Select Carrier"}
+                          </option>
+                          {carriers.map((carrier) => (
+                            <option
+                              key={carrier.carrier_id}
+                              value={carrier.carrier_id}
+                            >
+                              {carrier.friendly_name}
                             </option>
-                            {carriers.map((carrier) => (
-                              <option
-                                key={carrier.carrier_id}
-                                value={carrier.carrier_id}
-                              >
-                                {carrier.friendly_name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                          ))}
+                        </select>
 
                         {shipment.carrierId && (
                           <select
@@ -993,45 +972,19 @@ export default function ShippingLabelForm({
                           </select>
                         )}
 
+                        {/* Packages - compact for split mode */}
                         <div className="space-y-3 pt-2 border-t">
                           <div className="flex items-center justify-between">
                             <h5 className="text-xs font-medium text-gray-700 dark:text-gray-400">
                               Packages ({shipment.packages.length})
                             </h5>
-                            {/* ✅ HIDE package add controls for Stamps.com */}
-                            {!isStampsCarrier(shipment.carrierId) && (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  placeholder="#"
-                                  className="w-12 px-2 py-1 text-xs border rounded"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      const value = parseInt(
-                                        (e.target as HTMLInputElement).value
-                                      );
-                                      if (value > 0) {
-                                        for (let i = 0; i < value; i++) {
-                                          addPackageToShipment(shipment.id);
-                                        }
-                                        (e.target as HTMLInputElement).value =
-                                          "";
-                                      }
-                                    }
-                                  }}
-                                />
-                                <button
-                                  onClick={() =>
-                                    addPackageToShipment(shipment.id)
-                                  }
-                                  className="cursor-pointer px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
-                                >
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  Add
-                                </button>
-                              </div>
-                            )}
+                            <button
+                              onClick={() => addPackageToShipment(shipment.id)}
+                              className="cursor-pointer px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 flex items-center"
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add
+                            </button>
                           </div>
 
                           {shipment.packages.map((pkg, pkgIndex) => (
@@ -1043,21 +996,19 @@ export default function ShippingLabelForm({
                                 <span className="text-xs font-medium">
                                   Package {pkgIndex + 1}
                                 </span>
-                                {/* ✅ HIDE remove button for Stamps.com (only 1 package allowed) */}
-                                {shipment.packages.length > 1 &&
-                                  !isStampsCarrier(shipment.carrierId) && (
-                                    <button
-                                      onClick={() =>
-                                        removePackageFromShipment(
-                                          shipment.id,
-                                          pkg.id
-                                        )
-                                      }
-                                      className="text-red-400 hover:text-red-500 cursor-pointer"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  )}
+                                {shipment.packages.length > 1 && (
+                                  <button
+                                    onClick={() =>
+                                      removePackageFromShipment(
+                                        shipment.id,
+                                        pkg.id
+                                      )
+                                    }
+                                    className="text-red-400 hover:text-red-500 cursor-pointer"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
@@ -1159,6 +1110,7 @@ export default function ShippingLabelForm({
           </div>
         )}
 
+        {/* Single Shipment Mode */}
         {!splitMode && shipments.length === 1 && (
           <div className="space-y-4">
             {shipments.map((shipment) => (
@@ -1226,6 +1178,7 @@ export default function ShippingLabelForm({
                   )}
                 </div>
 
+                {/* ✅ UPDATED: Package Details with Quick Add for UPS */}
                 <div>
                   {shipment.carrierId &&
                     !isStampsCarrier(shipment.carrierId) && (
@@ -1235,6 +1188,7 @@ export default function ShippingLabelForm({
                             Package Details
                           </label>
                           <div className="flex items-center gap-2">
+                            {/* Quick Add Multiple Packages */}
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
@@ -1267,6 +1221,7 @@ export default function ShippingLabelForm({
                               </button>
                             </div>
 
+                            {/* Manual Add Button */}
                             {shipment.packages.length < 20 && (
                               <button
                                 onClick={() =>
@@ -1281,260 +1236,150 @@ export default function ShippingLabelForm({
                           </div>
                         </div>
 
+                        {/* Package List */}
                         {shipment.packages.map((pkg, pkgIndex) => (
                           <div
                             key={pkg.id}
                             className="border p-4 rounded bg-gray-50 dark:bg-zinc-800 space-y-3 mb-3"
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-md font-medium text-emerald-500">
-                                Package {pkgIndex + 1}
-                              </span>
-                              {shipment.packages.length > 1 && (
-                                <button
-                                  onClick={() =>
-                                    removePackageFromShipment(
-                                      shipment.id,
-                                      pkg.id
-                                    )
-                                  }
-                                  className="text-red-600 hover:text-red-800 cursor-pointer"
-                                >
-                                  <X className="w-5 h-5" />
-                                </button>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-xs font-medium block mb-1">
-                                  Package Type
-                                </label>
-                                <select
-                                  value={pkg.packageCode}
-                                  onChange={(e) =>
-                                    updatePackageConfig(
-                                      shipment.id,
-                                      pkg.id,
-                                      "packageCode",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border rounded text-sm"
-                                >
-                                  <option value="">Select Type</option>
-                                  {getCarrierOptions(
-                                    shipment.carrierId
-                                  ).packages.map((option) => (
-                                    <option
-                                      key={option.package_code}
-                                      value={option.package_code}
-                                    >
-                                      {option.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="text-xs font-medium block mb-1">
-                                  Weight (lbs)
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  placeholder="0.0"
-                                  value={pkg.weight}
-                                  onChange={(e) =>
-                                    updatePackageConfig(
-                                      shipment.id,
-                                      pkg.id,
-                                      "weight",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border rounded text-sm"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-medium block mb-1">
-                                Dimensions (inches)
-                              </label>
-                              <div className="grid grid-cols-3 gap-2">
-                                <input
-                                  type="number"
-                                  placeholder="Length"
-                                  value={pkg.dimensions.length}
-                                  onChange={(e) =>
-                                    updatePackageConfig(
-                                      shipment.id,
-                                      pkg.id,
-                                      "dimensions.length",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="px-3 py-2 border rounded text-sm"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Width"
-                                  value={pkg.dimensions.width}
-                                  onChange={(e) =>
-                                    updatePackageConfig(
-                                      shipment.id,
-                                      pkg.id,
-                                      "dimensions.width",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="px-3 py-2 border rounded text-sm"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Height"
-                                  value={pkg.dimensions.height}
-                                  onChange={(e) =>
-                                    updatePackageConfig(
-                                      shipment.id,
-                                      pkg.id,
-                                      "dimensions.height",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="px-3 py-2 border rounded text-sm"
-                                />
-                              </div>
-                            </div>
+                            {/* ...package fields here... */}
                           </div>
                         ))}
                       </>
                     )}
 
-                  {shipment.carrierId &&
-                    isStampsCarrier(shipment.carrierId) &&
-                    shipment.packages.map((pkg, pkgIndex) => (
-                      <div
-                        key={pkg.id}
-                        className="border p-4 rounded bg-gray-50 dark:bg-zinc-800 space-y-3 mb-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-md font-medium text-emerald-500">
-                            Package {pkgIndex + 1}
-                          </span>
-                        </div>
+                  {shipment.packages.map((pkg, pkgIndex) => (
+                    <div
+                      key={pkg.id}
+                      className="border p-4 rounded bg-gray-50 dark:bg-zinc-800 space-y-3 mb-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-md font-medium text-emerald-500">
+                          Package {pkgIndex + 1}
+                        </span>
+                        {shipment.packages.length > 1 && (
+                          <button
+                            onClick={() =>
+                              removePackageFromShipment(shipment.id, pkg.id)
+                            }
+                            className="text-red-600 hover:text-red-800 cursor-pointer"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs font-medium block mb-1">
-                              Package Type
-                            </label>
-                            <select
-                              value={pkg.packageCode}
-                              onChange={(e) =>
-                                updatePackageConfig(
-                                  shipment.id,
-                                  pkg.id,
-                                  "packageCode",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border rounded text-sm"
-                            >
-                              <option value="">Select Type</option>
-                              {getCarrierOptions(
-                                shipment.carrierId
-                              ).packages.map((option) => (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium block mb-1">
+                            Package Type
+                          </label>
+                          <select
+                            value={pkg.packageCode}
+                            onChange={(e) =>
+                              updatePackageConfig(
+                                shipment.id,
+                                pkg.id,
+                                "packageCode",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border rounded text-sm"
+                          >
+                            <option value="">Select Type</option>
+                            {getCarrierOptions(shipment.carrierId).packages.map(
+                              (option) => (
                                 <option
                                   key={option.package_code}
                                   value={option.package_code}
                                 >
                                   {option.name}
                                 </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-medium block mb-1">
-                              Weight (lbs)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              placeholder="0.0"
-                              value={pkg.weight}
-                              onChange={(e) =>
-                                updatePackageConfig(
-                                  shipment.id,
-                                  pkg.id,
-                                  "weight",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border rounded text-sm"
-                            />
-                          </div>
+                              )
+                            )}
+                          </select>
                         </div>
 
                         <div>
                           <label className="text-xs font-medium block mb-1">
-                            Dimensions (inches)
+                            Weight (lbs)
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <input
-                              type="number"
-                              placeholder="Length"
-                              value={pkg.dimensions.length}
-                              onChange={(e) =>
-                                updatePackageConfig(
-                                  shipment.id,
-                                  pkg.id,
-                                  "dimensions.length",
-                                  e.target.value
-                                )
-                              }
-                              className="px-3 py-2 border rounded text-sm"
-                            />
-                            <input
-                              type="number"
-                              placeholder="Width"
-                              value={pkg.dimensions.width}
-                              onChange={(e) =>
-                                updatePackageConfig(
-                                  shipment.id,
-                                  pkg.id,
-                                  "dimensions.width",
-                                  e.target.value
-                                )
-                              }
-                              className="px-3 py-2 border rounded text-sm"
-                            />
-                            <input
-                              type="number"
-                              placeholder="Height"
-                              value={pkg.dimensions.height}
-                              onChange={(e) =>
-                                updatePackageConfig(
-                                  shipment.id,
-                                  pkg.id,
-                                  "dimensions.height",
-                                  e.target.value
-                                )
-                              }
-                              className="px-3 py-2 border rounded text-sm"
-                            />
-                          </div>
+                          <input
+                            type="number"
+                            step="0.1"
+                            placeholder="0.0"
+                            value={pkg.weight}
+                            onChange={(e) =>
+                              updatePackageConfig(
+                                shipment.id,
+                                pkg.id,
+                                "weight",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border rounded text-sm"
+                          />
                         </div>
                       </div>
-                    ))}
+
+                      <div>
+                        <label className="text-xs font-medium block mb-1">
+                          Dimensions (inches)
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            type="number"
+                            placeholder="Length"
+                            value={pkg.dimensions.length}
+                            onChange={(e) =>
+                              updatePackageConfig(
+                                shipment.id,
+                                pkg.id,
+                                "dimensions.length",
+                                e.target.value
+                              )
+                            }
+                            className="px-3 py-2 border rounded text-sm"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Width"
+                            value={pkg.dimensions.width}
+                            onChange={(e) =>
+                              updatePackageConfig(
+                                shipment.id,
+                                pkg.id,
+                                "dimensions.width",
+                                e.target.value
+                              )
+                            }
+                            className="px-3 py-2 border rounded text-sm"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Height"
+                            value={pkg.dimensions.height}
+                            onChange={(e) =>
+                              updatePackageConfig(
+                                shipment.id,
+                                pkg.id,
+                                "dimensions.height",
+                                e.target.value
+                              )
+                            }
+                            className="px-3 py-2 border rounded text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
         )}
 
+        {/* Action Buttons */}
         <div className="flex gap-3 justify-end pt-4 border-t">
           {onCancel && (
             <button
@@ -1572,6 +1417,7 @@ export default function ShippingLabelForm({
         </div>
       </div>
 
+      {/* Split Item Modal */}
       {selectedItemForSplit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
