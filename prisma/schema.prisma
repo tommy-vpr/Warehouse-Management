@@ -60,6 +60,9 @@ model User {
 
   notifications         Notification[]
 
+  receivingSessionsCounted  ReceivingSession[] @relation("CountedBy")
+  receivingSessionsApproved ReceivingSession[] @relation("ApprovedBy")
+
   inventoryTransactions InventoryTransaction[]
   assignedPickLists     PickList[]
   pickedItems           PickListItem[]
@@ -930,4 +933,60 @@ enum BackOrderReason {
   DAMAGED_PRODUCT                   
   LOCATION_EMPTY                    
   OTHER
+}
+
+// ---------------------------------------------------
+// ***Receiving
+// ---------------------------------------------------
+
+model ReceivingSession {
+  id              String           @id @default(cuid())
+  poId            String
+  poReference     String
+  vendor          String?
+  status          ReceivingStatus  @default(PENDING)
+  
+  // Counting user
+  countedBy       String
+  countedByUser   User             @relation("CountedBy", fields: [countedBy], references: [id])
+  countedAt       DateTime         @default(now())
+  
+  // Approval
+  approvedBy      String?
+  approvedByUser  User?            @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  
+  // Line items
+  lineItems       ReceivingLine[]
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  @@map("receiving_sessions")
+
+  @@index([poId])
+  @@index([status])
+  @@index([countedBy])
+}
+
+model ReceivingLine {
+  id                String           @id @default(cuid())
+  sessionId         String
+  sku               String
+  productName       String
+  quantityCounted   Int
+  quantityExpected  Int?
+  variance          Int?             // counted - expected
+  
+  session           ReceivingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@map("receiving_lines")
+}
+
+enum ReceivingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }

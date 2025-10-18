@@ -77,6 +77,8 @@ export default function PurchaseOrderDetailPage() {
     retry: 1,
   });
 
+  console.log(po);
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "open":

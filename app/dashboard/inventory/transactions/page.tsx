@@ -51,16 +51,33 @@ export default function TransactionsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams.get("product");
+  const typeParam = searchParams.get("type");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
 
+  // const { data, isLoading } = useQuery<TransactionsResponse>({
+  //   queryKey: ["transactions", productId],
+  //   queryFn: async () => {
+  //     const url = productId
+  //       ? `/api/inventory/transactions?product=${productId}`
+  //       : "/api/inventory/transactions";
+  //     const res = await fetch(url);
+  //     if (!res.ok) throw new Error("Failed to fetch");
+  //     return res.json();
+  //   },
+  // });
+
   const { data, isLoading } = useQuery<TransactionsResponse>({
-    queryKey: ["transactions", productId],
+    queryKey: ["transactions", productId, typeParam], // Include in cache key
     queryFn: async () => {
-      const url = productId
-        ? `/api/inventory/transactions?product=${productId}`
-        : "/api/inventory/transactions";
+      const params = new URLSearchParams();
+      if (productId) params.append("product", productId);
+      if (typeParam) params.append("type", typeParam); // Add this
+
+      const url = `/api/inventory/transactions${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
