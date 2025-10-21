@@ -54,6 +54,26 @@ export default function CreateCampaign() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Add this query to fetch product data
+  const { data: productVariant } = useQuery({
+    queryKey: ["product-variant", productVariantId],
+    queryFn: async () => {
+      if (!productVariantId) return null;
+
+      const response = await fetch(
+        `/api/products/variants/${productVariantId}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to load product");
+      }
+      return response.json();
+    },
+    enabled: !!productVariantId, // Only run if productVariantId exists
+    staleTime: 300000,
+  });
+
+  console.log(productVariant);
+
   // Fetch locations
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["cycle-count-locations", productVariantId],
@@ -224,13 +244,14 @@ export default function CreateCampaign() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               Create Cycle Count Campaign
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Set up a new inventory counting campaign
-              {productVariantId && (
-                <Badge variant="outline" className="ml-2">
-                  Product Specific
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              {productVariant.name || productVariant.sku}
+              {/* Set up a new inventory counting campaign
+              {productVariantId && productVariant && (
+                <Badge variant="outline" className="ml-2 text-sm">
+                  {productVariant.name || productVariant.sku}
                 </Badge>
-              )}
+              )} */}
             </p>
           </div>
         </div>

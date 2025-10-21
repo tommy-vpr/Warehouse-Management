@@ -132,10 +132,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </Button>
             </Link>
 
-            <Link href="/dashboard/picking/scan" className="hidden sm:block">
+            {/* <Link href="/dashboard/picking/scan" className="hidden sm:block">
               <Button className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
                 <Scan className="w-4 h-4" />
-                Pick
+                Scan
+              </Button>
+            </Link> */}
+
+            <Link href="/dashboard/scan" className="hidden sm:block">
+              <Button className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
+                <Scan className="w-4 h-4" />
+                Scan
               </Button>
             </Link>
 

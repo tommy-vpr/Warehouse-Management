@@ -255,6 +255,17 @@ export default function MobilePickingInterface() {
     });
   };
 
+  // Add this near the top of your component, after the useMemo
+  const totalQuantityToPick = useMemo(() => {
+    if (!pickList) return 0;
+    return pickList.items.reduce((sum, item) => sum + item.quantityToPick, 0);
+  }, [pickList]);
+
+  const totalQuantityPicked = useMemo(() => {
+    if (!pickList) return 0;
+    return pickList.items.reduce((sum, item) => sum + item.quantityPicked, 0);
+  }, [pickList]);
+
   // Error state
   if (isError) {
     return (
@@ -378,14 +389,14 @@ export default function MobilePickingInterface() {
         </div>
       </div>
 
-      {/* Progress Bar */}
+      {/* Progress Bar Section - Update this */}
       <div className="bg-background border-b">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex justify-between text-sm mb-2">
             <span>Progress</span>
             <span>
               {pickList.stats.progress}% ({pickList.stats.pickedItems}/
-              {pickList.stats.totalItems})
+              {pickList.stats.totalItems} tasks)
             </span>
           </div>
           <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-2">
@@ -394,11 +405,23 @@ export default function MobilePickingInterface() {
               style={{ width: `${pickList.stats.progress}%` }}
             />
           </div>
+
+          {/* ✅ ADD THIS: Show both task count AND unit count */}
           <div className="flex justify-between text-xs text-gray-500 mt-1">
             <span>
-              Item {currentItemIndex + 1} of {pickList.items.length}
+              Task {currentItemIndex + 1} of {pickList.items.length}
             </span>
-            <span>{pendingItems.length} remaining</span>
+            <span>{pendingItems.length} tasks remaining</span>
+          </div>
+
+          {/* ✅ NEW: Show unit progress */}
+          <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+            <span>
+              Units: {totalQuantityPicked} / {totalQuantityToPick}
+            </span>
+            <span>
+              {totalQuantityToPick - totalQuantityPicked} units remaining
+            </span>
           </div>
         </div>
       </div>
@@ -514,7 +537,7 @@ export default function MobilePickingInterface() {
             <Button
               onClick={() => processItem("PICK")}
               disabled={pickActionMutation.isPending}
-              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-500 hover:bg-blue-600 text-gray-200"
+              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-500 hover:bg-blue-600"
             >
               {pickActionMutation.isPending ? (
                 <>

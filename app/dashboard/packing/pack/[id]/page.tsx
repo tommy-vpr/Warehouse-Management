@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import ShippingLabelForm from "@/components/shipping/ShippingLabelForm";
+import OrderImageUploader from "@/components/order/OrderImageUploader";
 
 interface OrderItem {
   id: string;
@@ -51,6 +52,12 @@ interface OrderDetails {
   totalAmount: string;
   shippingAddress: any;
   items: OrderItem[];
+  images?: Array<{
+    // ✅ ADD THIS
+    id: string;
+    url: string;
+    createdAt: string;
+  }>;
 }
 
 interface ApiResponse {
@@ -752,6 +759,25 @@ export default function EnhancedPackingInterface() {
                           {BOX_TYPES.find((b) => b.id === selectedBox)?.name}
                         </strong>
                       </p>
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <div className="mb-2">
+                        <h4 className="font-medium text-sm">
+                          Packing Photos (Optional)
+                        </h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Take photos of packed contents before sealing the box
+                        </p>
+                      </div>
+                      <OrderImageUploader
+                        orderId={order.id}
+                        orderNumber={order.orderNumber}
+                        customerName={order.customerName}
+                        existingImages={order.images}
+                        onUploadSuccess={loadOrderDetails}
+                        compact={true}
+                      />
                     </div>
 
                     <div>

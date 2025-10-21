@@ -61,7 +61,7 @@ export default function ReceivingPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Receiving Center
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Receive purchase orders and manage inbound inventory
           </p>
         </div>
@@ -75,9 +75,7 @@ export default function ReceivingPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                     Open POs
                   </p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {openPOsCount}
-                  </p>
+                  <p className="text-3xl font-bold">{openPOsCount}</p>
                 </div>
                 <FileText className="w-12 h-12 text-blue-600" />
               </div>
@@ -112,12 +110,11 @@ export default function ReceivingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
                 Browse open purchase orders from Inventory Planner and start
                 blind count receiving process.
               </p>
               <Button className="w-full">
-                <FileText className="w-4 h-4 mr-2" />
                 Browse Purchase Orders ({openPOsCount} open)
               </Button>
             </CardContent>
@@ -142,7 +139,7 @@ export default function ReceivingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
                 Review and approve receiving sessions submitted by warehouse
                 staff. (Admin/Manager only)
               </p>
@@ -150,7 +147,6 @@ export default function ReceivingPage() {
                 className="w-full"
                 variant={pendingCount > 0 ? "default" : "outline"}
               >
-                <TrendingUp className="w-4 h-4 mr-2" />
                 {pendingCount > 0
                   ? `Review ${pendingCount} Pending Approval${
                       pendingCount > 1 ? "s" : ""
@@ -173,7 +169,7 @@ export default function ReceivingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
                 View past receiving transactions and audit trail.
               </p>
               <Button variant="outline" className="w-full">

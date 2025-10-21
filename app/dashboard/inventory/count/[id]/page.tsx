@@ -600,10 +600,7 @@ export default function CycleCountInterface() {
                       {countMutation.isPending ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          Count
-                        </>
+                        <>Submit</>
                       )}
                     </Button>
                   </div>

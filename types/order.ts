@@ -129,4 +129,10 @@ export interface OrderDetailResponse {
   statusHistory: StatusHistoryEntry[];
   backOrders: BackOrder[];
   shippingPackages: ShippingPackage[]; // ✅ ADD THIS
+  images?: Array<{
+    id: string;
+    url: string;
+    createdAt: string;
+    reference?: string;
+  }>;
 }

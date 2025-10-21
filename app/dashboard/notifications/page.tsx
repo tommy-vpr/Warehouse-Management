@@ -206,7 +206,7 @@ export default function NotificationsPage() {
                           }}
                           className="shrink-0 cursor-pointer"
                         >
-                          <Check className="w-4 h-4" />
+                          {/* <Check className="w-4 h-4" /> */}
                         </Button>
                       )}
                     </div>

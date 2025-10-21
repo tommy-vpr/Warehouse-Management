@@ -289,6 +289,8 @@ model Order {
   // Back order
   hasBackOrders     Boolean     @default(false)
   backOrders        BackOrder[]
+
+  images          OrderImage[]
   
   // Relations
   items           OrderItem[]
@@ -303,6 +305,19 @@ model Order {
   updatedAt       DateTime    @updatedAt
 
   @@map("orders")
+}
+
+model OrderImage {
+  id        String   @id @default(cuid())
+  orderId   String
+  url       String
+  reference String?
+  createdAt DateTime @default(now())
+  
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+  @@map("order_images")
 }
 
 model InventoryReservation {

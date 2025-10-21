@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,8 +42,6 @@ import {
   Play,
   Pause,
   Archive,
-  Settings,
-  Download,
   CheckCircle,
   Trash2,
   Edit,
@@ -47,7 +51,6 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface CycleCountCampaign {
   id: string;
@@ -79,10 +82,47 @@ interface DashboardStats {
   totalTasksThisMonth: number;
 }
 
-interface DashboardData {
+interface FetchCampaignsParams {
+  limit: number;
+  pageParam: number;
+  search?: string;
+  status?: string;
+  type?: string;
+  productVariantId?: string;
+}
+
+const fetchCampaigns = async ({
+  limit,
+  pageParam,
+  search,
+  status,
+  type,
+  productVariantId,
+}: FetchCampaignsParams): Promise<{
   campaigns: CycleCountCampaign[];
   stats: DashboardStats;
-}
+  total: number;
+}> => {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    page: String(pageParam),
+  });
+
+  if (search) params.append("search", search);
+  if (status && status !== "ALL") params.append("status", status);
+  if (type && type !== "ALL") params.append("type", type);
+  if (productVariantId) params.append("productVariantId", productVariantId);
+
+  const res = await fetch(`/api/inventory/cycle-counts/campaigns?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch campaigns");
+
+  const data = await res.json();
+  return {
+    campaigns: data.campaigns,
+    stats: data.stats,
+    total: data.campaigns.length, // You'll need to add actual total from backend
+  };
+};
 
 export default function CycleCountDashboard() {
   const router = useRouter();
@@ -99,22 +139,55 @@ export default function CycleCountDashboard() {
     name: string;
   } | null>(null);
 
-  // Fetch dashboard data
-  const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ["cycle-count-campaigns", productVariantId],
-    queryFn: async () => {
-      const url = productVariantId
-        ? `/api/inventory/cycle-counts/campaigns?productVariantId=${productVariantId}`
-        : `/api/inventory/cycle-counts/campaigns`;
+  // Infinite query for campaigns
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
+    useInfiniteQuery({
+      queryKey: [
+        "cycle-count-campaigns-infinite",
+        productVariantId,
+        searchTerm,
+        statusFilter,
+        typeFilter,
+      ],
+      queryFn: ({ pageParam = 0 }) =>
+        fetchCampaigns({
+          limit: 10,
+          pageParam,
+          search: searchTerm,
+          status: statusFilter,
+          type: typeFilter,
+          productVariantId: productVariantId || undefined,
+        }),
+      getNextPageParam: (lastPage, allPages) => {
+        const totalLoaded = allPages.reduce(
+          (sum, page) => sum + page.campaigns.length,
+          0
+        );
+        // You'll need to return actual total from backend
+        // For now, just check if we got a full page
+        if (lastPage.campaigns.length < 10) {
+          return undefined;
+        }
+        return allPages.length;
+      },
+      initialPageParam: 0,
+      staleTime: 30 * 1000,
+    });
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Failed to load dashboard data");
-      }
-      return response.json();
-    },
-    staleTime: 30000,
-  });
+  const campaigns = useMemo(() => {
+    return data?.pages.flatMap((page) => page.campaigns) ?? [];
+  }, [data]);
+
+  const stats = data?.pages[0]?.stats || {
+    totalCampaigns: 0,
+    activeCampaigns: 0,
+    completedThisWeek: 0,
+    averageAccuracy: 0,
+    totalVariances: 0,
+    pendingReviews: 0,
+    tasksCompletedThisMonth: 0,
+    totalTasksThisMonth: 0,
+  };
 
   // Update campaign status mutation
   const updateStatusMutation = useMutation({
@@ -141,22 +214,10 @@ export default function CycleCountDashboard() {
 
       return response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.setQueryData<DashboardData>(
-        ["cycle-count-campaigns", productVariantId],
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            campaigns: old.campaigns.map((campaign) =>
-              campaign.id === variables.campaignId
-                ? { ...campaign, status: variables.status as any }
-                : campaign
-            ),
-          };
-        }
-      );
-      queryClient.invalidateQueries({ queryKey: ["cycle-count-campaigns"] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["cycle-count-campaigns-infinite"],
+      });
     },
   });
 
@@ -176,7 +237,9 @@ export default function CycleCountDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cycle-count-campaigns"] });
+      queryClient.invalidateQueries({
+        queryKey: ["cycle-count-campaigns-infinite"],
+      });
       toast({
         title: "Campaign Deleted",
         description: "The campaign has been successfully deleted.",
@@ -205,41 +268,6 @@ export default function CycleCountDashboard() {
     }
   };
 
-  // const handleStartCampaign = (campaignId: string, campaignName: string) => {
-  //   toast({
-  //     title: "Confirm Action",
-  //     description: `Start campaign "${campaignName}"?`,
-  //     action: (
-  //       <Button
-  //         variant="secondary"
-  //         size="sm"
-  //         onClick={() => {
-  //           updateStatusMutation.mutate(
-  //             { campaignId, status: "ACTIVE" },
-  //             {
-  //               onSuccess: () => {
-  //                 toast({
-  //                   title: "Campaign Started",
-  //                   description: `${campaignName} is now active and ready for counting.`,
-  //                   variant: "success",
-  //                 });
-  //               },
-  //               onError: (error) => {
-  //                 toast({
-  //                   title: "Error",
-  //                   description: error.message,
-  //                   variant: "destructive",
-  //                 });
-  //               },
-  //             }
-  //           );
-  //         }}
-  //       >
-  //         Yes, Start
-  //       </Button>
-  //     ),
-  //   });
-  // };
   const handleStartCampaign = (campaignId: string, campaignName: string) => {
     toast({
       title: "⚠️ Confirm Action",
@@ -284,7 +312,7 @@ export default function CycleCountDashboard() {
           ✓ Yes, Start Campaign
         </Button>
       ),
-      duration: 10000, // Longer duration so user has time to read and act
+      duration: 10000,
     });
   };
 
@@ -339,35 +367,13 @@ export default function CycleCountDashboard() {
       .replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  const campaigns = data?.campaigns || [];
-  const stats = data?.stats || {
-    totalCampaigns: 0,
-    activeCampaigns: 0,
-    completedThisWeek: 0,
-    averageAccuracy: 0,
-    totalVariances: 0,
-    pendingReviews: 0,
-    tasksCompletedThisMonth: 0,
-    totalTasksThisMonth: 0,
-  };
-
   const filteredCampaigns = campaigns.filter((campaign) => {
-    const matchesSearch =
-      campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      campaign.description?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // ⭐ Add special handling for NEEDS_REVIEW filter
-    const matchesStatus =
-      statusFilter === "ALL"
-        ? true
-        : statusFilter === "NEEDS_REVIEW"
+    const matchesNeedsReview =
+      statusFilter === "NEEDS_REVIEW"
         ? campaign.hasPendingReviews === true
-        : campaign.status === statusFilter;
+        : true;
 
-    const matchesType =
-      typeFilter === "ALL" || campaign.countType === typeFilter;
-
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesNeedsReview;
   });
 
   if (isLoading) {
@@ -574,6 +580,7 @@ export default function CycleCountDashboard() {
                 <option value="COMPLETED">Completed</option>
                 <option value="PAUSED">Paused</option>
                 <option value="CANCELLED">Cancelled</option>
+                <option value="NEEDS_REVIEW">Needs Review</option>
               </select>
 
               <select
@@ -626,300 +633,331 @@ export default function CycleCountDashboard() {
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredCampaigns.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No campaigns found</p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => {
-                      const createUrl = productVariantId
-                        ? `/dashboard/inventory/count/create?product=${productVariantId}`
-                        : `/dashboard/inventory/count/create`;
-                      router.push(createUrl);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create First Campaign
-                  </Button>
-                </div>
-              ) : (
-                filteredCampaigns.map((campaign) => (
-                  <div
-                    key={campaign.id}
-                    className="p-4 border border-zinc-200 dark:border-zinc-600 rounded-lg hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200">
-                            {campaign.name}
-                          </h3>
-                          <Badge className={getStatusColor(campaign.status)}>
-                            {campaign.status}
-                          </Badge>
-                          <Badge variant="outline">
-                            {getCountTypeLabel(campaign.countType)}
-                          </Badge>
-                        </div>
-
-                        {campaign.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            {campaign.description}
-                          </p>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            <span>
-                              {campaign.status === "PLANNED"
-                                ? `Starts: ${new Date(
-                                    campaign.startDate
-                                  ).toLocaleDateString()}`
-                                : campaign.status === "ACTIVE"
-                                ? `Started: ${new Date(
-                                    campaign.startDate
-                                  ).toLocaleDateString()}`
-                                : campaign.endDate
-                                ? `Completed: ${new Date(
-                                    campaign.endDate
-                                  ).toLocaleDateString()}`
-                                : `Started: ${new Date(
-                                    campaign.startDate
-                                  ).toLocaleDateString()}`}
-                            </span>
+          <CardContent className="p-0">
+            {filteredCampaigns.length === 0 ? (
+              <div className="text-center py-12 px-6">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No campaigns found</p>
+                <Button
+                  className="mt-4"
+                  onClick={() => {
+                    const createUrl = productVariantId
+                      ? `/dashboard/inventory/count/create?product=${productVariantId}`
+                      : `/dashboard/inventory/count/create`;
+                    router.push(createUrl);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create First Campaign
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="divide-y dark:divide-border">
+                  {filteredCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200">
+                              {campaign.name}
+                            </h3>
+                            <Badge className={getStatusColor(campaign.status)}>
+                              {campaign.status}
+                            </Badge>
+                            <Badge variant="outline">
+                              {getCountTypeLabel(campaign.countType)}
+                            </Badge>
                           </div>
 
-                          <div className="flex items-center">
-                            <Package className="w-4 h-4 mr-1" />
-                            <span>
-                              {campaign.completedTasks}/{campaign.totalTasks}{" "}
-                              tasks
-                            </span>
-                          </div>
-
-                          <div className="flex items-center">
-                            <TrendingUp className="w-4 h-4 mr-1" />
-                            <span>
-                              {campaign.accuracy?.toFixed(1) ?? "0.0"}% accuracy
-                            </span>
-                          </div>
-
-                          {campaign.variancesFound > 0 && (
-                            <div className="flex items-center text-red-400">
-                              <AlertTriangle className="w-4 h-4 mr-1" />
-                              <span>{campaign.variancesFound} variances</span>
-                            </div>
+                          {campaign.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              {campaign.description}
+                            </p>
                           )}
-                        </div>
 
-                        {/* Progress Bar */}
-                        {campaign.status === "ACTIVE" &&
-                          campaign.totalTasks > 0 && (
-                            <div className="mt-3">
-                              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-500 mb-1">
-                                <span>Progress</span>
-                                <span>
-                                  {Math.round(
-                                    (campaign.completedTasks /
-                                      campaign.totalTasks) *
-                                      100
-                                  )}
-                                  %
-                                </span>
+                          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1" />
+                              <span>
+                                {campaign.status === "PLANNED"
+                                  ? `Starts: ${new Date(
+                                      campaign.startDate
+                                    ).toLocaleDateString()}`
+                                  : campaign.status === "ACTIVE"
+                                  ? `Started: ${new Date(
+                                      campaign.startDate
+                                    ).toLocaleDateString()}`
+                                  : campaign.endDate
+                                  ? `Completed: ${new Date(
+                                      campaign.endDate
+                                    ).toLocaleDateString()}`
+                                  : `Started: ${new Date(
+                                      campaign.startDate
+                                    ).toLocaleDateString()}`}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center">
+                              <Package className="w-4 h-4 mr-1" />
+                              <span>
+                                {campaign.completedTasks}/{campaign.totalTasks}{" "}
+                                tasks
+                              </span>
+                            </div>
+
+                            <div className="flex items-center">
+                              <TrendingUp className="w-4 h-4 mr-1" />
+                              <span>
+                                {campaign.accuracy?.toFixed(1) ?? "0.0"}%
+                                accuracy
+                              </span>
+                            </div>
+
+                            {campaign.variancesFound > 0 && (
+                              <div className="flex items-center text-red-400">
+                                <AlertTriangle className="w-4 h-4 mr-1" />
+                                <span>{campaign.variancesFound} variances</span>
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                  style={{
-                                    width: `${
+                            )}
+                          </div>
+
+                          {campaign.status === "ACTIVE" &&
+                            campaign.totalTasks > 0 && (
+                              <div className="mt-3">
+                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-500 mb-1">
+                                  <span>Progress</span>
+                                  <span>
+                                    {Math.round(
                                       (campaign.completedTasks /
                                         campaign.totalTasks) *
-                                      100
-                                    }%`,
-                                  }}
-                                ></div>
+                                        100
+                                    )}
+                                    %
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                    style={{
+                                      width: `${
+                                        (campaign.completedTasks /
+                                          campaign.totalTasks) *
+                                        100
+                                      }%`,
+                                    }}
+                                  ></div>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        {campaign.status === "COMPLETED" &&
-                          campaign.hasPendingReviews && (
-                            <div className="mt-3 flex items-center text-sm text-red-400">
-                              <AlertTriangle className="w-4 h-4 mr-1" />
-                              <span>Has items pending supervisor review</span>
-                            </div>
-                          )}
-                      </div>
+                            )}
+                          {campaign.status === "COMPLETED" &&
+                            campaign.hasPendingReviews && (
+                              <div className="mt-3 flex items-center text-sm text-red-400">
+                                <AlertTriangle className="w-4 h-4 mr-1" />
+                                <span>Has items pending supervisor review</span>
+                              </div>
+                            )}
+                        </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 ml-4">
-                        {campaign.status === "PLANNED" && (
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleStartCampaign(campaign.id, campaign.name)
-                            }
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            <Play className="w-4 h-4 mr-1" />
-                            Start
-                          </Button>
-                        )}
-
-                        {campaign.status === "ACTIVE" && (
-                          <>
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 ml-4">
+                          {campaign.status === "PLANNED" && (
                             <Button
                               size="sm"
                               onClick={() =>
-                                router.push(
-                                  `/dashboard/inventory/count/${campaign.id}`
-                                )
-                              }
-                            >
-                              Continue
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                handlePauseCampaign(campaign.id, campaign.name)
+                                handleStartCampaign(campaign.id, campaign.name)
                               }
                               disabled={updateStatusMutation.isPending}
                             >
-                              <Pause className="w-4 h-4" />
+                              <Play className="w-4 h-4 mr-1" />
+                              Start
                             </Button>
-                          </>
-                        )}
+                          )}
 
-                        {campaign.status === "PAUSED" && (
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleStartCampaign(campaign.id, campaign.name)
-                            }
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            <Play className="w-4 h-4 mr-1" />
-                            Resume
-                          </Button>
-                        )}
-
-                        {campaign.status === "COMPLETED" && (
-                          <>
-                            <Button
-                              className="cursor-pointer"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                router.push(
-                                  `/dashboard/inventory/count/${campaign.id}/results`
-                                )
-                              }
-                            >
-                              <Eye className="w-4 h-4 mr-1" />
-                              View Results
-                            </Button>
-
-                            {/* ⭐ Add this - Review button if there are pending reviews */}
-                            {campaign.hasPendingReviews && (
+                          {campaign.status === "ACTIVE" && (
+                            <>
                               <Button
                                 size="sm"
-                                className="bg-blue-500 hover:bg-blue-600 cursor-pointer"
                                 onClick={() =>
                                   router.push(
-                                    `/dashboard/inventory/count/${campaign.id}/review`
+                                    `/dashboard/inventory/count/${campaign.id}`
                                   )
                                 }
                               >
-                                <AlertTriangle className="w-4 h-4 mr-1" />
-                                Review
+                                Count
                               </Button>
-                            )}
-                          </>
-                        )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  handlePauseCampaign(
+                                    campaign.id,
+                                    campaign.name
+                                  )
+                                }
+                                disabled={updateStatusMutation.isPending}
+                              >
+                                <Pause className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="ghost">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
+                          {campaign.status === "PAUSED" && (
+                            <Button
+                              size="sm"
                               onClick={() =>
-                                router.push(
-                                  `/dashboard/inventory/count/${campaign.id}`
-                                )
+                                handleStartCampaign(campaign.id, campaign.name)
                               }
+                              disabled={updateStatusMutation.isPending}
                             >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
+                              <Play className="w-4 h-4 mr-1" />
+                              Resume
+                            </Button>
+                          )}
 
-                            {(campaign.status === "PLANNED" ||
-                              campaign.status === "PAUSED") && (
+                          {campaign.status === "COMPLETED" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/inventory/count/${campaign.id}/results`
+                                  )
+                                }
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View Results
+                              </Button>
+
+                              {campaign.hasPendingReviews && (
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-500 hover:bg-blue-600"
+                                  onClick={() =>
+                                    router.push(
+                                      `/dashboard/inventory/count/${campaign.id}/review`
+                                    )
+                                  }
+                                >
+                                  <AlertTriangle className="w-4 h-4 mr-1" />
+                                  Review
+                                </Button>
+                              )}
+                            </>
+                          )}
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem
                                 onClick={() =>
                                   router.push(
-                                    `/dashboard/inventory/count/${campaign.id}/edit`
+                                    `/dashboard/inventory/count/${campaign.id}`
                                   )
                                 }
                               >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Campaign
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
                               </DropdownMenuItem>
-                            )}
 
-                            <DropdownMenuItem
-                              onClick={() =>
-                                router.push(
-                                  `/dashboard/inventory/count/create?duplicate=${campaign.id}`
-                                )
-                              }
-                            >
-                              <Copy className="w-4 h-4 mr-2" />
-                              Duplicate
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onClick={() => {
-                                // Export logic here
-                                toast({
-                                  title: "Export Started",
-                                  description: `Exporting ${campaign.name}...`,
-                                  variant: "success",
-                                });
-                              }}
-                            >
-                              <FileText className="w-4 h-4 mr-2" />
-                              Export Report
-                            </DropdownMenuItem>
-
-                            {(campaign.status === "PLANNED" ||
-                              campaign.status === "CANCELLED" ||
-                              campaign.status === "COMPLETED") && (
-                              <>
-                                <DropdownMenuSeparator />
+                              {(campaign.status === "PLANNED" ||
+                                campaign.status === "PAUSED") && (
                                 <DropdownMenuItem
-                                  onClick={() => handleDeleteClick(campaign)}
-                                  className="text-red-400 focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950"
+                                  onClick={() =>
+                                    router.push(
+                                      `/dashboard/inventory/count/${campaign.id}/edit`
+                                    )
+                                  }
                                 >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete Campaign
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit Campaign
                                 </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              )}
+
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/inventory/count/create?duplicate=${campaign.id}`
+                                  )
+                                }
+                              >
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  toast({
+                                    title: "Export Started",
+                                    description: `Exporting ${campaign.name}...`,
+                                    variant: "success",
+                                  });
+                                }}
+                              >
+                                <FileText className="w-4 h-4 mr-2" />
+                                Export Report
+                              </DropdownMenuItem>
+
+                              {(campaign.status === "PLANNED" ||
+                                campaign.status === "CANCELLED" ||
+                                campaign.status === "COMPLETED") && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteClick(campaign)}
+                                    className="text-red-400 focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Campaign
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Load More Button */}
+                {hasNextPage && (
+                  <div className="p-4 border-t dark:border-border text-center">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                      className="w-full sm:w-auto"
+                    >
+                      {isFetchingNextPage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Loading more...
+                        </>
+                      ) : (
+                        "Load More Campaigns"
+                      )}
+                    </Button>
                   </div>
-                ))
-              )}
-            </div>
+                )}
+
+                {/* Footer */}
+                {filteredCampaigns.length > 0 && (
+                  <div className="px-6 py-3 bg-gray-50 dark:bg-muted border-t dark:border-border text-sm text-gray-600 dark:text-gray-400 text-center">
+                    Showing {filteredCampaigns.length} campaigns
+                    {!hasNextPage && " (all loaded)"}
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

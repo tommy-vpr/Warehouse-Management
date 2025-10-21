@@ -15,7 +15,7 @@ export async function GET(
 
     const { id } = await context.params;
 
-    // ✅ Get order details WITH ALL back orders
+    // ✅ Get order details WITH ALL back orders AND IMAGES
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -30,6 +30,12 @@ export async function GET(
         },
         // ✅ Get ALL back orders (not filtered by status)
         backOrders: true,
+        // ✅ ADD THIS: Include order images
+        images: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
       },
     });
 
@@ -212,6 +218,12 @@ export async function GET(
         shippingAddress: shippingAddr,
         billingAddress: order.billingAddress,
         isBackOrderFulfillment, // ✅ Add context flag
+        // ✅ ADD THIS: Include images in response
+        images: order.images.map((img) => ({
+          id: img.id,
+          url: img.url,
+          createdAt: img.createdAt.toISOString(),
+        })),
         items: itemsToPackFiltered.map((item) => ({
           id: item.id,
           productName: item.productVariant.product.name,
@@ -268,7 +280,7 @@ export async function GET(
 
 //     const { id } = await context.params;
 
-//     // ✅ Get order details WITH back orders
+//     // ✅ Get order details WITH ALL back orders
 //     const order = await prisma.order.findUnique({
 //       where: { id },
 //       include: {
@@ -281,14 +293,8 @@ export async function GET(
 //             },
 //           },
 //         },
-//         // ✅ Include back orders to calculate actual quantities to pack
-//         backOrders: {
-//           where: {
-//             status: {
-//               in: ["PENDING", "ALLOCATED", "PICKING", "PICKED", "PACKED"], // Not yet fulfilled
-//             },
-//           },
-//         },
+//         // ✅ Get ALL back orders (not filtered by status)
+//         backOrders: true,
 //       },
 //     });
 
@@ -296,46 +302,130 @@ export async function GET(
 //       return NextResponse.json({ error: "Order not found" }, { status: 404 });
 //     }
 
-//     // ✅ Create a map of back-ordered quantities by product variant (ONCE!)
-//     const backOrderedQuantities = new Map<string, number>();
-//     order.backOrders.forEach((backOrder) => {
-//       const remaining =
-//         backOrder.quantityBackOrdered - backOrder.quantityFulfilled;
-//       backOrderedQuantities.set(
-//         backOrder.productVariantId,
-//         (backOrderedQuantities.get(backOrder.productVariantId) || 0) + remaining
-//       );
+//     // ✅ Categorize back orders by status
+//     const backOrdersByStatus = {
+//       pending: order.backOrders.filter(
+//         (bo) => bo.status === "PENDING" || bo.status === "ALLOCATED"
+//       ),
+//       inProgress: order.backOrders.filter(
+//         (bo) =>
+//           bo.status === "PICKING" ||
+//           bo.status === "PICKED" ||
+//           bo.status === "PACKED"
+//       ),
+//       fulfilled: order.backOrders.filter((bo) => bo.status === "FULFILLED"),
+//     };
+
+//     console.log("📦 Back order status breakdown:", {
+//       pending: backOrdersByStatus.pending.length,
+//       inProgress: backOrdersByStatus.inProgress.length,
+//       fulfilled: backOrdersByStatus.fulfilled.length,
 //     });
 
-//     // ✅ Calculate quantities to pack (order quantity - back order quantity) (ONCE!)
+//     // ✅ CRITICAL LOGIC: Determine what we're packing
 //     const itemsToPack = order.items.map((item) => {
-//       const backOrderedQty =
-//         backOrderedQuantities.get(item.productVariantId) || 0;
-//       const quantityToPack = item.quantity - backOrderedQty;
+//       // Find back orders for this product
+//       const pendingBO = backOrdersByStatus.pending.find(
+//         (bo) => bo.productVariantId === item.productVariantId
+//       );
+//       const inProgressBO = backOrdersByStatus.inProgress.find(
+//         (bo) => bo.productVariantId === item.productVariantId
+//       );
+//       const fulfilledBO = backOrdersByStatus.fulfilled.find(
+//         (bo) => bo.productVariantId === item.productVariantId
+//       );
+
+//       let quantityToPack = 0;
+//       let quantityBackOrdered = 0;
+//       let quantityAlreadyShipped = 0;
+//       let packingContext = "FULL_ORDER";
+
+//       if (inProgressBO) {
+//         // ✅ CASE 1: We're packing back-ordered items (PICKED/PACKED status)
+//         quantityToPack =
+//           inProgressBO.quantityBackOrdered - inProgressBO.quantityFulfilled;
+//         quantityAlreadyShipped = item.quantity - quantityToPack;
+//         quantityBackOrdered = 0; // Not back-ordered anymore since we're packing it
+//         packingContext = "BACK_ORDER_FULFILLMENT";
+
+//         console.log(
+//           `  📦 Item ${item.productVariant.sku}: Packing back order (${quantityToPack} units)`
+//         );
+//       } else if (pendingBO) {
+//         // ✅ CASE 2: Initial order with some items on back order
+//         const backOrderQty =
+//           pendingBO.quantityBackOrdered - pendingBO.quantityFulfilled;
+//         quantityToPack = item.quantity - backOrderQty;
+//         quantityBackOrdered = backOrderQty;
+//         quantityAlreadyShipped = 0;
+//         packingContext = "PARTIAL_ORDER";
+
+//         console.log(
+//           `  📦 Item ${item.productVariant.sku}: Packing ${quantityToPack} of ${item.quantity} (${backOrderQty} on back order)`
+//         );
+//       } else if (fulfilledBO) {
+//         // ✅ CASE 3: All items already shipped
+//         quantityToPack = 0;
+//         quantityAlreadyShipped = item.quantity;
+//         quantityBackOrdered = 0;
+//         packingContext = "ALREADY_FULFILLED";
+
+//         console.log(`  ✅ Item ${item.productVariant.sku}: Already fulfilled`);
+//       } else {
+//         // ✅ CASE 4: Full order with no back orders
+//         quantityToPack = item.quantity;
+//         quantityBackOrdered = 0;
+//         quantityAlreadyShipped = 0;
+//         packingContext = "FULL_ORDER";
+
+//         console.log(
+//           `  📦 Item ${item.productVariant.sku}: Full order (${quantityToPack} units)`
+//         );
+//       }
 
 //       return {
 //         ...item,
 //         quantityToPack,
-//         quantityBackOrdered: backOrderedQty,
+//         quantityBackOrdered,
+//         quantityAlreadyShipped,
+//         packingContext,
 //       };
 //     });
 
-//     // ✅ Check if there's anything to pack
-//     const totalQuantityToPack = itemsToPack.reduce(
-//       (sum, item) => sum + item.quantityToPack,
-//       0
+//     // ✅ Filter out items with nothing to pack
+//     const itemsToPackFiltered = itemsToPack.filter(
+//       (item) => item.quantityToPack > 0
 //     );
 
-//     if (totalQuantityToPack <= 0) {
+//     // ✅ Check if there's anything to pack
+//     if (itemsToPackFiltered.length === 0) {
 //       return NextResponse.json(
 //         {
-//           error: "No items available to pack. All items are on back order.",
+//           error:
+//             "No items available to pack. All items have been shipped or are on back order.",
 //         },
 //         { status: 400 }
 //       );
 //     }
 
-//     // ✅ Allow packing if items are picked OR if there's a partial shipment ready
+//     // ✅ Determine overall packing context
+//     const isBackOrderFulfillment = itemsToPackFiltered.some(
+//       (item) => item.packingContext === "BACK_ORDER_FULFILLMENT"
+//     );
+
+//     console.log(
+//       `📦 Packing context: ${
+//         isBackOrderFulfillment ? "BACK_ORDER" : "INITIAL_ORDER"
+//       }`
+//     );
+//     console.log(
+//       `📦 Total items to pack: ${itemsToPackFiltered.reduce(
+//         (sum, item) => sum + item.quantityToPack,
+//         0
+//       )}`
+//     );
+
+//     // ✅ Allow packing if items are picked OR packed OR shipped (for partial shipments)
 //     const allowedStatuses = ["PICKED", "PACKED", "SHIPPED", "BACKORDER"];
 //     if (!allowedStatuses.includes(order.status)) {
 //       return NextResponse.json(
@@ -346,8 +436,8 @@ export async function GET(
 //       );
 //     }
 
-//     // ✅ Calculate total weight using quantityToPack (not full quantity)
-//     const totalWeightGrams = itemsToPack.reduce((sum, item) => {
+//     // ✅ Calculate total weight using quantityToPack
+//     const totalWeightGrams = itemsToPackFiltered.reduce((sum, item) => {
 //       const unitWeightGrams = item.productVariant.weight
 //         ? parseFloat(item.productVariant.weight.toString())
 //         : 94;
@@ -358,7 +448,7 @@ export async function GET(
 //     const totalWeightLbs = totalWeightGrams * 0.00220462;
 
 //     // ✅ Calculate total volume using quantityToPack
-//     const totalVolume = itemsToPack.reduce((sum, item) => {
+//     const totalVolume = itemsToPackFiltered.reduce((sum, item) => {
 //       const dims = item.productVariant.dimensions as any;
 //       let volume = 100;
 
@@ -386,17 +476,19 @@ export async function GET(
 //         totalAmount: order.totalAmount.toString(),
 //         shippingAddress: shippingAddr,
 //         billingAddress: order.billingAddress,
-//         items: itemsToPack.map((item) => ({
+//         isBackOrderFulfillment, // ✅ Add context flag
+//         items: itemsToPackFiltered.map((item) => ({
 //           id: item.id,
 //           productName: item.productVariant.product.name,
 //           sku: item.productVariant.sku,
-//           quantity: item.quantityToPack, // ✅ Return quantityToPack, not original quantity
-//           originalQuantity: item.quantity, // ✅ Optional: include original for reference
-//           quantityBackOrdered: item.quantityBackOrdered, // ✅ Show back-ordered amount
+//           quantity: item.quantityToPack, // ✅ What we're packing NOW
+//           originalQuantity: item.quantity, // ✅ Original order quantity
+//           quantityBackOrdered: item.quantityBackOrdered, // ✅ Still on back order
+//           quantityAlreadyShipped: item.quantityAlreadyShipped, // ✅ Already shipped
 //           unitPrice: item.unitPrice.toString(),
 //           totalPrice: (
 //             parseFloat(item.unitPrice.toString()) * item.quantityToPack
-//           ).toFixed(2), // ✅ Recalculate based on quantityToPack
+//           ).toFixed(2),
 //           weightGrams: item.productVariant.weight
 //             ? parseFloat(item.productVariant.weight.toString())
 //             : 94,

@@ -212,6 +212,11 @@ export async function GET(
             items: true, // ✅ ADD THIS
           },
         },
+        images: {
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
       },
     });
 
@@ -306,6 +311,13 @@ export async function GET(
       })),
     }));
 
+    const formattedImages = order.images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      reference: img.reference,
+      createdAt: img.createdAt.toISOString(),
+    }));
+
     // Calculate priority
     const priority = calculatePriority(order);
 
@@ -345,6 +357,7 @@ export async function GET(
       statusHistory: formattedHistory,
       backOrders: formattedBackOrders,
       shippingPackages: formattedShippingPackages, // Backorder shipment
+      images: formattedImages,
     };
 
     return NextResponse.json(response);

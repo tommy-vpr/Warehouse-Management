@@ -19,11 +19,17 @@ import {
   User,
   FileText,
   Loader2,
+  Expand,
+  MoveDiagonal,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 import { useOrderDetail, useOrderAction } from "@/hooks/use-order";
 import { OrderDetailResponse, ShippingPackage } from "@/types/order";
+import OrderImageUploadModal from "../modal/OrderImageUploadModal";
+import OrderImageDetailModal from "../modal/OrderImageDetailModal";
 
 interface OrderDetailViewProps {
   orderId: string;
@@ -45,10 +51,16 @@ export default function OrderDetailView({
 
   const orderActionMutation = useOrderAction();
 
-  console.log(order);
+  const [imageUploadModalOpen, setImageUploadModalOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<{
+    id: string;
+    url: string;
+    createdAt: string;
+    reference?: string;
+  } | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "items" | "history" | "shipping" | "backorders"
+    "items" | "history" | "shipping" | "backorders" | "images"
   >("items");
 
   const handleOrderAction = async (action: string) => {
@@ -510,6 +522,16 @@ export default function OrderDetailView({
               >
                 Shipping Info
               </button>
+              <button
+                className={`cursor-pointer pb-2 px-1 ${
+                  activeTab === "images"
+                    ? "border-b-2 border-green-600 font-medium"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                }`}
+                onClick={() => setActiveTab("images")}
+              >
+                Order Images ({order.images?.length || 0})
+              </button>
               {order.backOrders.length > 0 && (
                 <button
                   className={`pb-2 px-1 ${
@@ -885,6 +907,101 @@ export default function OrderDetailView({
                     </p>
                   </div>
                 )} */}
+              </div>
+            )}
+
+            {activeTab === "images" && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {order.images && order.images.length > 0
+                      ? `${order.images.length} image${
+                          order.images.length !== 1 ? "s" : ""
+                        }`
+                      : "No images"}
+                  </h3>
+                  <Button
+                    onClick={() => setImageUploadModalOpen(true)}
+                    size="sm"
+                    className="cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Image
+                  </Button>
+                </div>
+
+                {order.images && order.images.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {order.images.map((img) => (
+                      <div
+                        key={img.id}
+                        onClick={() => setSelectedImage(img)}
+                        className="relative group rounded-lg overflow-hidden border dark:border-border bg-gray-50 dark:bg-gray-800 aspect-square cursor-pointer transition-all"
+                      >
+                        <img
+                          src={img.url}
+                          alt="Order"
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+
+                        {/* Overlay on hover */}
+                        <div className="absolute inset-0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                          <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                            View Details
+                          </span>
+                        </div>
+
+                        {/* Timestamp */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-xs text-white">
+                            {new Date(img.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                    <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                      No images uploaded yet
+                    </p>
+                    <Button
+                      onClick={() => setImageUploadModalOpen(true)}
+                      variant="outline"
+                      className="cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload First Image
+                    </Button>
+                  </div>
+                )}
+
+                {/* Upload Modal */}
+                <OrderImageUploadModal
+                  orderId={order.id}
+                  orderNumber={order.orderNumber}
+                  customerName={order.customerName}
+                  open={imageUploadModalOpen}
+                  onOpenChange={setImageUploadModalOpen}
+                  onUploadSuccess={() => {
+                    refetch();
+                  }}
+                />
+
+                {/* Image Detail Modal */}
+                <OrderImageDetailModal
+                  image={selectedImage}
+                  orderNumber={order.orderNumber}
+                  open={!!selectedImage}
+                  onOpenChange={(open) => !open && setSelectedImage(null)}
+                  onDelete={(imageId) => {
+                    // Remove from local state immediately
+                    setSelectedImage(null);
+                    // Refresh to get updated list
+                    refetch();
+                  }}
+                />
               </div>
             )}
 
