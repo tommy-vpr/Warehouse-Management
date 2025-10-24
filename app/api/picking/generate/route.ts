@@ -61,14 +61,18 @@ export async function POST(request: NextRequest) {
             productVariant: {
               include: {
                 inventory: {
-                  // ✅ FIX: Remove the where clause to get ALL inventory locations
-                  // We'll filter for quantityReserved > 0 in JavaScript instead
                   include: {
                     location: true,
                   },
                 },
               },
             },
+          },
+        },
+        // ✅ NEW: Include back orders to know what quantities to pick
+        backOrders: {
+          where: {
+            status: "ALLOCATED",
           },
         },
       },
@@ -93,69 +97,103 @@ export async function POST(request: NextRequest) {
 
     for (const order of allocatedOrders) {
       console.log(`\n📦 Processing order ${order.orderNumber} (${order.id})`);
+
+      const hasBackOrders = order.backOrders.length > 0;
+      console.log(
+        `   ${hasBackOrders ? "🔄 Back order mode" : "📦 Normal order mode"}`
+      );
       console.log(`   Order has ${order.items.length} line items`);
+
+      // ✅ NEW: Get order-specific reservations
+      const orderReservations = await prisma.inventoryReservation.findMany({
+        where: {
+          orderId: order.id,
+          status: "ACTIVE",
+        },
+        include: {
+          location: true,
+        },
+      });
+
+      console.log(
+        `   📍 Found ${orderReservations.length} reservation(s) for this order`
+      );
 
       for (const orderItem of order.items) {
         console.log(
           `\n  📄 Item: ${orderItem.productVariant.sku} - ${orderItem.productVariant.name}`
         );
-        console.log(`     Quantity needed: ${orderItem.quantity}`);
-        console.log(
-          `     Inventory locations available: ${orderItem.productVariant.inventory.length}`
-        );
 
-        // ✅ FIX: Filter for reserved inventory in JavaScript with detailed logging
-        const allInventory = orderItem.productVariant.inventory;
-        const reservedInventory = allInventory
-          .filter((inv) => {
-            const hasReserved = inv.quantityReserved > 0;
+        // ✅ FIXED: Determine quantity to pick based on back orders
+        let quantityNeeded = orderItem.quantity;
+
+        if (hasBackOrders) {
+          const backOrder = order.backOrders.find(
+            (bo) => bo.productVariantId === orderItem.productVariantId
+          );
+
+          if (backOrder) {
+            quantityNeeded =
+              backOrder.quantityBackOrdered - backOrder.quantityFulfilled;
+            console.log(`     🔄 Back order quantity: ${quantityNeeded} units`);
+          } else {
             console.log(
-              `     - Location ${inv.location.name}: OnHand=${
-                inv.quantityOnHand
-              }, Reserved=${inv.quantityReserved} ${hasReserved ? "✅" : "❌"}`
+              `     ⏭️  Skipping - no back order for this product (already fulfilled)`
             );
-            return hasReserved;
-          })
-          .sort((a, b) => b.quantityReserved - a.quantityReserved);
+            continue; // Skip items without back orders
+          }
+        }
 
-        if (reservedInventory.length === 0) {
-          const errorMsg = `No reserved inventory for SKU ${orderItem.productVariant.sku}`;
+        console.log(`     📊 Quantity needed: ${quantityNeeded}`);
+
+        // ✅ FIXED: Filter reservations for THIS order and THIS product
+        const productReservations = orderReservations
+          .filter((r) => r.productVariantId === orderItem.productVariantId)
+          .sort((a, b) => b.quantity - a.quantity);
+
+        if (productReservations.length === 0) {
+          const errorMsg = `No reservations found for SKU ${orderItem.productVariant.sku} on this order`;
           console.error(`     ❌ ERROR: ${errorMsg}`);
           skippedItems.push({
             sku: orderItem.productVariant.sku,
             reason: errorMsg,
           });
-          continue; // Skip this item but continue processing
+          continue;
         }
 
         console.log(
-          `     ✅ Found ${reservedInventory.length} location(s) with reserved inventory`
+          `     ✅ Found ${productReservations.length} reservation(s) for this product:`
         );
+        productReservations.forEach((r) => {
+          console.log(
+            `        - ${r.location.name}: ${r.quantity} units reserved`
+          );
+        });
 
-        let remainingToPick = orderItem.quantity;
+        let remainingToPick = quantityNeeded;
 
-        for (const inventory of reservedInventory) {
+        for (const reservation of productReservations) {
           if (remainingToPick <= 0) break;
 
           const quantityFromThisLocation = Math.min(
             remainingToPick,
-            inventory.quantityReserved
+            reservation.quantity // ✅ Use reservation quantity, not total inventory
           );
 
           console.log(
-            `     📍 Adding pick task: ${quantityFromThisLocation} units from ${inventory.location.name}`
+            `     📍 Adding pick task: ${quantityFromThisLocation} units from ${reservation.location.name}`
           );
 
           pickItems.push({
             orderId: order.id,
             orderNumber: order.orderNumber,
             productVariantId: orderItem.productVariantId,
-            locationId: inventory.locationId,
-            locationName: inventory.location.name,
+            locationId: reservation.locationId,
+            locationName: reservation.location.name,
             sku: orderItem.productVariant.sku,
             productName: orderItem.productVariant.name,
             quantityToPick: quantityFromThisLocation,
-            zone: inventory.location.name.split("-")[0] || "MAIN",
+            zone: reservation.location.name.split("-")[0] || "MAIN",
           });
 
           remainingToPick -= quantityFromThisLocation;
@@ -168,7 +206,11 @@ export async function POST(request: NextRequest) {
         }
 
         if (remainingToPick > 0) {
-          const errorMsg = `Insufficient reserved inventory for SKU ${orderItem.productVariant.sku}. Short by ${remainingToPick} units`;
+          const errorMsg = `Insufficient reservations for SKU ${
+            orderItem.productVariant.sku
+          }. Need ${quantityNeeded}, only ${
+            quantityNeeded - remainingToPick
+          } reserved`;
           console.error(`     ❌ ERROR: ${errorMsg}`);
           skippedItems.push({
             sku: orderItem.productVariant.sku,

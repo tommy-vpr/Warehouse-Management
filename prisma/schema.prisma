@@ -12,6 +12,147 @@ datasource db {
 // ---------------------------------------------------
 // 📦 Core Models
 // ---------------------------------------------------
+model WorkTask {
+  id          String          @id @default(cuid())
+  taskNumber  String          @unique
+  type        WorkTaskType    // ← Updated
+  status      WorkTaskStatus  @default(PENDING)  // ← Updated
+  
+  assignedTo  String?
+  assignedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  orderIds    String[]
+  totalOrders Int
+  completedOrders Int   @default(0)
+  
+  totalItems     Int
+  completedItems Int    @default(0)
+  
+  priority    Int        @default(0)
+  notes       String?
+  
+  parentTaskId String?
+  parentTask   WorkTask?  @relation("TaskContinuation", fields: [parentTaskId], references: [id])
+  continuations WorkTask[] @relation("TaskContinuation")
+  
+  assignedUser User?      @relation(fields: [assignedTo], references: [id])
+  taskItems    TaskItem[]
+  events       TaskEvent[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  @@index([type, status])
+  @@index([assignedTo])
+  @@map("work_tasks")
+}
+
+model TaskItem {
+  id               String              @id @default(cuid())
+  taskId           String
+  orderId          String
+  productVariantId String?
+  locationId       String?
+  
+  quantityRequired Int
+  quantityCompleted Int                @default(0)
+  
+  status           WorkTaskItemStatus  @default(PENDING)  // ← Updated
+  sequence         Int
+  
+  completedBy      String?
+  completedAt      DateTime?
+  notes            String?
+  
+  task             WorkTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  order            Order               @relation(fields: [orderId], references: [id])
+  productVariant   ProductVariant?     @relation(fields: [productVariantId], references: [id])
+  location         Location?           @relation(fields: [locationId], references: [id])
+  completedByUser  User?               @relation(fields: [completedBy], references: [id])
+  
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  
+  @@index([taskId])
+  @@index([orderId])
+  @@map("task_items")
+}
+
+model TaskEvent {
+  id        String             @id @default(cuid())
+  taskId    String
+  eventType WorkTaskEventType  // ← Updated
+  userId    String
+  data      Json?
+  notes     String?
+  createdAt DateTime           @default(now())
+  
+  task      WorkTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id])
+  
+  @@index([taskId])
+  @@map("task_events")
+}
+
+enum WorkTaskType {  // ← Renamed from TaskType
+  PICKING
+  PACKING
+  SHIPPING
+  QC
+}
+
+enum WorkTaskStatus {  // ← Renamed from TaskStatus
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  PAUSED
+  PARTIALLY_COMPLETED
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkTaskItemStatus {  // ← Renamed from TaskItemStatus
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  ISSUE
+}
+
+enum WorkTaskEventType {  // ← Renamed from TaskEventType
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_STARTED
+  TASK_PAUSED
+  TASK_RESUMED
+  ITEM_COMPLETED
+  ITEM_SKIPPED
+  TASK_COMPLETED
+  TASK_CANCELLED
+  TASK_REASSIGNED
+  TASK_SPLIT
+
+  LABEL_GENERATED
+  LABEL_PRINTED
+  LABEL_VOIDED
+  PACKAGE_WEIGHED
+  PACKAGE_DIMENSIONS_RECORDED
+  CARRIER_SELECTED
+  SERVICE_LEVEL_SELECTED
+  RATE_SHOPPED
+  INSURANCE_ADDED
+  SIGNATURE_REQUIRED
+  TRACKING_NUMBER_ASSIGNED
+  SHIPMENT_MANIFESTED
+  PICKUP_SCHEDULED
+  PACKAGE_SCANNED
+  SHIPMENT_VOIDED
+  CUSTOMS_FORM_CREATED
+  HAZMAT_DECLARED
+}
+
 
 // Authentication Models
 model Account {
@@ -64,12 +205,25 @@ model User {
   receivingSessionsApproved ReceivingSession[] @relation("ApprovedBy")
 
   inventoryTransactions InventoryTransaction[]
-  assignedPickLists     PickList[]
+  assignedPickLists     PickList[]    
   pickedItems           PickListItem[]
-  pickEvents            PickEvent[]
+  pickEvents            PickEvent[]   @relation("PickEventUser")
+
+  pickEventsAsFromUser  PickEvent[]   @relation("PickEventFromUser")
+  pickEventsAsToUser    PickEvent[]   @relation("PickEventToUser")
+
   statusChanges         OrderStatusHistory[]
   assignedCountTasks    CycleCountTask[]
   countEvents           CycleCountEvent[]
+  
+  pickingOrders         Order[]               @relation("PickingOrders")
+  packingOrders         Order[]               @relation("PackingOrders")
+  shippingOrders        Order[]               @relation("ShippingOrders")
+
+  assignedTasks         WorkTask[]
+  completedTaskItems    TaskItem[]
+  taskEvents            TaskEvent[]
+
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -175,6 +329,8 @@ model ProductVariant {
   pickListItems         PickListItem[]
   countTasks            CycleCountTask[]
   purchaseOrderItems    PurchaseOrderItem[]
+
+  taskItems         TaskItem[]
   
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -200,6 +356,8 @@ model Location {
   space                 Int?                   // SPACE column (1, 2, 3, etc.)
   bin                   String?                // BIN column (X, Y, Z, etc.)
   barcode               String?                @unique // Barcode for scanning
+
+  taskItems         TaskItem[]
   
   // Existing fields
   type                  LocationType           @default(GENERAL)
@@ -283,6 +441,8 @@ model Order {
   labelUrl          String?     // Direct link to shipping label
   notes             String?     // Packing/shipping notes
 
+  taskItems       TaskItem[]
+
   shopifyFulfillmentIds String? 
   shopifyLineItems      Json?
 
@@ -291,6 +451,14 @@ model Order {
   backOrders        BackOrder[]
 
   images          OrderImage[]
+
+  currentStage          OrderStage?  @default(PICKING)
+  pickingAssignedTo     String?
+  packingAssignedTo     String?
+  shippingAssignedTo    String?
+  pickingAssignedAt     DateTime?
+  packingAssignedAt     DateTime?
+  shippingAssignedAt    DateTime?
   
   // Relations
   items           OrderItem[]
@@ -300,11 +468,23 @@ model Order {
 
   reservations    InventoryReservation[]
   shopifySyncs    ShopifySync[]
+
+  pickingUser     User?        @relation("PickingOrders", fields: [pickingAssignedTo], references: [id])
+  packingUser     User?        @relation("PackingOrders", fields: [packingAssignedTo], references: [id])
+  shippingUser    User?        @relation("ShippingOrders", fields: [shippingAssignedTo], references: [id])
+  
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@map("orders")
+}
+
+enum OrderStage {
+  PICKING
+  PACKING
+  SHIPPING
+  COMPLETED
 }
 
 model OrderImage {
@@ -367,7 +547,11 @@ model OrderItem {
   id               String         @id @default(cuid())
   orderId          String
   productVariantId String
+
   quantity         Int
+  quantityPicked   Int?           @default(0)  // ✅ actual picked quantity
+  quantityPacked   Int?           @default(0)  // ✅ actual packed quantity
+
   unitPrice        Decimal        @db.Decimal(10, 2)
   totalPrice       Decimal        @db.Decimal(10, 2)
 
@@ -376,6 +560,7 @@ model OrderItem {
 
   order            Order          @relation(fields: [orderId], references: [id])
   productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  pickListItems    PickListItem[] 
 
   @@map("order_items")
 }
@@ -495,6 +680,10 @@ model PickList {
   startTime   DateTime?
   endTime     DateTime?
   notes       String?
+
+  parentPickListId String?       
+  parentPickList   PickList?     @relation("PickListContinuation", fields: [parentPickListId], references: [id])
+  continuations    PickList[]    @relation("PickListContinuation")
   
   // Relations
   items        PickListItem[]
@@ -511,6 +700,7 @@ model PickListItem {
   id               String         @id @default(cuid())
   pickListId       String
   orderId          String
+  orderItemId       String?
   productVariantId String
   locationId       String
   quantityToPick   Int
@@ -525,6 +715,7 @@ model PickListItem {
   // Relations
   pickList       PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
   order          Order          @relation(fields: [orderId], references: [id])
+  orderItem         OrderItem?     @relation(fields: [orderItemId], references: [id])
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
   location       Location       @relation(fields: [locationId], references: [id])
   picker         User?          @relation(fields: [pickedBy], references: [id])
@@ -539,6 +730,8 @@ model PickEvent {
   itemId      String?       // PickListItem ID (optional for list-level events)
   eventType   PickEventType
   userId      String
+  fromUserId  String?       // ✅ NEW: User reassigned FROM
+  toUserId    String?       // ✅ NEW: User reassigned TO
   location    String?       // Location code scanned
   scannedCode String?       // Barcode scanned
   data        Json?         // Additional event data
@@ -547,7 +740,9 @@ model PickEvent {
   
   // Relations
   pickList    PickList      @relation(fields: [pickListId], references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId], references: [id])
+  user        User          @relation("PickEventUser", fields: [userId], references: [id])
+  fromUser    User?         @relation("PickEventFromUser", fields: [fromUserId], references: [id])
+  toUser      User?         @relation("PickEventToUser", fields: [toUserId], references: [id])
 
   @@map("pick_events")
 }
@@ -557,6 +752,7 @@ enum PickStatus {
   ASSIGNED
   IN_PROGRESS
   PAUSED
+  PARTIALLY_COMPLETED
   COMPLETED
   CANCELLED
 }
@@ -581,6 +777,9 @@ enum PickEventType {
   PICK_COMPLETED
   PICK_CANCELLED
   ERROR_OCCURRED
+  PICK_REASSIGNED     
+  PICK_SPLIT           
+  PARTIAL_COMPLETION 
 }
 
 // ---------------------------------------------------
@@ -670,7 +869,7 @@ model CycleCountTask {
   // Task details
   taskNumber        String              @unique
   priority          Int                 @default(0)
-  status            TaskStatus          @default(PENDING)
+  status            CycleCountTaskStatus            @default(PENDING)
   countType         CycleCountType
   
   // Expected vs actual counts
@@ -746,7 +945,7 @@ enum CampaignStatus {
   CANCELLED
 }
 
-enum TaskStatus {
+enum CycleCountTaskStatus {
   PENDING
   ASSIGNED
   IN_PROGRESS

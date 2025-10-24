@@ -77,7 +77,7 @@ export default function OrderImageDetailModal({
         </DialogHeader>
 
         {/* Image Display */}
-        <div className="relative bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden">
+        <div className="relative bg-gray-100 dark:bg-gray-900 overflow-hidden">
           <img
             src={image.url}
             alt="Order"
@@ -87,22 +87,21 @@ export default function OrderImageDetailModal({
 
         {/* Image Metadata */}
         <div className="space-y-3 border-t pt-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center gap-2 text-xs">
             <span className="text-gray-600 dark:text-gray-400">Uploaded:</span>
             <span className="font-medium">
               {new Date(image.createdAt).toLocaleString()}
             </span>
           </div>
 
-          {image.reference && (
+          {/* {image.reference && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-600 dark:text-gray-400">
                 Reference:
               </span>
               <span className="font-medium">{image.reference}</span>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Actions */}

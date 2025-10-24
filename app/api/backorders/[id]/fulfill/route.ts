@@ -121,16 +121,75 @@ export async function POST(
         });
 
         if (existingReservation) {
-          // Update existing reservation
+          // ✅ FIXED: Update existing reservation - REPLACE quantity, don't ADD
+          console.log(
+            `  ⚠️  Found existing reservation of ${existingReservation.quantity} units, updating to ${qty} units`
+          );
+
           await tx.inventoryReservation.update({
             where: { id: existingReservation.id },
             data: {
-              quantity: existingReservation.quantity + qty,
+              quantity: qty, // ✅ Replace with new quantity
               status: "ACTIVE",
             },
           });
+
+          // ✅ FIXED: Adjust inventory by the difference, not by full qty
+          const difference = qty - existingReservation.quantity;
+          if (difference !== 0) {
+            console.log(
+              `  📊 Adjusting inventory reservation by ${difference} (${existingReservation.quantity} → ${qty})`
+            );
+
+            await tx.inventory.update({
+              where: {
+                productVariantId_locationId: {
+                  productVariantId: backOrder.productVariantId,
+                  locationId: inventory.locationId,
+                },
+              },
+              data: {
+                quantityReserved: {
+                  increment: difference, // Only adjust by the difference
+                },
+              },
+            });
+
+            // Create inventory transaction for the adjustment
+            if (difference > 0) {
+              await tx.inventoryTransaction.create({
+                data: {
+                  productVariantId: backOrder.productVariantId,
+                  locationId: inventory.locationId,
+                  transactionType: "ALLOCATION",
+                  quantityChange: -difference,
+                  referenceId: backOrder.orderId,
+                  referenceType: "BACKORDER_ALLOCATION_ADJUSTMENT",
+                  userId: session.user.id,
+                  notes: `Back order allocation adjustment - Increased reservation by ${difference} units for order ${backOrder.order.orderNumber}`,
+                },
+              });
+            } else {
+              await tx.inventoryTransaction.create({
+                data: {
+                  productVariantId: backOrder.productVariantId,
+                  locationId: inventory.locationId,
+                  transactionType: "DEALLOCATION",
+                  quantityChange: Math.abs(difference),
+                  referenceId: backOrder.orderId,
+                  referenceType: "BACKORDER_ALLOCATION_ADJUSTMENT",
+                  userId: session.user.id,
+                  notes: `Back order allocation adjustment - Decreased reservation by ${Math.abs(
+                    difference
+                  )} units for order ${backOrder.order.orderNumber}`,
+                },
+              });
+            }
+          }
         } else {
-          // Create new reservation
+          // ✅ Create new reservation
+          console.log(`  ✅ Creating new reservation of ${qty} units`);
+
           await tx.inventoryReservation.create({
             data: {
               orderId: backOrder.orderId,
@@ -140,36 +199,36 @@ export async function POST(
               status: "ACTIVE",
             },
           });
-        }
 
-        // Reserve inventory
-        await tx.inventory.update({
-          where: {
-            productVariantId_locationId: {
+          // Reserve inventory (only for new reservations)
+          await tx.inventory.update({
+            where: {
+              productVariantId_locationId: {
+                productVariantId: backOrder.productVariantId,
+                locationId: inventory.locationId,
+              },
+            },
+            data: {
+              quantityReserved: {
+                increment: qty,
+              },
+            },
+          });
+
+          // Create inventory transaction
+          await tx.inventoryTransaction.create({
+            data: {
               productVariantId: backOrder.productVariantId,
               locationId: inventory.locationId,
+              transactionType: "ALLOCATION",
+              quantityChange: -qty,
+              referenceId: backOrder.orderId,
+              referenceType: "BACKORDER_ALLOCATION",
+              userId: session.user.id,
+              notes: `Back order allocation - Reserved ${qty} units for order ${backOrder.order.orderNumber}`,
             },
-          },
-          data: {
-            quantityReserved: {
-              increment: qty,
-            },
-          },
-        });
-
-        // Create inventory transaction
-        await tx.inventoryTransaction.create({
-          data: {
-            productVariantId: backOrder.productVariantId,
-            locationId: inventory.locationId,
-            transactionType: "ALLOCATION",
-            quantityChange: -qty,
-            referenceId: backOrder.orderId,
-            referenceType: "BACKORDER_ALLOCATION",
-            userId: session.user.id,
-            notes: `Back order allocation - Reserved ${qty} units for order ${backOrder.order.orderNumber}`,
-          },
-        });
+          });
+        }
 
         allocations.push({
           location: inventory.location.name,

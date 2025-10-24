@@ -31,6 +31,8 @@ import { OrderDetailResponse, ShippingPackage } from "@/types/order";
 import OrderImageUploadModal from "../modal/OrderImageUploadModal";
 import OrderImageDetailModal from "../modal/OrderImageDetailModal";
 
+import AuditTrailTab from "@/components/order/AuditTrailTab";
+
 interface OrderDetailViewProps {
   orderId: string;
   initialData?: OrderDetailResponse;
@@ -60,7 +62,7 @@ export default function OrderDetailView({
   } | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "items" | "history" | "shipping" | "backorders" | "images"
+    "items" | "history" | "shipping" | "backorders" | "images" | "audit"
   >("items");
 
   const handleOrderAction = async (action: string) => {
@@ -495,7 +497,7 @@ export default function OrderDetailView({
               <button
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "items"
-                    ? "border-b-2 border-green-600 font-medium"
+                    ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
                 }`}
                 onClick={() => setActiveTab("items")}
@@ -505,7 +507,7 @@ export default function OrderDetailView({
               <button
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "history"
-                    ? "border-b-2 border-green-600 font-medium"
+                    ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
                 }`}
                 onClick={() => setActiveTab("history")}
@@ -515,7 +517,7 @@ export default function OrderDetailView({
               <button
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "shipping"
-                    ? "border-b-2 border-green-600 font-medium"
+                    ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
                 }`}
                 onClick={() => setActiveTab("shipping")}
@@ -524,8 +526,18 @@ export default function OrderDetailView({
               </button>
               <button
                 className={`cursor-pointer pb-2 px-1 ${
+                  activeTab === "audit"
+                    ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                }`}
+                onClick={() => setActiveTab("audit")}
+              >
+                Audit Trail
+              </button>
+              <button
+                className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "images"
-                    ? "border-b-2 border-green-600 font-medium"
+                    ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
                     : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
                 }`}
                 onClick={() => setActiveTab("images")}
@@ -536,7 +548,7 @@ export default function OrderDetailView({
                 <button
                   className={`pb-2 px-1 ${
                     activeTab === "backorders"
-                      ? "border-b-2 border-green-600 font-medium"
+                      ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
                       : "text-gray-600 dark:text-gray-400"
                   }`}
                   onClick={() => setActiveTab("backorders")}
@@ -909,6 +921,8 @@ export default function OrderDetailView({
                 )} */}
               </div>
             )}
+
+            {activeTab === "audit" && <AuditTrailTab orderId={order.id} />}
 
             {activeTab === "images" && (
               <div>

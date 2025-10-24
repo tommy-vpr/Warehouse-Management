@@ -114,6 +114,32 @@ export async function POST(
         },
       });
 
+      // ✅ CREATE BACK ORDER for short-picked items
+      if (action === "SHORT_PICK" && actual < pickListItem.quantityToPick) {
+        const shortQuantity = pickListItem.quantityToPick - actual;
+        console.log(
+          `📦 Short picked: ${pickListItem.productVariant.sku} - ${shortQuantity} units shortage`
+        );
+
+        // ✅ FIXED: Always create a NEW back order for this specific shortage
+        // We'll consolidate duplicates later
+        await tx.backOrder.create({
+          data: {
+            orderId: pickListItem.orderId,
+            productVariantId: pickListItem.productVariantId,
+            quantityBackOrdered: shortQuantity,
+            quantityFulfilled: 0,
+            reason: "SHORT_PICK",
+            reasonDetails: `Short picked: ${actual} of ${
+              pickListItem.quantityToPick
+            } picked from ${pickListItem.location?.name || "unknown location"}`,
+            status: "PENDING",
+            createdDuring: "PICKING",
+            originalPickListItemId: pickListItem.id,
+          },
+        });
+      }
+
       const allItems = await tx.pickListItem.findMany({
         where: { pickListId: pickListItem.pickListId },
         select: { status: true },
@@ -162,14 +188,69 @@ export async function POST(
           },
         });
 
-        // ✅ UPDATED: Use helper function with transaction support
-        await updateOrderStatus({
-          orderId: pickListItem.orderId,
-          newStatus: "PICKED",
-          userId: session.user.id,
-          notes: `All items picked (${pickedCount}/${totalItems})`,
-          tx, // ← Pass transaction client
+        // ✅ NEW: Consolidate back orders for this order
+        // Group by productVariantId and sum up quantities
+        const backOrders = await tx.backOrder.groupBy({
+          by: ["orderId", "productVariantId"],
+          where: {
+            orderId: pickListItem.orderId,
+            createdDuring: "PICKING",
+            status: "PENDING",
+          },
+          _sum: {
+            quantityBackOrdered: true,
+          },
         });
+
+        // Delete all the individual back orders we just created
+        await tx.backOrder.deleteMany({
+          where: {
+            orderId: pickListItem.orderId,
+            createdDuring: "PICKING",
+            status: "PENDING",
+          },
+        });
+
+        // Create consolidated back orders
+        for (const bo of backOrders) {
+          if (bo._sum.quantityBackOrdered && bo._sum.quantityBackOrdered > 0) {
+            await tx.backOrder.create({
+              data: {
+                orderId: bo.orderId,
+                productVariantId: bo.productVariantId,
+                quantityBackOrdered: bo._sum.quantityBackOrdered,
+                quantityFulfilled: 0,
+                reason: "SHORT_PICK",
+                reasonDetails: `Consolidated shortage from picking session`,
+                status: "PENDING",
+                createdDuring: "PICKING",
+              },
+            });
+          }
+        }
+
+        // ✅ UPDATED: Update order status
+        const hasBackOrders =
+          backOrders.length > 0 &&
+          backOrders.some((bo) => (bo._sum.quantityBackOrdered || 0) > 0);
+
+        if (hasBackOrders) {
+          await updateOrderStatus({
+            orderId: pickListItem.orderId,
+            newStatus: "BACKORDER",
+            userId: session.user.id,
+            notes: `Picking completed with back orders`,
+            tx,
+          });
+        } else {
+          await updateOrderStatus({
+            orderId: pickListItem.orderId,
+            newStatus: "PICKED",
+            userId: session.user.id,
+            notes: `All items picked (${pickedCount}/${totalItems})`,
+            tx,
+          });
+        }
 
         // ✅ ADD THIS: Update back orders from PICKING → PICKED
         await tx.backOrder.updateMany({

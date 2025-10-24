@@ -154,6 +154,8 @@ export default function MobilePickingInterface() {
 
   const pickActionMutation = usePickAction();
 
+  console.log(pickList);
+
   // Memoized calculations
   const { currentItem, pendingItems } = useMemo(() => {
     if (!pickList) return { currentItem: null, pendingItems: [] };

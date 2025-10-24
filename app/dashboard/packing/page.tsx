@@ -1,364 +1,465 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
+  Users,
   Package,
+  Check,
+  AlertCircle,
   Search,
-  Truck,
-  Clock,
-  User,
-  MapPin,
-  Weight,
-  CheckCircle,
-  AlertTriangle,
-  BarChart3,
+  Filter,
+  Box,
   Loader2,
 } from "lucide-react";
-import { usePathname } from "next/navigation";
 
-interface PackableOrder {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerEmail: string;
-  status: string;
-  totalAmount: string;
-  itemCount: number;
-  totalWeight: number;
-  priority: "LOW" | "MEDIUM" | "HIGH";
-  pickedAt: string;
-  shippingAddress: {
-    city: string;
-    state: string;
-    zip: string;
-    country: string;
-  };
-  items: {
-    id: string;
-    productName: string;
-    sku: string;
-    quantity: number;
-    weight: number;
-  }[];
-}
-
-export default function PackStationDashboard() {
-  const [orders, setOrders] = useState<PackableOrder[]>([]);
+function AssignOrdersToPacking() {
+  const [orders, setOrders] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [selectedStaff, setSelectedStaff] = useState("");
+  const [priority, setPriority] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedPriority, setSelectedPriority] = useState<string>("ALL");
-
-  const pathname = usePathname();
 
   useEffect(() => {
-    loadPackableOrders();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadPackableOrders, 30000);
-    return () => clearInterval(interval);
+    loadData();
   }, []);
 
-  const loadPackableOrders = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/packing/orders");
+      const [ordersRes, staffRes] = await Promise.all([
+        fetch("/api/orders?status=PICKED"),
+        fetch("/api/users?role=STAFF&includeWorkload=true"),
+      ]);
+
+      const ordersData = await ordersRes.json();
+      const staffData = await staffRes.json();
+
+      console.log("Picked orders:", ordersData);
+      console.log("Staff data:", staffData);
+
+      setOrders(ordersData);
+      setStaff(staffData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleOrder = (orderId) => {
+    setSelectedOrders((prev) =>
+      prev.includes(orderId)
+        ? prev.filter((id) => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedOrders.length === filteredOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(filteredOrders.map((o) => o.id));
+    }
+  };
+
+  const handleCreatePackingTask = async () => {
+    if (!selectedStaff || selectedOrders.length === 0) {
+      alert("Please select staff member and at least one order");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const response = await fetch("/api/packing-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderIds: selectedOrders,
+          assignedTo: selectedStaff,
+          priority: priority,
+        }),
+      });
+
       if (response.ok) {
-        const data = await response.json();
-        setOrders(data.orders || []);
+        const packingTask = await response.json();
+        alert(`Packing task ${packingTask.taskNumber} created successfully!`);
+        setSelectedOrders([]);
+        setSelectedStaff("");
+        loadData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to create packing task");
       }
     } catch (error) {
-      console.error("Failed to load packable orders:", error);
+      alert("Error creating packing task");
+    } finally {
+      setCreating(false);
     }
-    setIsLoading(false);
   };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesPriority =
-      selectedPriority === "ALL" || order.priority === selectedPriority;
-
-    return matchesSearch && matchesPriority;
+      order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
   });
 
-  // Calculate statistics
-  const stats = {
-    totalOrders: orders.length,
-    highPriority: orders.filter((o) => o.priority === "HIGH").length,
-    totalWeight: orders.reduce((sum, o) => sum + o.totalWeight, 0),
-    averageItems:
-      orders.length > 0
-        ? Math.round(
-            orders.reduce((sum, o) => sum + o.itemCount, 0) / orders.length
-          )
-        : 0,
-  };
+  const selectedOrdersData = filteredOrders.filter((o) =>
+    selectedOrders.includes(o.id)
+  );
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "HIGH":
-        return "bg-red-100 text-red-800";
-      case "MEDIUM":
-        return "bg-yellow-100 text-yellow-800";
-      case "LOW":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  const totalItems = selectedOrdersData.reduce((sum, order) => {
+    return sum + (order.items?.reduce((s, i) => s + i.quantity, 0) || 0);
+  }, 0);
 
-  const getShippingZone = (address: any) => {
-    if (address.country !== "US") return "INTL";
-    const state = address.state;
-    const westCoast = ["CA", "WA", "OR", "NV"];
-    const eastCoast = ["NY", "NJ", "CT", "MA", "FL"];
-
-    if (westCoast.includes(state)) return "WEST";
-    if (eastCoast.includes(state)) return "EAST";
-    return "CENTRAL";
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading pack station...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Pack Station</h1>
-              <p className="text-gray-600">Pack and ship completed orders</p>
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Assign Orders to Packing
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Create packing tasks and assign them to packing staff
+        </p>
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label="Ready for Packing"
+          value={orders.length}
+          icon={<Box className="w-5 h-5" />}
+          color="blue"
+        />
+        <StatCard
+          label="Selected Orders"
+          value={selectedOrders.length}
+          icon={<Check className="w-5 h-5" />}
+          color="green"
+        />
+        <StatCard
+          label="Total Items"
+          value={totalItems}
+          icon={<Package className="w-5 h-5" />}
+          color="purple"
+        />
+        <StatCard
+          label="Available Staff"
+          value={staff.length}
+          icon={<Users className="w-5 h-5" />}
+          color="orange"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Order Selection */}
+        <div className="lg:col-span-2">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow">
+            {/* Search */}
+            <div className="p-4 border-b border-gray-200 dark:border-zinc-700">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search orders..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:bg-zinc-700 dark:text-gray-100 dark:placeholder-gray-400"
+                />
+              </div>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={loadPackableOrders}>
-                Refresh Orders
-              </Button>
-              <Button
-                onClick={() => (window.location.href = "/packing/settings")}
-              >
-                Pack Settings
-              </Button>
+
+            {/* Select All */}
+            <div className="px-4 py-3 bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedOrders.length === filteredOrders.length &&
+                    filteredOrders.length > 0
+                  }
+                  onChange={toggleAll}
+                  className="w-4 h-4 text-blue-600 dark:text-blue-500 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-zinc-700 dark:border-zinc-600"
+                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Select All ({filteredOrders.length} orders)
+                </span>
+              </label>
+              {selectedOrders.length > 0 && (
+                <button
+                  onClick={() => setSelectedOrders([])}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  Clear Selection
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Package className="w-8 h-8 text-blue-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">{stats.totalOrders}</p>
-                    <p className="text-gray-600">Ready to Pack</p>
-                  </div>
+            {/* Orders List */}
+            <div className="max-h-[600px] overflow-y-auto">
+              {filteredOrders.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  <Box className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-600" />
+                  <p>No orders found</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <AlertTriangle className="w-8 h-8 text-red-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">{stats.highPriority}</p>
-                    <p className="text-gray-600">High Priority</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Weight className="w-8 h-8 text-green-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">
-                      {stats.totalWeight.toFixed(1)}
-                    </p>
-                    <p className="text-gray-600">Total lbs</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <BarChart3 className="w-8 h-8 text-purple-600" />
-                  <div className="ml-4">
-                    <p className="text-2xl font-bold">{stats.averageItems}</p>
-                    <p className="text-gray-600">Avg Items</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search orders, customers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              ) : (
+                filteredOrders.map((order) => (
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    selected={selectedOrders.includes(order.id)}
+                    onToggle={() => toggleOrder(order.id)}
+                  />
+                ))
+              )}
             </div>
-            <select
-              value={selectedPriority}
-              onChange={(e) => setSelectedPriority(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="HIGH">High Priority</option>
-              <option value="MEDIUM">Medium Priority</option>
-              <option value="LOW">Low Priority</option>
-            </select>
           </div>
         </div>
 
-        {/* Orders Grid */}
-        {filteredOrders.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No orders ready for packing
+        {/* Right Column - Task Creation */}
+        <div className="lg:col-span-1">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 sticky top-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <Check className="w-5 h-5" />
+              Create Packing Task
             </h3>
-            <p className="text-gray-600">
-              Complete some pick lists to see orders here.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredOrders.map((order) => (
-              <Card
-                key={order.id}
-                className="hover:shadow-lg transition-shadow"
+
+            {/* Summary */}
+            {selectedOrders.length > 0 ? (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                <div className="text-sm text-blue-900 dark:text-blue-200">
+                  <div className="flex justify-between mb-2">
+                    <span>Selected Orders:</span>
+                    <span className="font-semibold">
+                      {selectedOrders.length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Items:</span>
+                    <span className="font-semibold">{totalItems}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg p-4 mb-4 text-center">
+                <AlertCircle className="w-8 h-8 text-gray-400 dark:text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Select orders from the list to create a packing task
+                </p>
+              </div>
+            )}
+
+            {/* Staff Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Assign To Packing Staff
+              </label>
+              <select
+                value={selectedStaff}
+                onChange={(e) => setSelectedStaff(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-zinc-700 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={selectedOrders.length === 0}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">
-                        {order.orderNumber}
-                      </CardTitle>
-                      <div className="flex gap-2 mt-2">
-                        <Badge className={getPriorityColor(order.priority)}>
-                          {order.priority}
-                        </Badge>
-                        <Badge variant="secondary">
-                          {getShippingZone(order.shippingAddress)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">Items</div>
-                      <div className="font-semibold">{order.itemCount}</div>
-                    </div>
-                  </div>
-                </CardHeader>
+                <option value="">Select staff member...</option>
+                {staff
+                  .sort(
+                    (a, b) =>
+                      (a.workload?.remainingOrders || 0) -
+                      (b.workload?.remainingOrders || 0)
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.workload?.remainingOrders || 0} orders)
+                    </option>
+                  ))}
+              </select>
+            </div>
 
-                <CardContent className="space-y-4">
-                  {/* Customer Info */}
-                  <div>
-                    <div className="flex items-center mb-1">
-                      <User className="w-4 h-4 mr-2 text-gray-500" />
-                      <span className="font-medium">{order.customerName}</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {order.customerEmail}
-                    </div>
-                  </div>
+            {/* Priority */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Priority
+              </label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-zinc-700 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={selectedOrders.length === 0}
+              >
+                <option value={0}>Normal</option>
+                <option value={1}>High</option>
+                <option value={2}>Urgent</option>
+              </select>
+            </div>
 
-                  {/* Shipping Address */}
-                  <div>
-                    <div className="flex items-center mb-1">
-                      <MapPin className="w-4 h-4 mr-2 text-gray-500" />
-                      <span className="text-sm font-medium">Ship To:</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {order.shippingAddress.city},{" "}
-                      {order.shippingAddress.state} {order.shippingAddress.zip}
-                    </div>
-                  </div>
-
-                  {/* Order Details */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Value:</span>
-                      <div className="font-medium">${order.totalAmount}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Weight:</span>
-                      <div className="font-medium">
-                        {order.totalWeight.toFixed(1)} lbs
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Timing */}
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Clock className="w-4 h-4 mr-1" />
-                    Picked: {new Date(
-                      order.pickedAt
-                    ).toLocaleDateString()} at{" "}
-                    {new Date(order.pickedAt).toLocaleTimeString()}
-                  </div>
-
-                  {/* Items Preview */}
-                  <div>
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      Items:
-                    </div>
+            {/* Selected Staff Info */}
+            {selectedStaff && (
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">
+                  Current Workload
+                </div>
+                {(() => {
+                  const staffMember = staff.find((s) => s.id === selectedStaff);
+                  return staffMember?.workload ? (
                     <div className="space-y-1">
-                      {order.items.slice(0, 2).map((item) => (
-                        <div
-                          key={item.id}
-                          className="text-xs text-gray-600 flex justify-between"
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Active Tasks:
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {staffMember.workload.activePackingTasks}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Orders in Queue:
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {staffMember.workload.remainingOrders}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Status:
+                        </span>
+                        <span
+                          className={`font-medium capitalize ${
+                            staffMember.workload.status === "idle"
+                              ? "text-gray-600 dark:text-gray-400"
+                              : staffMember.workload.status === "light"
+                              ? "text-green-600 dark:text-green-400"
+                              : staffMember.workload.status === "moderate"
+                              ? "text-yellow-600 dark:text-yellow-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
                         >
-                          <span>{item.productName}</span>
-                          <span>×{item.quantity}</span>
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="text-xs text-gray-500">
-                          +{order.items.length - 2} more items
-                        </div>
-                      )}
+                          {staffMember.workload.status}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      No active work
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
-                  {/* Action Button */}
-                  <Button
-                    className="w-full"
-                    onClick={() =>
-                      (window.location.href = `${pathname}/pack/${order.id}`)
-                    }
-                  >
-                    <Package className="w-4 h-4 mr-2" />
-                    Start Packing
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+            {/* Create Button */}
+            <button
+              onClick={handleCreatePackingTask}
+              disabled={
+                !selectedStaff || selectedOrders.length === 0 || creating
+              }
+              className="w-full bg-blue-600 dark:bg-blue-700 text-white py-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Create Packing Task
+                </>
+              )}
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
+
+function StatCard({ label, value, icon, color }) {
+  const colors = {
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+    green:
+      "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+    purple:
+      "bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+    orange:
+      "bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+  };
+
+  return (
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            {label}
+          </p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {value}
+          </p>
+        </div>
+        <div className={`p-3 rounded-lg ${colors[color]}`}>{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+function OrderRow({ order, selected, onToggle }) {
+  const itemCount =
+    order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  return (
+    <label className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-zinc-700/50 cursor-pointer border-b border-gray-100 dark:border-zinc-700 last:border-b-0">
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggle}
+        className="w-4 h-4 text-blue-600 dark:text-blue-500 rounded focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-zinc-700 dark:border-zinc-600"
+      />
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-3 mb-1">
+          <span className="font-semibold text-gray-900 dark:text-gray-100">
+            {order.orderNumber}
+          </span>
+          <span
+            className={`px-2 py-1 rounded text-xs font-medium ${
+              order.status === "PICKED"
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+            }`}
+          >
+            {order.status}
+          </span>
+        </div>
+
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {order.customerName}
+        </div>
+
+        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-500">
+          <span className="flex items-center gap-1">
+            <Package className="w-3 h-3" />
+            {itemCount} item{itemCount !== 1 ? "s" : ""}
+          </span>
+          <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+
+      {order.packingAssignedTo && (
+        <div className="text-xs text-gray-500 dark:text-gray-400">Assigned</div>
+      )}
+    </label>
+  );
+}
+
+export default AssignOrdersToPacking;

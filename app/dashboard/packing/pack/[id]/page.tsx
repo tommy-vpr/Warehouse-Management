@@ -138,8 +138,9 @@ export default function EnhancedPackingInterface() {
   const loadOrderDetails = async () => {
     try {
       const response = await fetch(`/api/packing/pack/${id}`);
+      const data: any = await response.json();
+
       if (response.ok) {
-        const data: ApiResponse = await response.json();
         setOrder(data.order);
         setPackingInfo(data.packingInfo);
 
@@ -147,9 +148,32 @@ export default function EnhancedPackingInterface() {
         if (data.packingInfo.suggestedBox) {
           setSelectedBox(data.packingInfo.suggestedBox);
         }
+      } else {
+        // ✅ Handle specific error cases with detailed information
+        console.error("Failed to load order:", data);
+
+        // Show detailed error if available
+        if (
+          data.details?.pendingItems &&
+          data.details.pendingItems.length > 0
+        ) {
+          const pendingInfo = data.details.pendingItems
+            .map(
+              (item: any) =>
+                `  • ${item.sku}: ${item.quantityPicked}/${item.quantityOrdered} picked`
+            )
+            .join("\n");
+
+          alert(
+            `${data.error}\n\nPending items:\n${pendingInfo}\n\nPlease complete picking these items first.`
+          );
+        } else {
+          alert(data.error || "Order not found or not ready for packing");
+        }
       }
     } catch (error) {
       console.error("Failed to load order:", error);
+      alert("Failed to load order. Please try again.");
     }
     setIsLoading(false);
   };
@@ -172,9 +196,7 @@ export default function EnhancedPackingInterface() {
   // Check if can proceed to next step
   const canProceedToStep = (step: number) => {
     switch (step) {
-      case 2: // Select box → Pack items
-        return selectedBox !== "";
-      case 3: // Pack items → Create Label
+      case 2: // Pack items → Create Label
         return order ? verifiedItems.size === order.items.length : false;
       default:
         return true;
@@ -204,8 +226,7 @@ export default function EnhancedPackingInterface() {
         throw new Error(errorData.error || "Failed to mark as packed");
       }
 
-      // Move to Step 3 (shipping label form)
-      setCurrentStep(3);
+      setCurrentStep(2);
     } catch (error) {
       console.error("Failed to complete packing:", error);
       alert(
@@ -227,18 +248,12 @@ export default function EnhancedPackingInterface() {
   const steps = [
     {
       number: 1,
-      title: "Select Box",
-      icon: Box,
-      completed: canProceedToStep(2),
-    },
-    {
-      number: 2,
       title: "Pack Items",
       icon: Package,
       completed: canProceedToStep(3),
     },
     {
-      number: 3,
+      number: 2,
       title: "Create Label",
       icon: Truck,
       completed: isPackingComplete,
@@ -300,14 +315,6 @@ export default function EnhancedPackingInterface() {
               className="w-full h-12 text-lg"
             >
               Pack Next Order
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => (window.location.href = "/dashboard/orders")}
-              className="w-full"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Orders
             </Button>
           </div>
         </div>
@@ -456,7 +463,7 @@ export default function EnhancedPackingInterface() {
                     <div
                       className={`w-12 h-12 rounded-full flex items-center justify-center ${
                         currentStep === step.number
-                          ? "bg-blue-600 text-white"
+                          ? "bg-gray-400 dark:bg-zinc-700 text-white"
                           : step.completed
                           ? "bg-green-600 text-white"
                           : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
@@ -552,10 +559,10 @@ export default function EnhancedPackingInterface() {
                     <div
                       key={item.id}
                       onClick={() =>
-                        currentStep >= 2 && toggleItemVerification(item.id)
+                        currentStep >= 1 && toggleItemVerification(item.id)
                       }
                       className={`p-2 rounded-lg transition-colors ${
-                        currentStep >= 2 ? "cursor-pointer" : ""
+                        currentStep >= 1 ? "cursor-pointer" : ""
                       } ${
                         verifiedItems.has(item.id)
                           ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 border"
@@ -641,210 +648,50 @@ export default function EnhancedPackingInterface() {
 
           {/* Right Column - Packing Steps */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Step 1: Select Box */}
+            {/* Step 1: Pack Items */}
             {currentStep === 1 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <Box className="w-5 h-5 mr-2" />
-                    Step 1: Select Box Type
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    {BOX_TYPES.map((box) => (
-                      <div
-                        key={box.id}
-                        onClick={() => setSelectedBox(box.id)}
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                          selectedBox === box.id
-                            ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className="font-semibold">{box.name}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {box.dimensions}"
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          Max: {box.maxWeight} lbs
-                        </div>
-                        {box.cost > 0 && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            ${box.cost.toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedBox === "CUSTOM" && (
-                    <div className="mt-4 p-4 bg-background rounded-lg">
-                      <h4 className="font-medium mb-3">
-                        Custom Dimensions (inches)
-                      </h4>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-sm">Length</label>
-                          <Input
-                            type="number"
-                            value={customDimensions.length}
-                            onChange={(e) =>
-                              setCustomDimensions({
-                                ...customDimensions,
-                                length: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm">Width</label>
-                          <Input
-                            type="number"
-                            value={customDimensions.width}
-                            onChange={(e) =>
-                              setCustomDimensions({
-                                ...customDimensions,
-                                width: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm">Height</label>
-                          <Input
-                            type="number"
-                            value={customDimensions.height}
-                            onChange={(e) =>
-                              setCustomDimensions({
-                                ...customDimensions,
-                                height: e.target.value,
-                              })
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={() => setCurrentStep(2)}
-                    disabled={!canProceedToStep(2)}
-                    className="w-full mt-4"
-                  >
-                    Continue to Pack Items
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Step 2: Pack Items */}
-            {currentStep === 2 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
                     <Package className="w-5 h-5 mr-2" />
-                    Step 2: Pack & Verify Items
+                    Step 1: Pack & Verify Items
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                       <p className="text-sm">
-                        Click each item as you pack it into the{" "}
-                        <strong>
+                        Click each item as you pack
+                        {/* <strong>
                           {BOX_TYPES.find((b) => b.id === selectedBox)?.name}
-                        </strong>
+                        </strong> */}
                       </p>
                     </div>
 
-                    <div className="border-t pt-4">
-                      <div className="mb-2">
-                        <h4 className="font-medium text-sm">
-                          Packing Photos (Optional)
-                        </h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          Take photos of packed contents before sealing the box
-                        </p>
-                      </div>
-                      <OrderImageUploader
-                        orderId={order.id}
-                        orderNumber={order.orderNumber}
-                        customerName={order.customerName}
-                        existingImages={order.images}
-                        onUploadSuccess={loadOrderDetails}
-                        compact={true}
-                      />
-                    </div>
+                    {/* ... packing photos and materials sections ... */}
 
-                    <div>
-                      <h4 className="font-medium mb-3">
-                        Packing Materials (Optional)
-                      </h4>
-                      <div className="space-y-2">
-                        {Object.entries({
-                          bubbleWrap: "Bubble Wrap",
-                          voidFill: "Void Fill / Packing Peanuts",
-                          fragileSticker: "Fragile Sticker",
-                          extraTape: "Extra Tape",
-                        }).map(([key, label]) => (
-                          <label
-                            key={key}
-                            className="flex items-center cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={
-                                packingMaterials[
-                                  key as keyof typeof packingMaterials
-                                ]
-                              }
-                              onChange={(e) =>
-                                setPackingMaterials({
-                                  ...packingMaterials,
-                                  [key]: e.target.checked,
-                                })
-                              }
-                              className="mr-2"
-                            />
-                            <span className="text-sm">{label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCurrentStep(1)}
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        onClick={proceedToCreateLabel}
-                        disabled={!canProceedToStep(3) || isPacking}
-                        className="flex-1"
-                      >
-                        {isPacking
-                          ? "Marking as Packed..."
-                          : "Continue to Create Label"}
-                      </Button>
-                    </div>
+                    {/* ✅ ADD THIS BUTTON SECTION */}
+                    <Button
+                      onClick={proceedToCreateLabel}
+                      disabled={!canProceedToStep(2) || isPacking}
+                      className="w-full"
+                    >
+                      {isPacking
+                        ? "Marking as Packed..."
+                        : "Continue to Create Label"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Step 3: Create Shipping Label */}
-            {currentStep === 3 && (
+            {/* Step 2: Create Shipping Label */}
+            {currentStep === 2 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <Truck className="w-5 h-5 mr-2" />
-                    Step 3: Create Shipping Label
+                    Step 2: Create Shipping Label
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -854,7 +701,7 @@ export default function EnhancedPackingInterface() {
                     initialWeight={calculatedWeightLbs}
                     initialDimensions={getSelectedBoxDetails()}
                     onSuccess={handleLabelSuccess}
-                    onCancel={() => setCurrentStep(2)}
+                    onCancel={() => setCurrentStep(1)}
                   />
                 </CardContent>
               </Card>
