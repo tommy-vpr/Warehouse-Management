@@ -13,97 +13,97 @@ datasource db {
 // 📦 Core Models
 // ---------------------------------------------------
 model WorkTask {
-  id          String          @id @default(cuid())
-  taskNumber  String          @unique
-  type        WorkTaskType    // ← Updated
-  status      WorkTaskStatus  @default(PENDING)  // ← Updated
-  
+  id         String         @id @default(cuid())
+  taskNumber String         @unique
+  type       WorkTaskType // ← Updated
+  status     WorkTaskStatus @default(PENDING) // ← Updated
+
   assignedTo  String?
   assignedAt  DateTime?
   startedAt   DateTime?
   completedAt DateTime?
-  
-  orderIds    String[]
-  totalOrders Int
-  completedOrders Int   @default(0)
-  
+
+  orderIds        String[]
+  totalOrders     Int
+  completedOrders Int      @default(0)
+
   totalItems     Int
-  completedItems Int    @default(0)
-  
-  priority    Int        @default(0)
-  notes       String?
-  
-  parentTaskId String?
-  parentTask   WorkTask?  @relation("TaskContinuation", fields: [parentTaskId], references: [id])
+  completedItems Int @default(0)
+
+  priority Int     @default(0)
+  notes    String?
+
+  parentTaskId  String?
+  parentTask    WorkTask?  @relation("TaskContinuation", fields: [parentTaskId], references: [id])
   continuations WorkTask[] @relation("TaskContinuation")
-  
-  assignedUser User?      @relation(fields: [assignedTo], references: [id])
+
+  assignedUser User?       @relation(fields: [assignedTo], references: [id])
   taskItems    TaskItem[]
   events       TaskEvent[]
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([type, status])
   @@index([assignedTo])
   @@map("work_tasks")
 }
 
 model TaskItem {
-  id               String              @id @default(cuid())
+  id               String  @id @default(cuid())
   taskId           String
   orderId          String
   productVariantId String?
   locationId       String?
-  
-  quantityRequired Int
-  quantityCompleted Int                @default(0)
-  
-  status           WorkTaskItemStatus  @default(PENDING)  // ← Updated
-  sequence         Int
-  
-  completedBy      String?
-  completedAt      DateTime?
-  notes            String?
-  
-  task             WorkTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  order            Order               @relation(fields: [orderId], references: [id])
-  productVariant   ProductVariant?     @relation(fields: [productVariantId], references: [id])
-  location         Location?           @relation(fields: [locationId], references: [id])
-  completedByUser  User?               @relation(fields: [completedBy], references: [id])
-  
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  
+
+  quantityRequired  Int
+  quantityCompleted Int @default(0)
+
+  status   WorkTaskItemStatus @default(PENDING) // ← Updated
+  sequence Int
+
+  completedBy String?
+  completedAt DateTime?
+  notes       String?
+
+  task            WorkTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  order           Order           @relation(fields: [orderId], references: [id])
+  productVariant  ProductVariant? @relation(fields: [productVariantId], references: [id])
+  location        Location?       @relation(fields: [locationId], references: [id])
+  completedByUser User?           @relation(fields: [completedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([taskId])
   @@index([orderId])
   @@map("task_items")
 }
 
 model TaskEvent {
-  id        String             @id @default(cuid())
+  id        String            @id @default(cuid())
   taskId    String
-  eventType WorkTaskEventType  // ← Updated
+  eventType WorkTaskEventType // ← Updated
   userId    String
   data      Json?
   notes     String?
-  createdAt DateTime           @default(now())
-  
-  task      WorkTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User               @relation(fields: [userId], references: [id])
-  
+  createdAt DateTime          @default(now())
+
+  task WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id])
+
   @@index([taskId])
   @@map("task_events")
 }
 
-enum WorkTaskType {  // ← Renamed from TaskType
+enum WorkTaskType {
   PICKING
   PACKING
   SHIPPING
   QC
 }
 
-enum WorkTaskStatus {  // ← Renamed from TaskStatus
+enum WorkTaskStatus {
   PENDING
   ASSIGNED
   IN_PROGRESS
@@ -113,7 +113,7 @@ enum WorkTaskStatus {  // ← Renamed from TaskStatus
   CANCELLED
 }
 
-enum WorkTaskItemStatus {  // ← Renamed from TaskItemStatus
+enum WorkTaskItemStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
@@ -121,7 +121,7 @@ enum WorkTaskItemStatus {  // ← Renamed from TaskItemStatus
   ISSUE
 }
 
-enum WorkTaskEventType {  // ← Renamed from TaskEventType
+enum WorkTaskEventType {
   TASK_CREATED
   TASK_ASSIGNED
   TASK_STARTED
@@ -152,7 +152,6 @@ enum WorkTaskEventType {  // ← Renamed from TaskEventType
   CUSTOMS_FORM_CREATED
   HAZMAT_DECLARED
 }
-
 
 // Authentication Models
 model Account {
@@ -185,68 +184,69 @@ model Session {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  name                  String?
-  email                 String                 @unique
-  emailVerified         DateTime?
-  password              String?
-  image                 String?
-  role                  UserRole               @default(STAFF)
-  
-  currentChallenge      String?
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          UserRole  @default(STAFF)
 
-  accounts              Account[]
-  sessions              Session[]
-  credentials           UserCredential[]
+  currentChallenge String?
 
-  notifications         Notification[]
+  accounts    Account[]
+  sessions    Session[]
+  credentials UserCredential[]
+
+  notifications Notification[]
 
   receivingSessionsCounted  ReceivingSession[] @relation("CountedBy")
   receivingSessionsApproved ReceivingSession[] @relation("ApprovedBy")
 
   inventoryTransactions InventoryTransaction[]
-  assignedPickLists     PickList[]    
+  assignedPickLists     PickList[]
   pickedItems           PickListItem[]
-  pickEvents            PickEvent[]   @relation("PickEventUser")
+  pickEvents            PickEvent[]            @relation("PickEventUser")
 
-  pickEventsAsFromUser  PickEvent[]   @relation("PickEventFromUser")
-  pickEventsAsToUser    PickEvent[]   @relation("PickEventToUser")
+  pickEventsAsFromUser PickEvent[] @relation("PickEventFromUser")
+  pickEventsAsToUser   PickEvent[] @relation("PickEventToUser")
 
-  statusChanges         OrderStatusHistory[]
-  assignedCountTasks    CycleCountTask[]
-  countEvents           CycleCountEvent[]
-  
-  pickingOrders         Order[]               @relation("PickingOrders")
-  packingOrders         Order[]               @relation("PackingOrders")
-  shippingOrders        Order[]               @relation("ShippingOrders")
+  statusChanges      OrderStatusHistory[]
+  assignedCountTasks CycleCountTask[]
+  countEvents        CycleCountEvent[]
 
-  assignedTasks         WorkTask[]
-  completedTaskItems    TaskItem[]
-  taskEvents            TaskEvent[]
+  pickingOrders  Order[] @relation("PickingOrders")
+  packingOrders  Order[] @relation("PackingOrders")
+  shippingOrders Order[] @relation("ShippingOrders")
 
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  assignedTasks      WorkTask[]
+  completedTaskItems TaskItem[]
+  taskEvents         TaskEvent[]
+
+  printedBarcodes POBarcode[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
 
 model UserCredential {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // WebAuthn-specific fields
-  credentialId String   @unique         // base64url ID of the passkey
-  publicKey    String                  // base64-encoded public key
-  counter      Int                     // used to prevent replay attacks
-  transports   String?                 // "usb,nfc,ble,internal"
-  deviceType   String?                 // "singleDevice" | "multiDevice"
-  backedUp     Boolean?                // if authenticator supports backup
+  credentialId String   @unique // base64url ID of the passkey
+  publicKey    String // base64-encoded public key
+  counter      Int // used to prevent replay attacks
+  transports   String? // "usb,nfc,ble,internal"
+  deviceType   String? // "singleDevice" | "multiDevice"
+  backedUp     Boolean? // if authenticator supports backup
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
 
 enum UserRole {
   ADMIN
@@ -257,21 +257,21 @@ enum UserRole {
 
 // Products & Inventory
 model Product {
-  id               String           @id @default(cuid())
-  sku              String           @unique
+  id               String  @id @default(cuid())
+  sku              String  @unique
   name             String
   description      String?
-  shopifyProductId String?          @unique
-  
+  shopifyProductId String? @unique
+
   // Enhanced product fields
-  brand            String?
-  category         String?
-  productLine      String?          // "Skwezed ICE", "Skwezed Salt", etc.
-  flavor           String?          // "Banana", "Blue Razz", etc.
-  
-  variants         ProductVariant[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  brand       String?
+  category    String?
+  productLine String? // "Skwezed ICE", "Skwezed Salt", etc.
+  flavor      String? // "Banana", "Blue Razz", etc.
+
+  variants  ProductVariant[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@index([brand])
   @@index([category])
@@ -281,46 +281,46 @@ model Product {
 }
 
 model ProductVariant {
-  id                    String                 @id @default(cuid())
-  productId             String
-  sku                   String                 @unique
-  upc                   String?                @unique
-  name                  String
-  
+  id        String  @id @default(cuid())
+  productId String
+  sku       String  @unique
+  upc       String? @unique
+  name      String
+
   // Pricing
-  costPrice             Decimal?               @db.Decimal(10, 2)
-  sellingPrice          Decimal?               @db.Decimal(10, 2)
-  
+  costPrice    Decimal? @db.Decimal(10, 2)
+  sellingPrice Decimal? @db.Decimal(10, 2)
+
   // Physical characteristics (single unit)
-  weight                Decimal?               @db.Decimal(8, 2)  // Weight in grams
-  dimensions            Json?                  // Enhanced JSON with unit + master case data
-  
+  weight     Decimal? @db.Decimal(8, 2) // Weight in grams
+  dimensions Json? // Enhanced JSON with unit + master case data
+
   // Product specifications
-  volume                String?                // "100ml", "30ml"
-  strength              String?                // "00mg", "03mg", "06mg", "25mg", "50mg"
-  
+  volume   String? // "100ml", "30ml"
+  strength String? // "00mg", "03mg", "06mg", "25mg", "50mg"
+
   // Master Case Information
-  masterCaseQty         Int?                   // Quantity per master case (usually 100)
-  masterCaseWeight      Decimal?               @db.Decimal(8, 2)  // MC weight in grams
-  masterCaseDimensions  Json?                  // MC dimensions object
-  
+  masterCaseQty        Int? // Quantity per master case (usually 100)
+  masterCaseWeight     Decimal? @db.Decimal(8, 2) // MC weight in grams
+  masterCaseDimensions Json? // MC dimensions object
+
   // Enhanced variant attributes
-  hasIce                Boolean                @default(false)
-  hasSalt               Boolean                @default(false)
-  isNicotineFree        Boolean                @default(false)
-  flavor                String?                // Extracted flavor
-  productLine           String?                // Product line for this variant
-  
+  hasIce         Boolean @default(false)
+  hasSalt        Boolean @default(false)
+  isNicotineFree Boolean @default(false)
+  flavor         String? // Extracted flavor
+  productLine    String? // Product line for this variant
+
   // Existing fields
-  shopifyVariantId      String?                @unique
-  category              String?     
-  supplier              String?
-  barcode               String?
+  shopifyVariantId String? @unique
+  category         String?
+  supplier         String?
+  barcode          String?
 
   // Back orders
-  backOrders        BackOrder[]
-  reservations          InventoryReservation[]
-  
+  backOrders   BackOrder[]
+  reservations InventoryReservation[]
+
   // Relations
   product               Product                @relation(fields: [productId], references: [id])
   inventory             Inventory[]
@@ -330,10 +330,10 @@ model ProductVariant {
   countTasks            CycleCountTask[]
   purchaseOrderItems    PurchaseOrderItem[]
 
-  taskItems         TaskItem[]
-  
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  taskItems TaskItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([volume])
   @@index([strength])
@@ -341,40 +341,42 @@ model ProductVariant {
   @@index([hasSalt])
   @@index([flavor])
   @@index([productLine])
+  @@index([upc])
+  @@index([barcode])
   @@map("product_variants")
 }
 
 model Location {
-  id                    String                 @id @default(cuid())
-  name                  String                 @unique // "1-A-2-B-2-X" format
-  
-  // Enhanced location fields
-  warehouseNumber       Int?                   // WH column (1, 2, 3, etc.)
-  aisle                 String?                // AISLE column (A, B, C, etc.)
-  bay                   Int?                   // BAY column (1, 2, 3, etc.)
-  tier                  String?                // TIER column (A, B, C, etc.)
-  space                 Int?                   // SPACE column (1, 2, 3, etc.)
-  bin                   String?                // BIN column (X, Y, Z, etc.)
-  barcode               String?                @unique // Barcode for scanning
+  id   String @id @default(cuid())
+  name String @unique // "1-A-2-B-2-X" format
 
-  taskItems         TaskItem[]
-  
+  // Enhanced location fields
+  warehouseNumber Int? // WH column (1, 2, 3, etc.)
+  aisle           String? // AISLE column (A, B, C, etc.)
+  bay             Int? // BAY column (1, 2, 3, etc.)
+  tier            String? // TIER column (A, B, C, etc.)
+  space           Int? // SPACE column (1, 2, 3, etc.)
+  bin             String? // BIN column (X, Y, Z, etc.)
+  barcode         String? @unique // Barcode for scanning
+
+  taskItems TaskItem[]
+
   // Existing fields
-  type                  LocationType           @default(GENERAL)
-  zone                  String?
-  shelf                 String?                // Legacy field, can be deprecated
-  isPickable            Boolean                @default(true)
-  isReceivable          Boolean                @default(true)
-  
+  type         LocationType @default(GENERAL)
+  zone         String?
+  shelf        String? // Legacy field, can be deprecated
+  isPickable   Boolean      @default(true)
+  isReceivable Boolean      @default(true)
+
   // Relations
   inventory             Inventory[]
   inventoryTransactions InventoryTransaction[]
   pickListItems         PickListItem[]
   countTasks            CycleCountTask[]
   reservations          InventoryReservation[]
-  
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([warehouseNumber, aisle, bay, tier, space, bin])
   @@index([warehouseNumber, aisle])
@@ -394,25 +396,25 @@ enum LocationType {
 }
 
 model Inventory {
-  id               String         @id @default(cuid())
+  id               String @id @default(cuid())
   productVariantId String
   locationId       String
-  
+
   // Unit-level inventory
-  quantityOnHand   Int            @default(0)
-  quantityReserved Int            @default(0)
-  
+  quantityOnHand   Int @default(0)
+  quantityReserved Int @default(0)
+
   // Case-level inventory (optional)
-  casesOnHand      Int?           @default(0)    // Full cases available
-  casesReserved    Int?           @default(0)    // Full cases reserved
-  
-  reorderPoint     Int?
-  maxQuantity      Int?
-  lastCounted      DateTime?
-  
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
-  location         Location       @relation(fields: [locationId], references: [id])
-  updatedAt        DateTime       @updatedAt
+  casesOnHand   Int? @default(0) // Full cases available
+  casesReserved Int? @default(0) // Full cases reserved
+
+  reorderPoint Int?
+  maxQuantity  Int?
+  lastCounted  DateTime?
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  location       Location       @relation(fields: [locationId], references: [id])
+  updatedAt      DateTime       @updatedAt
 
   @@unique([productVariantId, locationId])
   @@map("inventory")
@@ -429,53 +431,52 @@ model Order {
   totalAmount     Decimal     @db.Decimal(10, 2)
   shippingAddress Json
   billingAddress  Json?
-  
+
   // Shipping fields
-  trackingNumber    String?
-  trackingUrl       String?  
-  shippedAt         DateTime?
-  shippingStatus    String?
-  shippingCost      String?     // Store as string to preserve decimal precision
-  shippingCarrier   String?     // usps, fedex, ups, etc.
-  shippingService   String?     // usps_ground_advantage, fedex_ground, etc.
-  labelUrl          String?     // Direct link to shipping label
-  notes             String?     // Packing/shipping notes
+  trackingNumber  String?
+  trackingUrl     String?
+  shippedAt       DateTime?
+  shippingStatus  String?
+  shippingCost    String? // Store as string to preserve decimal precision
+  shippingCarrier String? // usps, fedex, ups, etc.
+  shippingService String? // usps_ground_advantage, fedex_ground, etc.
+  labelUrl        String? // Direct link to shipping label
+  notes           String? // Packing/shipping notes
 
-  taskItems       TaskItem[]
+  taskItems TaskItem[]
 
-  shopifyFulfillmentIds String? 
+  shopifyFulfillmentIds String?
   shopifyLineItems      Json?
 
   // Back order
-  hasBackOrders     Boolean     @default(false)
-  backOrders        BackOrder[]
+  hasBackOrders Boolean     @default(false)
+  backOrders    BackOrder[]
 
-  images          OrderImage[]
+  images OrderImage[]
 
-  currentStage          OrderStage?  @default(PICKING)
-  pickingAssignedTo     String?
-  packingAssignedTo     String?
-  shippingAssignedTo    String?
-  pickingAssignedAt     DateTime?
-  packingAssignedAt     DateTime?
-  shippingAssignedAt    DateTime?
-  
+  currentStage       OrderStage? @default(PICKING)
+  pickingAssignedTo  String?
+  packingAssignedTo  String?
+  shippingAssignedTo String?
+  pickingAssignedAt  DateTime?
+  packingAssignedAt  DateTime?
+  shippingAssignedAt DateTime?
+
   // Relations
-  items           OrderItem[]
-  pickListItems   PickListItem[]
-  packages        ShippingPackage[]
-  statusHistory   OrderStatusHistory[]
+  items         OrderItem[]
+  pickListItems PickListItem[]
+  packages      ShippingPackage[]
+  statusHistory OrderStatusHistory[]
 
-  reservations    InventoryReservation[]
-  shopifySyncs    ShopifySync[]
+  reservations InventoryReservation[]
+  shopifySyncs ShopifySync[]
 
-  pickingUser     User?        @relation("PickingOrders", fields: [pickingAssignedTo], references: [id])
-  packingUser     User?        @relation("PackingOrders", fields: [packingAssignedTo], references: [id])
-  shippingUser    User?        @relation("ShippingOrders", fields: [shippingAssignedTo], references: [id])
-  
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  pickingUser  User? @relation("PickingOrders", fields: [pickingAssignedTo], references: [id])
+  packingUser  User? @relation("PackingOrders", fields: [packingAssignedTo], references: [id])
+  shippingUser User? @relation("ShippingOrders", fields: [shippingAssignedTo], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("orders")
 }
@@ -493,29 +494,29 @@ model OrderImage {
   url       String
   reference String?
   createdAt DateTime @default(now())
-  
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   @@index([orderId])
   @@map("order_images")
 }
 
 model InventoryReservation {
-  id               String         @id @default(cuid())
+  id               String            @id @default(cuid())
   orderId          String
   productVariantId String
   locationId       String
   quantity         Int
   status           ReservationStatus @default(ACTIVE)
-  
+
   // Relations
-  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
-  location         Location       @relation(fields: [locationId], references: [id])
-  
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  location       Location       @relation(fields: [locationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([orderId, productVariantId, locationId])
   @@index([orderId])
   @@index([productVariantId, locationId])
@@ -531,53 +532,53 @@ enum ReservationStatus {
 model OrderStatusHistory {
   id             String      @id @default(cuid())
   orderId        String
-  previousStatus OrderStatus  
+  previousStatus OrderStatus
   newStatus      OrderStatus
   changedBy      String
   changedAt      DateTime    @default(now())
   notes          String?
-  
-  order          Order       @relation(fields: [orderId], references: [id])
-  changedByUser  User        @relation(fields: [changedBy], references: [id])
-  
+
+  order         Order @relation(fields: [orderId], references: [id])
+  changedByUser User  @relation(fields: [changedBy], references: [id])
+
   @@map("order_status_history")
 }
 
 model OrderItem {
-  id               String         @id @default(cuid())
+  id               String @id @default(cuid())
   orderId          String
   productVariantId String
 
-  quantity         Int
-  quantityPicked   Int?           @default(0)  // ✅ actual picked quantity
-  quantityPacked   Int?           @default(0)  // ✅ actual packed quantity
+  quantity       Int
+  quantityPicked Int? @default(0) // ✅ actual picked quantity
+  quantityPacked Int? @default(0) // ✅ actual packed quantity
 
-  unitPrice        Decimal        @db.Decimal(10, 2)
-  totalPrice       Decimal        @db.Decimal(10, 2)
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
-  shopifyLineItemId                String?
+  shopifyLineItemId                 String?
   shopifyFulfillmentOrderLineItemId String?
 
-  order            Order          @relation(fields: [orderId], references: [id])
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
-  pickListItems    PickListItem[] 
+  order          Order          @relation(fields: [orderId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  pickListItems  PickListItem[]
 
   @@map("order_items")
 }
 
 model ShopifySync {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   orderId     String
-  syncType    String   // "FULFILLMENT", "CANCELLATION", "REFUND", etc.
-  status      String   // "PENDING", "COMPLETED", "FAILED"
-  attempts    Int      @default(0)
-  data        Json     // Store sync details (tracking, items, etc.)
+  syncType    String // "FULFILLMENT", "CANCELLATION", "REFUND", etc.
+  status      String // "PENDING", "COMPLETED", "FAILED"
+  attempts    Int       @default(0)
+  data        Json // Store sync details (tracking, items, etc.)
   error       String?
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([status, syncType])
@@ -609,10 +610,10 @@ enum TransactionType {
   COUNT
   ALLOCATION
   DEALLOCATION
-  PO_RECEIVING         // Purchase Order from Supplier
-  ASN_RECEIVING        // Advanced Ship Notice from Supplier
-  TRANSFER_RECEIVING   // Inter-warehouse transfer
-  RETURNS 
+  PO_RECEIVING // Purchase Order from Supplier
+  ASN_RECEIVING // Advanced Ship Notice from Supplier
+  TRANSFER_RECEIVING // Inter-warehouse transfer
+  RETURNS
 }
 
 model InventoryTransaction {
@@ -621,20 +622,20 @@ model InventoryTransaction {
   locationId       String?
   transactionType  TransactionType
   quantityChange   Int
-  
+
   // Enhanced reference tracking
-  referenceId      String?         // PO ID, Transfer ID, Order ID, etc.
-  referenceType    String?         // "PURCHASE_ORDER", "TRANSFER", "RETURN_ORDER"
-  sourceLocation   String?         // For transfers (which warehouse it came from)
-  
-  userId           String?
-  notes            String?
-  metadata         Json?
-  
-  productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
-  location         Location?       @relation(fields: [locationId], references: [id])
-  user             User?           @relation(fields: [userId], references: [id])
-  createdAt        DateTime        @default(now())
+  referenceId    String? // PO ID, Transfer ID, Order ID, etc.
+  referenceType  String? // "PURCHASE_ORDER", "TRANSFER", "RETURN_ORDER"
+  sourceLocation String? // For transfers (which warehouse it came from)
+
+  userId   String?
+  notes    String?
+  metadata Json?
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  location       Location?      @relation(fields: [locationId], references: [id])
+  user           User?          @relation(fields: [userId], references: [id])
+  createdAt      DateTime       @default(now())
 
   @@index([productVariantId])
   @@index([locationId])
@@ -648,19 +649,19 @@ model InventoryTransaction {
 // ---------------------------------------------------
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String   // RECOUNT_ASSIGNED, CAMPAIGN_STARTED, etc.
-  title     String
-  message   String
-  link      String?
-  read      Boolean  @default(false)
-  metadata  Json?
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id       String  @id @default(cuid())
+  userId   String
+  type     String // RECOUNT_ASSIGNED, CAMPAIGN_STARTED, etc.
+  title    String
+  message  String
+  link     String?
+  read     Boolean @default(false)
+  metadata Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
-  
+
   @@index([userId, read])
   @@map("notifications")
 }
@@ -673,7 +674,7 @@ model PickList {
   id          String     @id @default(cuid())
   batchNumber String     @unique
   status      PickStatus @default(PENDING)
-  assignedTo  String?    // User ID of assigned picker
+  assignedTo  String? // User ID of assigned picker
   priority    Int        @default(0)
   totalItems  Int
   pickedItems Int        @default(0)
@@ -681,17 +682,17 @@ model PickList {
   endTime     DateTime?
   notes       String?
 
-  parentPickListId String?       
-  parentPickList   PickList?     @relation("PickListContinuation", fields: [parentPickListId], references: [id])
-  continuations    PickList[]    @relation("PickListContinuation")
-  
+  parentPickListId String?
+  parentPickList   PickList?  @relation("PickListContinuation", fields: [parentPickListId], references: [id])
+  continuations    PickList[] @relation("PickListContinuation")
+
   // Relations
   items        PickListItem[]
   events       PickEvent[]
   assignedUser User?          @relation(fields: [assignedTo], references: [id])
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("pick_lists")
 }
@@ -700,26 +701,26 @@ model PickListItem {
   id               String         @id @default(cuid())
   pickListId       String
   orderId          String
-  orderItemId       String?
+  orderItemId      String?
   productVariantId String
   locationId       String
   quantityToPick   Int
   quantityPicked   Int            @default(0)
-  pickSequence     Int            // Order to pick items (route optimization)
+  pickSequence     Int // Order to pick items (route optimization)
   status           PickItemStatus @default(PENDING)
   pickedAt         DateTime?
-  pickedBy         String?        // User ID who picked this item
-  shortPickReason  String?        // Reason if short picked
+  pickedBy         String? // User ID who picked this item
+  shortPickReason  String? // Reason if short picked
   notes            String?
-  
+
   // Relations
   pickList       PickList       @relation(fields: [pickListId], references: [id], onDelete: Cascade)
   order          Order          @relation(fields: [orderId], references: [id])
-  orderItem         OrderItem?     @relation(fields: [orderItemId], references: [id])
+  orderItem      OrderItem?     @relation(fields: [orderItemId], references: [id])
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
   location       Location       @relation(fields: [locationId], references: [id])
   picker         User?          @relation(fields: [pickedBy], references: [id])
-  
+
   @@unique([pickListId, orderId, productVariantId, locationId])
   @@map("pick_list_items")
 }
@@ -727,22 +728,22 @@ model PickListItem {
 model PickEvent {
   id          String        @id @default(cuid())
   pickListId  String
-  itemId      String?       // PickListItem ID (optional for list-level events)
+  itemId      String? // PickListItem ID (optional for list-level events)
   eventType   PickEventType
   userId      String
-  fromUserId  String?       // ✅ NEW: User reassigned FROM
-  toUserId    String?       // ✅ NEW: User reassigned TO
-  location    String?       // Location code scanned
-  scannedCode String?       // Barcode scanned
-  data        Json?         // Additional event data
+  fromUserId  String? // ✅ NEW: User reassigned FROM
+  toUserId    String? // ✅ NEW: User reassigned TO
+  location    String? // Location code scanned
+  scannedCode String? // Barcode scanned
+  data        Json? // Additional event data
   notes       String?
   createdAt   DateTime      @default(now())
-  
+
   // Relations
-  pickList    PickList      @relation(fields: [pickListId], references: [id], onDelete: Cascade)
-  user        User          @relation("PickEventUser", fields: [userId], references: [id])
-  fromUser    User?         @relation("PickEventFromUser", fields: [fromUserId], references: [id])
-  toUser      User?         @relation("PickEventToUser", fields: [toUserId], references: [id])
+  pickList PickList @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  user     User     @relation("PickEventUser", fields: [userId], references: [id])
+  fromUser User?    @relation("PickEventFromUser", fields: [fromUserId], references: [id])
+  toUser   User?    @relation("PickEventToUser", fields: [toUserId], references: [id])
 
   @@map("pick_events")
 }
@@ -777,9 +778,9 @@ enum PickEventType {
   PICK_COMPLETED
   PICK_CANCELLED
   ERROR_OCCURRED
-  PICK_REASSIGNED     
-  PICK_SPLIT           
-  PARTIAL_COMPLETION 
+  PICK_REASSIGNED
+  PICK_SPLIT
+  PARTIAL_COMPLETION
 }
 
 // ---------------------------------------------------
@@ -794,33 +795,34 @@ model ShippingPackage {
   packageCode    String?
   trackingNumber String
   labelUrl       String
-  cost           Decimal  @db.Decimal(10,2)
+  cost           Decimal  @db.Decimal(10, 2)
   currency       String
-  weight         Decimal? @db.Decimal(8,2)
+  weight         Decimal? @db.Decimal(8, 2)
   dimensions     Json?
 
-  items          PackageItem[]
+  items      PackageItem[]
+  backOrders BackOrder[]
 
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("shipping_packages")
 }
 
 model PackageItem {
-  id              String          @id @default(cuid())
-  packageId       String
-  productName     String
-  sku             String
-  quantity        Int
-  unitPrice       Decimal         @db.Decimal(10,2)
-  
-  package         ShippingPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  
-  createdAt       DateTime        @default(now())
-  
+  id          String  @id @default(cuid())
+  packageId   String
+  productName String
+  sku         String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2)
+
+  package ShippingPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
   @@map("package_items")
 }
 
@@ -829,112 +831,112 @@ model PackageItem {
 // ---------------------------------------------------
 
 model CycleCountCampaign {
-  id          String              @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
   countType   CycleCountType
-  status      CampaignStatus      @default(PLANNED)
+  status      CampaignStatus  @default(PLANNED)
   startDate   DateTime
   endDate     DateTime?
-  frequency   CountFrequency?     // For recurring campaigns
-  
+  frequency   CountFrequency? // For recurring campaigns
+
   // Criteria for what to count
-  locationIds String[]            // Specific locations to count
-  zoneFilter  String?             // Count by zone
-  abcClass    String?             // Count by ABC classification
-  lastCountedBefore DateTime?     // Items not counted since this date
-  
+  locationIds       String[] // Specific locations to count
+  zoneFilter        String? // Count by zone
+  abcClass          String? // Count by ABC classification
+  lastCountedBefore DateTime? // Items not counted since this date
+
   // Progress tracking
-  totalTasks    Int               @default(0)
-  completedTasks Int              @default(0)
-  variancesFound Int              @default(0)
-  
+  totalTasks     Int @default(0)
+  completedTasks Int @default(0)
+  variancesFound Int @default(0)
+
   // Relations
-  tasks       CycleCountTask[]
-  createdBy   String
-  assignedTo  String[]            // User IDs who can perform counts
-  
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  tasks      CycleCountTask[]
+  createdBy  String
+  assignedTo String[] // User IDs who can perform counts
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("cycle_count_campaigns")
 }
 
 model CycleCountTask {
-  id                String              @id @default(cuid())
-  campaignId        String?             // Optional - for ad-hoc counts
-  locationId        String
-  productVariantId  String?             // null for location counts
-  
+  id               String  @id @default(cuid())
+  campaignId       String? // Optional - for ad-hoc counts
+  locationId       String
+  productVariantId String? // null for location counts
+
   // Task details
-  taskNumber        String              @unique
-  priority          Int                 @default(0)
-  status            CycleCountTaskStatus            @default(PENDING)
-  countType         CycleCountType
-  
+  taskNumber String               @unique
+  priority   Int                  @default(0)
+  status     CycleCountTaskStatus @default(PENDING)
+  countType  CycleCountType
+
   // Expected vs actual counts
-  systemQuantity    Int                 // What system says
-  countedQuantity   Int?                // What was actually counted
-  variance          Int?                // Difference (counted - system)
-  variancePercentage Decimal?           @db.Decimal(5,2)
-  
+  systemQuantity     Int // What system says
+  countedQuantity    Int? // What was actually counted
+  variance           Int? // Difference (counted - system)
+  variancePercentage Decimal? @db.Decimal(5, 2)
+
   // Assignment and timing
-  assignedTo        String?             // User ID
-  assignedAt        DateTime?
-  startedAt         DateTime?
-  completedAt       DateTime?
-  
+  assignedTo  String? // User ID
+  assignedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
   // Additional details
-  notes             String?
-  tolerancePercentage Decimal?          @db.Decimal(5,2) @default(5.0)
-  requiresRecount   Boolean             @default(false)
-  recountReason     String?
-  
+  notes               String?
+  tolerancePercentage Decimal? @default(5.0) @db.Decimal(5, 2)
+  requiresRecount     Boolean  @default(false)
+  recountReason       String?
+
   // Relations
-  campaign          CycleCountCampaign? @relation(fields: [campaignId], references: [id])
-  location          Location            @relation(fields: [locationId], references: [id])
-  productVariant    ProductVariant?     @relation(fields: [productVariantId], references: [id])
-  assignedUser      User?               @relation(fields: [assignedTo], references: [id])
-  events            CycleCountEvent[]
-  
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  
+  campaign       CycleCountCampaign? @relation(fields: [campaignId], references: [id])
+  location       Location            @relation(fields: [locationId], references: [id])
+  productVariant ProductVariant?     @relation(fields: [productVariantId], references: [id])
+  assignedUser   User?               @relation(fields: [assignedTo], references: [id])
+  events         CycleCountEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([campaignId, locationId, productVariantId]) // Prevent duplicate tasks
   @@map("cycle_count_tasks")
 }
 
 model CycleCountEvent {
-  id              String            @id @default(cuid())
-  taskId          String
-  eventType       CountEventType
-  userId          String
-  
+  id        String         @id @default(cuid())
+  taskId    String
+  eventType CountEventType
+  userId    String
+
   // Event data
-  previousValue   Int?              // Previous quantity
-  newValue        Int?              // New quantity
-  notes           String?
-  metadata        Json?             // Additional event data
-  
+  previousValue Int? // Previous quantity
+  newValue      Int? // New quantity
+  notes         String?
+  metadata      Json? // Additional event data
+
   // Relations
-  task            CycleCountTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user            User              @relation(fields: [userId], references: [id])
-  
-  createdAt       DateTime          @default(now())
-  
+  task CycleCountTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User           @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
   @@map("cycle_count_events")
 }
 
 enum CycleCountType {
-  FULL              // Count everything
-  PARTIAL           // Count specific items/locations
-  ABC_ANALYSIS      // Count based on ABC classification
-  FAST_MOVING       // High-velocity items
-  SLOW_MOVING       // Low-velocity items
-  NEGATIVE_STOCK    // Items with negative quantities
-  ZERO_STOCK        // Items showing zero quantity
-  HIGH_VALUE        // High-dollar-value items
-  DAMAGED_LOCATION  // Specific location audit
+  FULL // Count everything
+  PARTIAL // Count specific items/locations
+  ABC_ANALYSIS // Count based on ABC classification
+  FAST_MOVING // High-velocity items
+  SLOW_MOVING // Low-velocity items
+  NEGATIVE_STOCK // Items with negative quantities
+  ZERO_STOCK // Items showing zero quantity
+  HIGH_VALUE // High-dollar-value items
+  DAMAGED_LOCATION // Specific location audit
 }
 
 enum CampaignStatus {
@@ -979,32 +981,32 @@ enum CountFrequency {
 }
 
 model PurchaseOrder {
-  id          String   @id @default(cuid())
-  poNumber    String   @unique // e.g. "PO-202509-226"
-  supplier    String
-  status      String   @default("DRAFT") // or enum
-  orderDate   DateTime @default(now())
+  id           String    @id @default(cuid())
+  poNumber     String    @unique // e.g. "PO-202509-226"
+  supplier     String
+  status       String    @default("DRAFT") // or enum
+  orderDate    DateTime  @default(now())
   expectedDate DateTime?
-  totalAmount Decimal  @db.Decimal(10,2)
+  totalAmount  Decimal   @db.Decimal(10, 2)
 
   // Relations
-  items       PurchaseOrderItem[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  items     PurchaseOrderItem[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
 
   @@map("purchase_orders")
 }
 
 model PurchaseOrderItem {
-  id               String         @id @default(cuid())
+  id               String  @id @default(cuid())
   purchaseOrderId  String
   productVariantId String
   quantity         Int
-  unitCost         Decimal @db.Decimal(10,2)
-  totalCost        Decimal @db.Decimal(10,2)
+  unitCost         Decimal @db.Decimal(10, 2)
+  totalCost        Decimal @db.Decimal(10, 2)
 
-  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  purchaseOrder  PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@map("purchase_order_items")
 }
@@ -1013,8 +1015,8 @@ model PurchaseOrderItem {
 // *** Inventory Planner
 // ---------------------------------------------------
 model ForecastSuggestion {
-  id             String   @id @default(cuid())
-  sku            String   @unique
+  id             String    @id @default(cuid())
+  sku            String    @unique
   productName    String?
   vendorId       String?
   warehouseId    String?
@@ -1029,16 +1031,16 @@ model ForecastSuggestion {
   recommendedQty Int?
   unitCost       Float?
   currency       String?
-  replenishment  Int?      // from API
-  reviewPeriod   Int?      // from API
+  replenishment  Int? // from API
+  reviewPeriod   Int? // from API
   lastUpdated    DateTime
 
   @@index([sku, warehouseId])
 }
 
 model InventoryPlannerPurchaseOrder {
-  id           String   @id @default(cuid())
-  poId         String   @unique
+  id           String    @id @default(cuid())
+  poId         String    @unique
   reference    String?
   vendorId     String?
   vendorName   String?
@@ -1049,11 +1051,11 @@ model InventoryPlannerPurchaseOrder {
   totalValue   Float?
   lastUpdated  DateTime
 
-  lines        InventoryPlannerPOLine[]
+  lines InventoryPlannerPOLine[]
 }
 
 model InventoryPlannerPOLine {
-  id              String   @id @default(cuid())
+  id              String  @id @default(cuid())
   purchaseOrderId String
   sku             String
   productName     String?
@@ -1061,15 +1063,15 @@ model InventoryPlannerPOLine {
   unitCost        Float?
   totalCost       Float?
 
-  purchaseOrder   InventoryPlannerPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder InventoryPlannerPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@index([sku])
 }
 
 model SyncProgress {
   id          String   @id @default(cuid())
-  type        String   @unique  // "forecast" or "purchase_order"
-  status      String   // "running", "completed", "error"
+  type        String   @unique // "forecast" or "purchase_order"
+  status      String // "running", "completed", "error"
   progress    Int      @default(0)
   total       Int      @default(0)
   currentPage Int      @default(0)
@@ -1081,11 +1083,10 @@ model SyncProgress {
   @@index([type, status])
 }
 
-
 model SyncLog {
   id     String   @id @default(cuid())
-  type   String   // "forecast" | "purchase_order"
-  status String   // "success" | "error"
+  type   String // "forecast" | "purchase_order"
+  status String // "success" | "error"
   count  Int?
   error  String?
   runAt  DateTime @default(now())
@@ -1096,56 +1097,59 @@ model SyncLog {
 // ---------------------------------------------------
 
 model BackOrder {
-  id                    String          @id @default(cuid())
-  orderId               String
-  productVariantId      String
-  
+  id                String  @id @default(cuid())
+  orderId           String
+  productVariantId  String
+  shippingPackageId String?
+
   // Quantities
-  quantityBackOrdered   Int             // Total backordered
-  quantityFulfilled     Int             @default(0)
-  
+  quantityBackOrdered Int // Total backordered
+  quantityFulfilled   Int @default(0)
+
   // Status & tracking
-  status                BackOrderStatus @default(PENDING)
-  reason                BackOrderReason
-  reasonDetails         String?
-  priority              Int             @default(0)
-  
+  status        BackOrderStatus @default(PENDING)
+  reason        BackOrderReason
+  reasonDetails String?
+  priority      Int             @default(0)
+
   // Context (where backorder originated)
-  createdDuring         String          // "ORDER_ALLOCATION" | "PICKING"
-  originalPickListItemId String?        // Only if created during picking
-  
+  createdDuring          String // "ORDER_ALLOCATION" | "PICKING"
+  originalPickListItemId String? // Only if created during picking
+
   // Dates
-  createdAt             DateTime        @default(now())
-  fulfilledAt           DateTime?
-  
+  createdAt   DateTime  @default(now())
+  fulfilledAt DateTime?
+
   // Relations
-  order                 Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productVariant        ProductVariant  @relation(fields: [productVariantId], references: [id])
-  
-  updatedAt             DateTime        @updatedAt
-  
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant  ProductVariant   @relation(fields: [productVariantId], references: [id])
+  shippingPackage ShippingPackage? @relation(fields: [shippingPackageId], references: [id]) // ✅ NEW
+
+  updatedAt DateTime @updatedAt
+
   @@unique([orderId, productVariantId])
   @@index([status])
   @@index([productVariantId, status])
+  @@index([shippingPackageId])
   @@map("back_orders")
 }
 
 enum BackOrderStatus {
-  PENDING           // Waiting for inventory
-  ALLOCATED         // Inventory reserved
-  PICKING           // ✅ Being picked
-  PICKED            // ✅ Picked from warehouse
-  PACKED            // ✅ Packed in box
-  FULFILLED         // Shipped to customer
-  CANCELLED         // Cancelled
+  PENDING // Waiting for inventory
+  ALLOCATED // Inventory reserved
+  PICKING // ✅ Being picked
+  PICKED // ✅ Picked from warehouse
+  PACKED // ✅ Packed in box
+  FULFILLED // Shipped to customer
+  CANCELLED // Cancelled
 }
 
 enum BackOrderReason {
-  INSUFFICIENT_STOCK_AT_ALLOCATION  // ← Created during order allocation
-  SHORT_PICK                        // ← Created during picking
-  ITEM_SKIPPED                      // ← Created when picker skips
-  DAMAGED_PRODUCT                   
-  LOCATION_EMPTY                    
+  INSUFFICIENT_STOCK_AT_ALLOCATION // ← Created during order allocation
+  SHORT_PICK // ← Created during picking
+  ITEM_SKIPPED // ← Created when picker skips
+  DAMAGED_PRODUCT
+  LOCATION_EMPTY
   OTHER
 }
 
@@ -1154,47 +1158,46 @@ enum BackOrderReason {
 // ---------------------------------------------------
 
 model ReceivingSession {
-  id              String           @id @default(cuid())
-  poId            String
-  poReference     String
-  vendor          String?
-  status          ReceivingStatus  @default(PENDING)
-  
+  id          String          @id @default(cuid())
+  poId        String
+  poReference String
+  vendor      String?
+  status      ReceivingStatus @default(PENDING)
+
   // Counting user
-  countedBy       String
-  countedByUser   User             @relation("CountedBy", fields: [countedBy], references: [id])
-  countedAt       DateTime         @default(now())
-  
+  countedBy     String
+  countedByUser User     @relation("CountedBy", fields: [countedBy], references: [id])
+  countedAt     DateTime @default(now())
+
   // Approval
   approvedBy      String?
-  approvedByUser  User?            @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  approvedByUser  User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
   approvedAt      DateTime?
   rejectionReason String?
-  
+
   // Line items
-  lineItems       ReceivingLine[]
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  
-  @@map("receiving_sessions")
+  lineItems ReceivingLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([poId])
   @@index([status])
   @@index([countedBy])
+  @@map("receiving_sessions")
 }
 
 model ReceivingLine {
-  id                String           @id @default(cuid())
-  sessionId         String
-  sku               String
-  productName       String
-  quantityCounted   Int
-  quantityExpected  Int?
-  variance          Int?             // counted - expected
-  
-  session           ReceivingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  
+  id               String @id @default(cuid())
+  sessionId        String
+  sku              String
+  productName      String
+  quantityCounted  Int
+  quantityExpected Int?
+  variance         Int? // counted - expected
+
+  session ReceivingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
   @@map("receiving_lines")
 }
 
@@ -1203,4 +1206,40 @@ enum ReceivingStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+model POBarcode {
+  id String @id @default(cuid())
+
+  // PO Information
+  poId        String @unique
+  poReference String
+  vendorName  String
+
+  // Barcode
+  barcodeValue String @unique
+  barcodeType  String @default("CODE128")
+
+  // Tracking
+  printedCount      Int       @default(0)
+  lastPrintedAt     DateTime?
+  lastPrintedBy     String?
+  lastPrintedByUser User?     @relation(fields: [lastPrintedBy], references: [id])
+
+  scannedCount  Int       @default(0)
+  lastScannedAt DateTime?
+  lastScannedBy String?
+
+  // Metadata
+  expectedItems    Json?
+  totalExpectedQty Int?
+  status           String @default("ACTIVE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([poId])
+  @@index([barcodeValue])
+  @@index([status])
+  @@map("po_barcodes")
 }

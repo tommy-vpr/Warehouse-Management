@@ -347,7 +347,7 @@ export default function BlindCountReceivingPage() {
                 const isCounted = counted > 0;
 
                 // ✅ Use a combination of id and sku for unique keys
-                const uniqueKey = `${item.id || `${item.sku}-${index}`}`;
+                const uniqueKey = `${item.sku}-${index}`;
 
                 return (
                   <Card

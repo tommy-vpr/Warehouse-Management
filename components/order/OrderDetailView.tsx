@@ -498,7 +498,7 @@ export default function OrderDetailView({
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "items"
                     ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 transition"
                 }`}
                 onClick={() => setActiveTab("items")}
               >
@@ -508,7 +508,7 @@ export default function OrderDetailView({
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "history"
                     ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 transition"
                 }`}
                 onClick={() => setActiveTab("history")}
               >
@@ -518,7 +518,7 @@ export default function OrderDetailView({
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "shipping"
                     ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 transition"
                 }`}
                 onClick={() => setActiveTab("shipping")}
               >
@@ -528,7 +528,7 @@ export default function OrderDetailView({
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "audit"
                     ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 transition"
                 }`}
                 onClick={() => setActiveTab("audit")}
               >
@@ -538,7 +538,7 @@ export default function OrderDetailView({
                 className={`cursor-pointer pb-2 px-1 ${
                   activeTab === "images"
                     ? "border-b-2 border-zinc-700 text-zinc-700 dark:border-gray-200 dark:text-gray-200 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-300 transition"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 transition"
                 }`}
                 onClick={() => setActiveTab("images")}
               >

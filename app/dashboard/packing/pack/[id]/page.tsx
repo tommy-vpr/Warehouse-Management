@@ -16,6 +16,7 @@ import {
   Box,
   Check,
   Loader2,
+  Dot,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import ShippingLabelForm from "@/components/shipping/ShippingLabelForm";
@@ -658,9 +659,23 @@ export default function EnhancedPackingInterface() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                      <p className="text-sm">
+                  {/* ADD IMAGE UPLOADER HERE - Compact version */}
+                  <OrderImageUploader
+                    orderId={order.id}
+                    orderNumber={order.orderNumber}
+                    customerName={order.customerName || "Customer"}
+                    existingImages={order.images || []} // if you have existing images
+                    onUploadSuccess={() => {
+                      console.log("Image uploaded!");
+                      // Optional: refresh order data
+                    }}
+                    compact={true} // Use compact layout for inline display
+                  />
+
+                  <div className="space-y-4 mt-4">
+                    <div className="bg-red-50 border border-red-200 dark:border-red-400 dark:bg-red-900/20 p-4 rounded-lg">
+                      <p className="text-sm flex items-center gap-1 text-red-400">
+                        <Dot />
                         Click each item as you pack
                         {/* <strong>
                           {BOX_TYPES.find((b) => b.id === selectedBox)?.name}
@@ -674,7 +689,7 @@ export default function EnhancedPackingInterface() {
                     <Button
                       onClick={proceedToCreateLabel}
                       disabled={!canProceedToStep(2) || isPacking}
-                      className="w-full"
+                      className="w-full bg-blue-500 hover:bg-blue-600"
                     >
                       {isPacking
                         ? "Marking as Packed..."

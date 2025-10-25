@@ -46,6 +46,7 @@ export default function SignIn() {
       } else if (result?.ok) {
         toast({
           title: "Welcome!",
+          variant: "success",
         });
         router.push("/dashboard");
         router.refresh();

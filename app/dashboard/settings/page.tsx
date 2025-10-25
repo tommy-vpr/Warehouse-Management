@@ -230,7 +230,7 @@ export default function UserSettingsPage() {
               <Button
                 type="submit"
                 disabled={updateProfileMutation.isPending}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600"
               >
                 {updateProfileMutation.isPending ? (
                   <>
@@ -350,7 +350,7 @@ export default function UserSettingsPage() {
               <Button
                 type="submit"
                 disabled={updatePasswordMutation.isPending}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600"
               >
                 {updatePasswordMutation.isPending ? (
                   <>

@@ -22,6 +22,7 @@ import {
   LaptopMinimal,
   ChartColumn,
   ScanText,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -55,6 +56,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "dashboard", label: "Dashboard", icon: LaptopMinimal },
     { id: "inventory", label: "Inventory", icon: ChartColumn },
     { id: "orders", label: "Orders", icon: ShoppingCart },
+    { id: "my-work", label: "My Work", icon: User },
     {
       id: "notifications",
       label: "Notifications",
