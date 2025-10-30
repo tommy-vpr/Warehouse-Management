@@ -168,3 +168,39 @@ button {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+@media print {
+  /* Hide common UI elements when printing */
+  nav,
+  header,
+  aside,
+  footer,
+  [role="navigation"],
+  [role="banner"],
+  button:not(.print-button),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Remove shadows and backgrounds */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Ensure text is black */
+  body {
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  /* Full page for print content */
+  .print-content,
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 5px !important;
+  }
+}

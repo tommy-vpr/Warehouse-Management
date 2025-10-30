@@ -12,9 +12,9 @@ export const metadata: Metadata = {
   description:
     "Comprehensive warehouse management with inventory tracking and order fulfillment",
   icons: {
-    icon: "/headquarter-logo.webp", // favicon
-    shortcut: "/headquarter-logo.webp",
-    apple: "/headquarter-logo.webp",
+    icon: "/images/headquarter-logo.png", // favicon
+    shortcut: "/images/headquarter-logo.png",
+    apple: "/images/headquarter-logo.png",
   },
 };
 

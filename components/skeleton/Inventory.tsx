@@ -1,32 +1,43 @@
-export const InventorySkeleton = () => (
-  <tbody className="bg-background divide-y divide-gray-200 dark:divide-zinc-700">
-    {Array.from({ length: 20 }).map((_, i) => (
-      <tr key={i} className="animate-pulse">
-        <td className="px-4 py-4">
-          <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-3/4 mb-2"></div>
-          <div className="h-3 bg-gray-200 dark:bg-zinc-700 rounded w-1/2"></div>
-        </td>
-        <td className="px-4 py-4">
-          <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-20 mb-2"></div>
-          <div className="h-3 bg-gray-200 dark:bg-zinc-700 rounded w-16"></div>
-        </td>
-        <td className="px-4 py-4">
-          <div className="h-6 bg-gray-200 dark:bg-zinc-700 rounded-full w-20"></div>
-        </td>
+import { Skeleton } from "@/components/ui/skeleton";
 
-        <td className="px-4 py-4">
-          <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-16"></div>
-        </td>
-        <td className="px-4 py-4">
-          <div className="h-4 bg-gray-200 dark:bg-zinc-700 rounded w-24"></div>
-        </td>
-        {/* <td className="px-4 py-4">
-          <div className="flex gap-1">
-            <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
-            <div className="h-8 w-8 bg-gray-200 dark:bg-zinc-700 rounded"></div>
-          </div>
-        </td> */}
-      </tr>
-    ))}
-  </tbody>
-);
+export function InventorySkeleton() {
+  return (
+    <tbody>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <tr key={i} className="border-b">
+          {/* Product */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-32 mt-1" />
+            <Skeleton className="h-3 w-24 mt-1" />
+          </td>
+
+          {/* Stock Level */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-20 mt-1" />
+            <Skeleton className="h-3 w-28 mt-1" />
+            <Skeleton className="h-3 w-20 mt-1" />
+          </td>
+
+          {/* Status */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </td>
+
+          {/* Location(s) */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-28 mt-1" />
+          </td>
+
+          {/* Last Count */}
+          <td className="px-4 py-4">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-16 mt-1" />
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}

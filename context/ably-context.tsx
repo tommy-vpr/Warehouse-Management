@@ -1,19 +1,31 @@
+// context/ably-context.tsx
+// FIXED - Proper connection lifecycle management
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import { useSession } from "next-auth/react";
 import Ably from "ably";
 
 interface AblyContextType {
   client: Ably.Realtime | null;
   channel: Ably.RealtimeChannel | null;
-  roleChannel: Ably.RealtimeChannel | null; // ← Add role channel
+  roleChannel: Ably.RealtimeChannel | null;
+  connectionState: Ably.ConnectionState;
+  isConnected: boolean;
 }
 
 const AblyContext = createContext<AblyContextType>({
   client: null,
   channel: null,
   roleChannel: null,
+  connectionState: "initialized",
+  isConnected: false,
 });
 
 export function AblyProvider({ children }: { children: React.ReactNode }) {
@@ -23,58 +35,94 @@ export function AblyProvider({ children }: { children: React.ReactNode }) {
   const [roleChannel, setRoleChannel] = useState<Ably.RealtimeChannel | null>(
     null
   );
+  const [connectionState, setConnectionState] =
+    useState<Ably.ConnectionState>("initialized");
+
+  // ✅ Use ref to prevent re-initialization
+  const clientRef = useRef<Ably.Realtime | null>(null);
+  const isInitializing = useRef(false);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    // Don't initialize if no session or already initialized
+    if (!session?.user?.id || clientRef.current || isInitializing.current) {
+      return;
+    }
 
-    console.log("🔌 Initializing Ably connection for user:", session.user.id);
+    console.log("🚀 Initializing Ably connection for user:", session.user.id);
+    isInitializing.current = true;
 
-    // Fetch Ably token from your API
     const ablyClient = new Ably.Realtime({
       authUrl: "/api/ably/auth",
       authMethod: "GET",
+      autoConnect: true,
+      // ✅ Add these options for better reliability
+      disconnectedRetryTimeout: 3000,
+      suspendedRetryTimeout: 3000,
     });
 
-    // Connection status logging
-    ablyClient.connection.on("connected", () => {
-      console.log("✅ Ably connected");
+    // Track all connection state changes
+    ablyClient.connection.on((stateChange) => {
+      console.log(
+        `🔌 Ably connection: ${stateChange.previous} → ${stateChange.current}`
+      );
+      setConnectionState(stateChange.current);
+
+      if (stateChange.current === "connected") {
+        console.log("✅ Ably connected successfully");
+      } else if (stateChange.current === "failed") {
+        console.error("❌ Ably connection failed:", stateChange.reason);
+      } else if (stateChange.current === "disconnected") {
+        console.warn("⚠️  Ably disconnected:", stateChange.reason);
+      } else if (stateChange.current === "suspended") {
+        console.warn("⏸️  Ably connection suspended");
+      } else if (stateChange.current === "closing") {
+        console.log("🔌 Ably connection closing");
+      } else if (stateChange.current === "closed") {
+        console.log("🔌 Ably connection closed");
+      }
     });
 
-    ablyClient.connection.on("disconnected", () => {
-      console.log("❌ Ably disconnected");
-    });
+    // Set initial connection state
+    setConnectionState(ablyClient.connection.state);
 
-    ablyClient.connection.on("failed", (error) => {
-      console.error("❌ Ably connection failed:", error);
-    });
-
+    // Store in ref
+    clientRef.current = ablyClient;
     setClient(ablyClient);
 
-    // Subscribe to user-specific channel
+    // Set up user channel
     const userChannel = ablyClient.channels.get(`user:${session.user.id}`);
-    console.log("📡 Subscribed to user channel:", `user:${session.user.id}`);
     setChannel(userChannel);
+    console.log("📺 User channel created: user:" + session.user.id);
 
-    // Subscribe to role channel if user has a role
+    // Set up role channel if role exists
     if (session.user.role) {
-      const userRoleChannel = ablyClient.channels.get(
-        `role:${session.user.role}`
-      );
-      console.log(
-        "📡 Subscribed to role channel:",
-        `role:${session.user.role}`
-      );
-      setRoleChannel(userRoleChannel);
+      const roleChan = ablyClient.channels.get(`role:${session.user.role}`);
+      setRoleChannel(roleChan);
+      console.log("📺 Role channel created: role:" + session.user.role);
     }
 
+    isInitializing.current = false;
+
+    // Cleanup function
     return () => {
-      console.log("🔌 Closing Ably connection");
-      ablyClient.close();
+      console.log("🧹 Cleaning up Ably connection");
+      if (clientRef.current) {
+        clientRef.current.close();
+        clientRef.current = null;
+      }
+      setClient(null);
+      setChannel(null);
+      setRoleChannel(null);
+      setConnectionState("closed");
     };
-  }, [session?.user?.id, session?.user?.role]);
+  }, [session?.user?.id, session?.user?.role]); // Only depend on user ID and role
+
+  const isConnected = connectionState === "connected";
 
   return (
-    <AblyContext.Provider value={{ client, channel, roleChannel }}>
+    <AblyContext.Provider
+      value={{ client, channel, roleChannel, connectionState, isConnected }}
+    >
       {children}
     </AblyContext.Provider>
   );

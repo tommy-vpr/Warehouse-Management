@@ -223,7 +223,9 @@ model User {
   completedTaskItems TaskItem[]
   taskEvents         TaskEvent[]
 
-  printedBarcodes POBarcode[]
+  printedBarcodes POBarcode[] @relation("UserPrintedBarcodes")
+  poBarcodeEvents POBarcodeEvent[]    
+  receivingEvents ReceivingEvent[] 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1169,6 +1171,8 @@ model ReceivingSession {
   countedByUser User     @relation("CountedBy", fields: [countedBy], references: [id])
   countedAt     DateTime @default(now())
 
+  submittedAt DateTime?
+
   // Approval
   approvedBy      String?
   approvedByUser  User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
@@ -1177,6 +1181,7 @@ model ReceivingSession {
 
   // Line items
   lineItems ReceivingLine[]
+  events    ReceivingEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1186,6 +1191,7 @@ model ReceivingSession {
   @@index([countedBy])
   @@map("receiving_sessions")
 }
+
 
 model ReceivingLine {
   id               String @id @default(cuid())
@@ -1198,6 +1204,7 @@ model ReceivingLine {
 
   session ReceivingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@unique([sessionId, sku], name: "sessionId_sku")
   @@map("receiving_lines")
 }
 
@@ -1224,7 +1231,7 @@ model POBarcode {
   printedCount      Int       @default(0)
   lastPrintedAt     DateTime?
   lastPrintedBy     String?
-  lastPrintedByUser User?     @relation(fields: [lastPrintedBy], references: [id])
+  lastPrintedByUser User? @relation("UserPrintedBarcodes", fields: [lastPrintedBy], references: [id])
 
   scannedCount  Int       @default(0)
   lastScannedAt DateTime?
@@ -1235,6 +1242,8 @@ model POBarcode {
   totalExpectedQty Int?
   status           String @default("ACTIVE")
 
+  events POBarcodeEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1242,4 +1251,51 @@ model POBarcode {
   @@index([barcodeValue])
   @@index([status])
   @@map("po_barcodes")
+}
+
+model POBarcodeEvent {
+  id          String              @id @default(cuid())
+  barcodeId   String
+  poId        String
+  eventType   POBarcodeEventType
+  userId      String?
+  quantity    Int?                @default(1)
+  source      String?             // "SCAN_GUN", "WEB_DASHBOARD", "MOBILE_APP", etc.
+  metadata    Json?
+  createdAt   DateTime            @default(now())
+
+  barcode     POBarcode           @relation(fields: [barcodeId], references: [id], onDelete: Cascade)
+  user        User?               @relation(fields: [userId], references: [id])
+
+  @@index([poId])
+  @@index([barcodeId])
+  @@map("po_barcode_events")
+}
+
+enum POBarcodeEventType {
+  LABEL_PRINTED
+  LABEL_REPRINTED
+  LABEL_VOIDED
+  LABEL_SCANNED
+  SESSION_STARTED
+  SESSION_COMPLETED
+}
+
+model ReceivingEvent {
+  id          String   @id @default(cuid())
+  sessionId   String
+  sku         String
+  productId   String?
+  userId      String
+  quantity    Int      @default(1)
+  scannedAt   DateTime @default(now())
+  source      String?  // "SCAN_GUN", "MANUAL_ADJUST", etc.
+  notes       String?
+
+  session     ReceivingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id])
+
+  @@index([sessionId])
+  @@index([sku])
+  @@map("receiving_events")
 }

@@ -123,7 +123,12 @@ export default function PendingApprovalsListPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             {(error as Error).message}
           </p>
-          <Button onClick={() => router.back()}>Go Back</Button>
+          <Button
+            onClick={() => router.back()}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            Go Back
+          </Button>
         </div>
       </div>
     );
@@ -137,7 +142,12 @@ export default function PendingApprovalsListPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             Only ADMIN or MANAGER roles can approve receiving.
           </p>
-          <Button onClick={() => router.back()}>Go Back</Button>
+          <Button
+            onClick={() => router.back()}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            Go Back
+          </Button>
         </div>
       </div>
     );
@@ -385,7 +395,7 @@ export default function PendingApprovalsListPage() {
                           `/dashboard/inventory/receive/pending/${session.id}`
                         );
                       }}
-                      className="ml-4 bg-blue-600 hover:bg-blue-700 text-white"
+                      className="ml-4 bg-blue-500 hover:bg-blue-600 text-white"
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       Review

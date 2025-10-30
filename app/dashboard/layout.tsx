@@ -23,6 +23,7 @@ import {
   ChartColumn,
   ScanText,
   User,
+  File,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -107,7 +108,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               )}
             </button>
 
-            <div className="relative w-10 h-10 sm:w-12 sm:h-12">
+            <div className="relative hidden md:w-10 md:h-10">
               <Link href={"/dashboard"}>
                 <Image
                   src="/images/headquarter-logo.webp"
@@ -128,28 +129,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/* Right: actions */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Desktop: Full buttons with text */}
             <Link
-              href="/dashboard/inventory/receive"
+              href="/dashboard/inventory/receive/scan"
               className="hidden sm:block"
             >
               <Button className="cursor-pointer bg-blue-600 hover:bg-blue-700 dark:text-gray-200">
                 <Scan className="w-4 h-4" />
                 Receive
-              </Button>
-            </Link>
-
-            {/* <Link href="/dashboard/picking/scan" className="hidden sm:block">
-              <Button className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
-                <Scan className="w-4 h-4" />
-                Scan
-              </Button>
-            </Link> */}
-
-            <Link href="/dashboard/scan" className="hidden sm:block">
-              <Button className="cursor-pointer bg-green-600 hover:bg-green-700 text-white">
-                <Scan className="w-4 h-4" />
-                Scan
               </Button>
             </Link>
 

@@ -1,7 +1,7 @@
 // app/dashboard/inventory/receive/scan/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,9 @@ import {
   AlertCircle,
   Loader2,
   Send,
-  BarcodeScannerIcon as BarcodeIcon,
+  Scan,
   XCircle,
+  ScanBarcode,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,9 +57,18 @@ export default function BarcodeScanReceivingPage() {
   const [productScanInput, setProductScanInput] = useState("");
   const [lastScannedSKU, setLastScannedSKU] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanQty, setScanQty] = useState(1);
 
   const poScanRef = useRef<HTMLInputElement>(null);
   const productScanRef = useRef<HTMLInputElement>(null);
+
+  // Helper to clean barcode input
+  const cleanBarcodeInput = (input: string): string => {
+    return input
+      .trim()
+      .replace(/^].*?(?=\d)/, "") // remove GS1 prefixes like ]C1
+      .replace(/[^\w\d-]/g, ""); // strip all invisible control chars
+  };
 
   // Auto-focus on input fields
   useEffect(() => {
@@ -85,7 +95,171 @@ export default function BarcodeScanReceivingPage() {
     }
   }, [scanError]);
 
-  // Scan PO barcode
+  // ✅ Load existing session on mount
+  useEffect(() => {
+    if (step !== "scan-products" || !po) return;
+
+    const loadExistingSession = async () => {
+      try {
+        const res = await fetch(`/api/inventory/receive/session/${po.id}`);
+
+        if (!res.ok) {
+          console.log("No existing session found");
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data.session && data.session.lineItems.length > 0) {
+          // ✅ Populate tallyCounts from database
+          const counts: TallyCount = {};
+          data.session.lineItems.forEach((line: any) => {
+            counts[line.sku] = line.quantityCounted;
+          });
+
+          setTallyCounts(counts);
+
+          toast({
+            title: "Session Resumed",
+            description: `Loaded ${data.session.lineItems.length} previously scanned items`,
+            variant: "success",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load session:", err);
+        // Don't show error to user - just start fresh
+      }
+    };
+
+    loadExistingSession();
+  }, [step, po, toast]);
+
+  // ✅ PRODUCTION-READY: Smart scanner detection
+  useEffect(() => {
+    if (step !== "scan-products" || !po) return;
+
+    let buffer = "";
+    let timer: NodeJS.Timeout | null = null;
+    let lastKeyTime = 0;
+    const SCANNER_SPEED_THRESHOLD = 50; // Scanners type <50ms between chars
+    const HUMAN_SPEED_THRESHOLD = 150; // Humans type >150ms between chars
+    let isScannerInput = false;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const timeSinceLastKey = now - lastKeyTime;
+
+      // Detect if this is scanner input (very fast typing)
+      if (timeSinceLastKey < SCANNER_SPEED_THRESHOLD && buffer.length > 0) {
+        isScannerInput = true;
+      }
+
+      // Reset if typing too slow (human speed)
+      if (timeSinceLastKey > HUMAN_SPEED_THRESHOLD) {
+        buffer = "";
+        isScannerInput = false;
+      }
+
+      // Handle Enter key
+      if (e.key === "Enter") {
+        if (buffer.length >= 6 && isScannerInput) {
+          e.preventDefault(); // Only prevent if it's scanner input
+          processScan(buffer);
+        }
+        buffer = "";
+        isScannerInput = false;
+        lastKeyTime = 0;
+        return;
+      }
+
+      // Build buffer from regular characters
+      if (e.key.length === 1) {
+        // Only prevent default if we're confident it's scanner input
+        if (isScannerInput || buffer.length >= 3) {
+          e.preventDefault();
+        }
+
+        buffer += e.key;
+        lastKeyTime = now;
+
+        if (timer) clearTimeout(timer);
+
+        // Process if no more input for 50ms (scanner finished)
+        timer = setTimeout(() => {
+          if (buffer.length >= 6 && isScannerInput) {
+            processScan(buffer);
+          }
+          buffer = "";
+          isScannerInput = false;
+          lastKeyTime = 0;
+        }, 50); // Shorter timeout for scanners
+      }
+    };
+
+    const processScan = async (rawBarcode: string) => {
+      const cleaned = cleanBarcodeInput(rawBarcode);
+      setProductScanInput(""); // Clear input
+
+      try {
+        const res = await fetch("/api/inventory/po-barcode/scan-product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            poId: po.id,
+            upc: cleaned,
+            quantity: scanQty,
+            source: "SCAN_GUN",
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          setScanError(data.error || "Scan failed");
+          return;
+        }
+
+        const sku = data.variant.sku;
+        const isInPO = po.line_items.some((item) => item.sku === sku);
+
+        if (!isInPO) {
+          setScanError(`⚠️ ${data.variant.name} is not in this PO`);
+        }
+
+        setTallyCounts((prev) => ({
+          ...prev,
+          [sku]: (prev[sku] || 0) + scanQty,
+        }));
+
+        setLastScannedSKU(sku);
+
+        // Beep
+        if (typeof window !== "undefined") {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = isInPO ? 800 : 400;
+          gain.gain.value = 0.3;
+          osc.start();
+          osc.stop(ctx.currentTime + 0.1);
+        }
+      } catch (err) {
+        console.error("Scan failed:", err);
+        setScanError("Network or server error");
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (timer) clearTimeout(timer);
+    };
+  }, [step, po, scanQty]);
+
+  // Scan PO barcode mutation
   const scanPOMutation = useMutation({
     mutationFn: async (barcodeValue: string) => {
       const res = await fetch("/api/inventory/po-barcode/scan", {
@@ -103,80 +277,28 @@ export default function BarcodeScanReceivingPage() {
     },
     onSuccess: (data) => {
       setPO(data.po);
+      setPOBarcode("");
       setStep("scan-products");
       toast({
-        title: "✅ PO Loaded",
+        title: "PO Loaded",
         description: `Ready to receive PO ${data.po.reference}`,
+        variant: "success",
       });
     },
     onError: (error: Error) => {
+      setPOBarcode("");
       toast({
         variant: "destructive",
-        title: "❌ Scan Failed",
+        title: "Scan Failed",
         description: error.message,
       });
+      setTimeout(() => {
+        poScanRef.current?.focus();
+      }, 100);
     },
   });
 
-  // Scan product UPC/barcode
-  const scanProductMutation = useMutation({
-    mutationFn: async (upc: string) => {
-      const res = await fetch("/api/inventory/po-barcode/scan-product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ upc }),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Product not found");
-      }
-
-      return res.json();
-    },
-    onSuccess: (data) => {
-      const sku = data.product.sku;
-
-      // Check if this SKU is in the PO
-      const isInPO = po?.line_items.some((item) => item.sku === sku);
-
-      if (!isInPO) {
-        setScanError(`⚠️ ${data.product.name} is not in this PO`);
-        // Still allow counting but warn
-      }
-
-      // Increment tally
-      setTallyCounts((prev) => ({
-        ...prev,
-        [sku]: (prev[sku] || 0) + 1,
-      }));
-
-      setLastScannedSKU(sku);
-      setProductScanInput("");
-
-      // Beep sound (optional)
-      if (typeof window !== "undefined") {
-        const audioContext = new AudioContext();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = isInPO ? 800 : 400; // Higher beep if in PO
-        gainNode.gain.value = 0.3;
-
-        oscillator.start();
-        oscillator.stop(audioContext.currentTime + 0.1);
-      }
-    },
-    onError: (error: Error) => {
-      setScanError(error.message);
-      setProductScanInput("");
-    },
-  });
-
-  // Submit receiving session
+  // Submit receiving session mutation
   const submitMutation = useMutation({
     mutationFn: async (counts: TallyCount) => {
       if (!po) throw new Error("No PO loaded");
@@ -211,8 +333,9 @@ export default function BarcodeScanReceivingPage() {
     },
     onSuccess: () => {
       toast({
-        title: "✅ Submitted for Approval!",
+        title: "Submitted for Approval!",
         description: "Receiving session created. Awaiting manager approval.",
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["pending-receiving"] });
       router.push("/dashboard/inventory/receive/pending");
@@ -220,24 +343,89 @@ export default function BarcodeScanReceivingPage() {
     onError: (error: Error) => {
       toast({
         variant: "destructive",
-        title: "❌ Failed to Submit",
+        title: "Failed to Submit",
         description: error.message,
       });
     },
   });
 
+  // Handle PO scan
   const handlePOScan = (e: React.FormEvent) => {
     e.preventDefault();
-    if (poBarcode.trim()) {
-      scanPOMutation.mutate(poBarcode.trim());
+    const cleaned = cleanBarcodeInput(poBarcode);
+    if (cleaned) {
+      scanPOMutation.mutate(cleaned);
     }
   };
 
-  const handleProductScan = (e: React.FormEvent) => {
+  // ✅ Handle product scan - allows rapid concurrent scanning
+  const handleProductScan = async (e: FormEvent) => {
     e.preventDefault();
-    if (productScanInput.trim()) {
-      scanProductMutation.mutate(productScanInput.trim());
+    const value = productScanInput.trim();
+    if (!value || !po) return; // ✅ Removed isSubmitting check!
+
+    // Clear input immediately for next scan
+    setProductScanInput("");
+    setScanError("");
+
+    try {
+      const res = await fetch("/api/inventory/po-barcode/scan-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poId: po.id,
+          upc: value,
+          quantity: scanQty,
+          source: "SCAN_GUN",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setScanError(data.error || "Scan failed");
+        return;
+      }
+
+      // ✅ Update tally with returned variant SKU
+      const sku = data.variant.sku;
+      const isInPO = po.line_items.some((item) => item.sku === sku);
+
+      if (!isInPO) {
+        setScanError(`⚠️ ${data.variant.name} is not in this PO`);
+      }
+
+      setTallyCounts((prev) => ({
+        ...prev,
+        [sku]: (prev[sku] || 0) + scanQty,
+      }));
+
+      setLastScannedSKU(sku);
+
+      // Beep feedback
+      if (typeof window !== "undefined") {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = isInPO ? 800 : 400;
+        gain.gain.value = 0.3;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+      }
+    } catch (err) {
+      console.error("Scan failed:", err);
+      setScanError("Network or server error");
     }
+  };
+
+  const handleManualAdjust = (sku: string, delta: number) => {
+    setTallyCounts((prev) => {
+      const current = prev[sku] || 0;
+      const newValue = Math.max(0, current + delta);
+      return { ...prev, [sku]: newValue };
+    });
   };
 
   const handleDone = () => {
@@ -252,18 +440,11 @@ export default function BarcodeScanReceivingPage() {
     submitMutation.mutate(tallyCounts);
   };
 
-  const handleManualAdjust = (sku: string, delta: number) => {
-    setTallyCounts((prev) => ({
-      ...prev,
-      [sku]: Math.max(0, (prev[sku] || 0) + delta),
-    }));
-  };
-
+  // Calculate totals
   const totalScanned = Object.values(tallyCounts).reduce(
     (sum, count) => sum + count,
     0
   );
-
   const itemsCounted = Object.keys(tallyCounts).filter(
     (sku) => tallyCounts[sku] > 0
   ).length;
@@ -271,61 +452,50 @@ export default function BarcodeScanReceivingPage() {
   // STEP 1: Scan PO Barcode
   if (step === "scan-po") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <BarcodeIcon className="w-10 h-10 text-blue-600" />
-            </div>
-            <CardTitle className="text-3xl">Scan PO Barcode</CardTitle>
-            <p className="text-gray-600 mt-2">
-              Scan the barcode on the receiving label to get started
-            </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePOScan} className="space-y-4">
-              <div>
-                <Input
-                  ref={poScanRef}
-                  type="text"
-                  placeholder="Scan or enter PO barcode..."
-                  value={poBarcode}
-                  onChange={(e) => setPOBarcode(e.target.value)}
-                  className="text-lg h-14"
-                  disabled={scanPOMutation.isPending}
-                  autoFocus
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full h-12 text-lg"
-                disabled={!poBarcode.trim() || scanPOMutation.isPending}
-              >
-                {scanPOMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Loading PO...
-                  </>
-                ) : (
-                  <>
-                    <BarcodeIcon className="w-5 h-5 mr-2" />
-                    Load PO
-                  </>
-                )}
-              </Button>
-            </form>
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                Scan Purchase Order
+              </CardTitle>
+              <p className="text-gray-600 dark:text-gray-400">
+                Scan the PO barcode to begin receiving
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={handlePOScan}>
+                <div className="relative">
+                  <ScanBarcode className="absolute left-3 top-3 w-6 h-6 text-gray-400 pointer-events-none" />
+                  <Input
+                    ref={poScanRef}
+                    type="text"
+                    value={poBarcode}
+                    onChange={(e) => setPOBarcode(e.target.value)}
+                    placeholder="Scan or enter PO barcode"
+                    className="pl-12 text-lg py-6"
+                    autoFocus
+                  />
+                </div>
+                <button type="submit" className="hidden" aria-hidden="true" />
+              </form>
 
-            <div className="mt-6 text-center text-sm text-gray-500">
-              <p>Don't have a barcode label?</p>
-              <button
-                onClick={() => router.push("/dashboard/inventory/receive/po")}
-                className="text-blue-600 hover:underline mt-1"
-              >
-                Use manual receiving instead
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+              {scanPOMutation.isPending && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">Loading PO...</span>
+                </div>
+              )}
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-500">
+                  <strong>Tip:</strong> Position scanner over the PO barcode and
+                  press trigger, or manually type and press Enter
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -333,81 +503,100 @@ export default function BarcodeScanReceivingPage() {
   // STEP 2: Scan Products
   if (step === "scan-products" && po) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between">
+      <div className="min-h-screen bg-background flex flex-col">
+        <Card className="sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl font-bold">
                   Receiving: {po.reference}
                 </h1>
-                <p className="text-gray-600">{po.vendor_name}</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Vendor: {po.vendor_name}
+                </p>
               </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-blue-600">
-                  {totalScanned}
-                </div>
-                <div className="text-sm text-gray-600">units scanned</div>
+              <Badge
+                className="text-lg px-4 py-2 bg-green-50 border-green-400 text-green-600
+              dark:bg-green-900/20 dark:border-green-400 dark:text-green-400"
+              >
+                {itemsCounted} / {po.line_items.length} items
+              </Badge>
+            </div>
+
+            {/* Qty picker */}
+            <div className="flex items-center gap-2 mb-4">
+              <label className="text-sm text-gray-600 dark:text-blue-500 mr-2">
+                Qty per scan:
+              </label>
+
+              <div className="flex gap-2">
+                {[1, 20, 50, 100].map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setScanQty(q)}
+                    className={`w-[36px] h-[36px] flex justify-center items-center rounded-md border text-sm font-medium transition-colors ${
+                      scanQty === q
+                        ? "bg-green-600 text-white border-green-600"
+                        : "bg-white dark:bg-zinc-800 hover:bg-gray-100 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-zinc-700"
+                    }`}
+                  >
+                    {q}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {/* ✅ FIXED: No disabled prop for continuous scanning */}
+            <form onSubmit={handleProductScan}>
+              <div className="relative">
+                <Scan className="absolute left-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
+                <Input
+                  ref={productScanRef}
+                  type="text"
+                  value={productScanInput}
+                  onChange={(e) => setProductScanInput(e.target.value)}
+                  placeholder="Scan product UPC or barcode"
+                  className="pl-10 text-lg py-6 bg-white"
+                />
+              </div>
+              <button type="submit" className="hidden" aria-hidden="true" />
+            </form>
+
+            {/* Scan Error Display */}
+            {scanError && (
+              <div className="mt-3 bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                  <p className="text-yellow-800 font-medium">{scanError}</p>
+                </div>
+              </div>
+            )}
           </div>
+        </Card>
 
-          {/* Scan Error Banner */}
-          {scanError && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 animate-shake">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
-                <p className="text-red-700 font-medium">{scanError}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Scanner Input */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <form onSubmit={handleProductScan}>
-                <div className="flex items-center gap-4">
-                  <BarcodeIcon className="w-8 h-8 text-gray-400" />
-                  <Input
-                    ref={productScanRef}
-                    type="text"
-                    placeholder="Scan product UPC or barcode..."
-                    value={productScanInput}
-                    onChange={(e) => setProductScanInput(e.target.value)}
-                    className="text-xl h-16 flex-1"
-                    disabled={scanProductMutation.isPending}
-                    autoFocus
-                  />
-                  {scanProductMutation.isPending && (
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Items List */}
-          <div className="grid md:grid-cols-2 gap-4 mb-6">
+        {/* Product List */}
+        <div className="max-w-6xl mx-auto p-6">
+          <div className="flex flex-col gap-4">
             {po.line_items.map((item) => {
               const counted = tallyCounts[item.sku] || 0;
               const expected = item.quantity_ordered;
-              const isComplete = counted >= expected;
+              const isComplete = counted === expected;
               const isHighlighted = lastScannedSKU === item.sku;
 
               return (
                 <Card
                   key={item.sku}
-                  className={`transition-all ${
+                  className={`w-full transition-all ${
                     isHighlighted
                       ? "ring-4 ring-green-500 scale-[1.02] shadow-lg"
                       : isComplete
-                      ? "border-green-500 bg-green-50"
+                      ? "border-green-500 bg-green-50 dark:bg-green-900/20"
                       : ""
                   }`}
                 >
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-8 lx:gap-12 justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           {isComplete && (
@@ -415,7 +604,9 @@ export default function BarcodeScanReceivingPage() {
                           )}
                           <h3 className="font-semibold">{item.product_name}</h3>
                         </div>
-                        <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                        <p className="text-sm text-gray-600 dark:text-blue-500">
+                          SKU: {item.sku}
+                        </p>
                         {item.upc && (
                           <p className="text-xs text-gray-500">
                             UPC: {item.upc}
@@ -429,18 +620,17 @@ export default function BarcodeScanReceivingPage() {
                               ? "text-orange-600"
                               : counted === expected
                               ? "text-green-600"
-                              : "text-gray-900"
+                              : "text-gray-900 dark:text-gray-100"
                           }`}
                         >
                           {counted}
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                           of {expected}
                         </div>
                       </div>
                     </div>
 
-                    {/* Manual Adjustment */}
                     <div className="flex gap-2 mt-3">
                       <Button
                         size="sm"
@@ -463,28 +653,38 @@ export default function BarcodeScanReceivingPage() {
               );
             })}
           </div>
-
-          {/* Done Button */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
-            <div className="max-w-6xl mx-auto flex justify-between items-center">
-              <div>
-                <div className="text-sm text-gray-600">
-                  {itemsCounted} of {po.line_items.length} items counted
-                </div>
-                <div className="text-xl font-bold">
-                  {totalScanned} total units
-                </div>
-              </div>
-              <Button
-                size="lg"
-                onClick={handleDone}
-                className="bg-green-600 hover:bg-green-700 text-lg px-8"
-              >
-                Done Scanning
-              </Button>
-            </div>
-          </div>
         </div>
+
+        {/* Proceed to review */}
+        <Card className="mt-auto block">
+          <div className="max-w-6xl mx-auto p-4 flex items-center justify-between">
+            {/* Left side: totals */}
+            <div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-gray-800 dark:text-white">
+                  {itemsCounted}
+                </span>{" "}
+                / {po.line_items.length} SKUs counted
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-gray-800 dark:text-white">
+                  {totalScanned}
+                </span>{" "}
+                /{" "}
+                {po.line_items.reduce((sum, i) => sum + i.quantity_ordered, 0)}{" "}
+                units counted
+              </div>
+            </div>
+
+            {/* Right side: action */}
+            <Button
+              onClick={handleDone}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Review & Submit
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
@@ -507,32 +707,38 @@ export default function BarcodeScanReceivingPage() {
             </CardHeader>
             <CardContent>
               {/* Summary */}
-              <div className="bg-blue-50 p-6 rounded-lg mb-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg mb-6">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="text-3xl font-bold text-blue-600">
                       {po.line_items.length}
                     </div>
-                    <div className="text-sm text-gray-600">Total SKUs</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Total SKUs
+                    </div>
                   </div>
                   <div>
                     <div className="text-3xl font-bold text-blue-600">
                       {totalScanned}
                     </div>
-                    <div className="text-sm text-gray-600">Units Counted</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Units Counted
+                    </div>
                   </div>
                   <div>
                     <div className="text-3xl font-bold text-blue-600">
                       {itemsCounted}
                     </div>
-                    <div className="text-sm text-gray-600">SKUs Counted</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      SKUs Counted
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Variance Warning */}
               {hasVariances && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
+                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 dark:bg-amber-900/20 dark:text-yellow-400">
                   <div className="flex items-center">
                     <AlertCircle className="w-5 h-5 text-yellow-500 mr-3" />
                     <p className="text-yellow-700 font-medium">
@@ -552,22 +758,26 @@ export default function BarcodeScanReceivingPage() {
                   return (
                     <div
                       key={item.sku}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800 rounded-lg"
                     >
                       <div>
                         <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          SKU: {item.sku}
+                        </p>
                       </div>
                       <div className="text-right">
                         <div className="flex items-center gap-4">
                           <div>
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
                               Expected
                             </div>
                             <div className="font-semibold">{expected}</div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-600">Counted</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              Counted
+                            </div>
                             <div
                               className={`font-semibold ${
                                 variance !== 0 ? "text-orange-600" : ""

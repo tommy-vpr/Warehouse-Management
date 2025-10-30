@@ -1,4 +1,5 @@
 // app/api/inventory/po-barcode/generate/route.ts
+// FIXED VERSION - Uses your existing BASE_URL
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -32,9 +33,19 @@ export async function POST(request: Request) {
       });
     }
 
+    // ✅ Use BASE_URL from environment (works with Cloudflare Tunnel)
+    const baseUrl =
+      process.env.BASE_URL ||
+      process.env.NEXTAUTH_URL ||
+      "http://localhost:3000";
+
+    console.log(
+      `🔍 Fetching PO from: ${baseUrl}/api/inventory-planner/purchase-orders/${poId}`
+    );
+
     // Fetch PO details from Inventory Planner
     const poResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/inventory-planner/purchase-orders/${poId}`,
+      `${baseUrl}/api/inventory-planner/purchase-orders/${poId}`,
       {
         headers: {
           Cookie: request.headers.get("cookie") || "",
@@ -43,11 +54,21 @@ export async function POST(request: Request) {
     );
 
     if (!poResponse.ok) {
+      const errorText = await poResponse.text();
+      console.error("❌ Failed to fetch PO:", errorText);
       throw new Error("Failed to fetch PO details");
     }
 
     const poData = await poResponse.json();
     const po = poData.purchaseOrder;
+
+    if (!po) {
+      throw new Error("Purchase order not found in response");
+    }
+
+    console.log(
+      `✅ Found PO: ${po.reference} with ${po.line_items?.length || 0} items`
+    );
 
     // Generate unique barcode value
     const shortId = nanoid(8).toUpperCase();
@@ -55,7 +76,7 @@ export async function POST(request: Request) {
 
     // Map line items with UPC lookup
     const expectedItems = await Promise.all(
-      po.line_items.map(async (item: any) => {
+      (po.line_items || []).map(async (item: any) => {
         // Try to find UPC from ProductVariant
         const variant = await prisma.productVariant.findUnique({
           where: { sku: item.sku.trim() },
@@ -75,7 +96,7 @@ export async function POST(request: Request) {
       })
     );
 
-    const totalExpectedQty = po.line_items.reduce(
+    const totalExpectedQty = (po.line_items || []).reduce(
       (sum: number, item: any) => sum + item.quantity_ordered,
       0
     );
@@ -85,14 +106,18 @@ export async function POST(request: Request) {
       data: {
         poId: po.id,
         poReference: po.reference,
-        vendorName: po.vendor_name,
+        vendorName: po.vendor_name || "Unknown Vendor",
         barcodeValue,
         barcodeType: "CODE128",
         expectedItems,
         totalExpectedQty,
         status: "ACTIVE",
+        lastPrintedAt: new Date(),
+        lastPrintedBy: session.user.id,
       },
     });
+
+    console.log(`✅ Barcode generated: ${barcodeValue}`);
 
     return NextResponse.json({
       success: true,
@@ -102,7 +127,12 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("❌ Failed to generate barcode:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: error.message,
+        details:
+          process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }

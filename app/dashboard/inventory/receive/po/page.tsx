@@ -1,4 +1,5 @@
 // app/dashboard/inventory/receive/po/page.tsx
+// UPDATED - Now passes barcodeId to button for smart "Generate" vs "View Label" behavior
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,6 +24,9 @@ import {
   Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import GeneratePOBarcodeButton from "@/components/inventory/GeneratePOBarcodeButton";
+import Link from "next/link";
+import { POListSkeleton } from "@/components/skeleton/POListSkeleton";
 
 interface PurchaseOrder {
   id: string;
@@ -37,7 +41,11 @@ interface PurchaseOrder {
     sku: string;
     quantity_ordered: number;
   }>;
-  hasPendingSession?: boolean; // New field
+  hasPendingSession?: boolean;
+  // ✅ NEW: Barcode fields
+  barcodeId?: string | null;
+  barcodeStatus?: string | null;
+  hasBarcode?: boolean;
 }
 
 interface POResponse {
@@ -49,43 +57,43 @@ interface POResponse {
 }
 
 // Skeleton Component
-function POSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Card key={i} className="animate-pulse">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
-                    <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-                  </div>
-                  <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                    <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
-                  </div>
-                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-                  <div className="flex gap-2">
-                    <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
-                    <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded ml-4" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
+// function POSkeleton() {
+//   return (
+//     <div className="space-y-4">
+//       {[1, 2, 3, 4, 5].map((i) => (
+//         <Card key={i} className="animate-pulse">
+//           <CardContent className="p-6">
+//             <div className="flex items-center justify-between">
+//               <div className="flex-1">
+//                 <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
+//                   <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
+//                   <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   <div className="flex gap-2">
+//                     <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                     <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                   </div>
+//                 </div>
+//               </div>
+//               <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded ml-4" />
+//             </div>
+//           </CardContent>
+//         </Card>
+//       ))}
+//     </div>
+//   );
+// }
 
 export default function POListPage() {
   const router = useRouter();
@@ -231,9 +239,15 @@ export default function POListPage() {
                 }
                 className="cursor-pointer transition"
               >
-                <FileText className="w-4 h-4 mr-2" />
+                {/* <FileText className="w-4 h-4 mr-2" /> */}
                 Pending Approvals
               </Button>
+              <Link href="/dashboard/inventory/receive/labels">
+                <Button variant="outline" className="cursor-pointer transition">
+                  {/* <FileText className="w-4 h-4 mr-2" /> */}
+                  Generated POs
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -332,7 +346,7 @@ export default function POListPage() {
 
         {/* PO List */}
         {isFiltering ? (
-          <POSkeleton />
+          <POListSkeleton />
         ) : (
           <div className="space-y-4">
             {filteredPOs && filteredPOs.length === 0 && (
@@ -363,11 +377,12 @@ export default function POListPage() {
               return (
                 <Card
                   key={po.id}
-                  className={`hover:shadow-lg transition-shadow ${
-                    hasPending
-                      ? "cursor-not-allowed opacity-60"
-                      : "cursor-pointer hover:bg-background"
-                  }`}
+                  // className={`hover:shadow-lg transition-shadow ${
+                  //   hasPending
+                  //     ? "cursor-not-allowed opacity-60"
+                  //     : "cursor-pointer hover:bg-background"
+                  // }`}
+                  className="hover:shadow-lg transition-shadow"
                   onClick={() => !hasPending && handleReceiveClick(po)}
                 >
                   <CardContent className="p-6">
@@ -392,14 +407,6 @@ export default function POListPage() {
                           >
                             {po.status.toUpperCase()}
                           </Badge>
-
-                          {/* Pending Badge */}
-                          {/* {hasPending && (
-                            <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300">
-                              <Clock className="w-3 h-3 mr-1" />
-                              PENDING APPROVAL
-                            </Badge>
-                          )} */}
 
                           {/* Vendor */}
                           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -447,21 +454,35 @@ export default function POListPage() {
                         </div>
                       </div>
 
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReceiveClick(po);
-                        }}
-                        disabled={hasPending}
-                        className={`ml-4 transition cursor-pointer ${
-                          hasPending
-                            ? "bg-gray-400 text-black dark:bg-gray-200 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-500 text-white"
-                        }`}
-                      >
-                        <Package className="w-4 h-4 mr-2" />
-                        {hasPending ? "Pending" : "Receive"}
-                      </Button>
+                      <div className="flex gap-2 ml-4">
+                        {/* ✅ Smart Barcode Button - passes existingBarcodeId */}
+                        <GeneratePOBarcodeButton
+                          poId={po.id}
+                          poReference={po.reference}
+                          existingBarcodeId={po.barcodeId}
+                        />
+
+                        {/* Receive Button */}
+                        {hasPending && (
+                          <Button variant={"outline"} disabled>
+                            <p>Pending Approval</p>
+                          </Button>
+                        )}
+                        {/* <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReceiveClick(po);
+                          }}
+                          disabled={hasPending}
+                          className={`transition cursor-pointer ${
+                            hasPending
+                              ? "bg-gray-400 text-black dark:bg-gray-200 cursor-not-allowed"
+                              : "bg-blue-600 hover:bg-blue-500 text-white"
+                          }`}
+                        >
+                          {hasPending ? "Pending" : "Receive"}
+                        </Button> */}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -538,7 +559,7 @@ export default function POListPage() {
 // import { useQuery } from "@tanstack/react-query";
 // import { keepPreviousData } from "@tanstack/react-query";
 // import { Button } from "@/components/ui/button";
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Card, CardContent } from "@/components/ui/card";
 // import { Badge } from "@/components/ui/badge";
 // import { Input } from "@/components/ui/input";
 // import {
@@ -552,7 +573,10 @@ export default function POListPage() {
 //   AlignLeft,
 //   RefreshCw,
 //   AlertCircle,
+//   Clock,
 // } from "lucide-react";
+// import { useToast } from "@/hooks/use-toast";
+// import GeneratePOBarcodeButton from "@/components/inventory/GeneratePOBarcodeButton";
 
 // interface PurchaseOrder {
 //   id: string;
@@ -567,6 +591,7 @@ export default function POListPage() {
 //     sku: string;
 //     quantity_ordered: number;
 //   }>;
+//   hasPendingSession?: boolean; // New field
 // }
 
 // interface POResponse {
@@ -585,19 +610,26 @@ export default function POListPage() {
 //         <Card key={i} className="animate-pulse">
 //           <CardContent className="p-6">
 //             <div className="flex items-center justify-between">
-//               <div className="flex-1 space-y-3">
-//                 <div className="flex items-center gap-3">
-//                   <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
-//                   <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+//               <div className="flex-1">
+//                 <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
 //                   <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
-//                 </div>
-//                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
+//                   <div className="flex items-center gap-2">
+//                     <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+//                     <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+//                   </div>
 //                   <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-//                   <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-//                 </div>
-//                 <div className="flex gap-4">
-//                   <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded-full" />
-//                   <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                   <div className="flex gap-2">
+//                     <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                     <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+//                   </div>
 //                 </div>
 //               </div>
 //               <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded ml-4" />
@@ -611,6 +643,7 @@ export default function POListPage() {
 
 // export default function POListPage() {
 //   const router = useRouter();
+//   const { toast } = useToast();
 //   const [mounted, setMounted] = useState(false);
 //   useEffect(() => setMounted(true), []);
 
@@ -656,7 +689,6 @@ export default function POListPage() {
 //   const hasNextPage = currentPage < totalPages - 1;
 //   const hasPrevPage = currentPage > 0;
 
-//   // Reset to first page when filters change
 //   const handleStatusChange = (status: string) => {
 //     setStatusFilter(status);
 //     setCurrentPage(0);
@@ -667,11 +699,17 @@ export default function POListPage() {
 //     setCurrentPage(0);
 //   };
 
-//   const handleFilterChange =
-//     (setter: (value: string) => void) => (value: string) => {
-//       setter(value);
-//       setCurrentPage(0);
-//     };
+//   const handleReceiveClick = (po: PurchaseOrder) => {
+//     if (po.hasPendingSession) {
+//       toast({
+//         variant: "destructive",
+//         title: "⏳ Pending Approval",
+//         description: `PO ${po.reference} already has a receiving session pending approval. Please wait for approval before creating a new count.`,
+//       });
+//       return;
+//     }
+//     router.push(`/dashboard/inventory/receive/po/${po.id}`);
+//   };
 
 //   if (isLoading) {
 //     return (
@@ -874,14 +912,17 @@ export default function POListPage() {
 //                   (sum, item) => sum + item.quantity_ordered,
 //                   0
 //                 ) || 0;
+//               const hasPending = po.hasPendingSession;
 
 //               return (
 //                 <Card
 //                   key={po.id}
-//                   className="hover:shadow-lg transition-shadow cursor-pointer hover:bg-background"
-//                   onClick={() =>
-//                     router.push(`/dashboard/inventory/receive/po/${po.id}`)
-//                   }
+//                   className={`hover:shadow-lg transition-shadow ${
+//                     hasPending
+//                       ? "cursor-not-allowed opacity-60"
+//                       : "cursor-pointer hover:bg-background"
+//                   }`}
+//                   onClick={() => !hasPending && handleReceiveClick(po)}
 //                 >
 //                   <CardContent className="p-6">
 //                     <div className="flex items-center justify-between">
@@ -906,8 +947,13 @@ export default function POListPage() {
 //                             {po.status.toUpperCase()}
 //                           </Badge>
 
-//                           {/* Divider */}
-//                           {/* <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
+//                           {/* Pending Badge */}
+//                           {/* {hasPending && (
+//                             <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300">
+//                               <Clock className="w-3 h-3 mr-1" />
+//                               PENDING APPROVAL
+//                             </Badge>
+//                           )} */}
 
 //                           {/* Vendor */}
 //                           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -916,9 +962,6 @@ export default function POListPage() {
 //                               {po.vendor_name || "Unknown Vendor"}
 //                             </span>
 //                           </div>
-
-//                           {/* Divider */}
-//                           {/* <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
 
 //                           {/* Created Date */}
 //                           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -932,44 +975,56 @@ export default function POListPage() {
 
 //                           {/* Expected Date */}
 //                           {po.expected_date && (
-//                             <>
-//                               {/* <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
-//                               <div className="text-sm text-gray-600 dark:text-gray-400">
-//                                 Due:{" "}
-//                                 {mounted
-//                                   ? new Date(
-//                                       po.expected_date
-//                                     ).toLocaleDateString()
-//                                   : po.expected_date}
-//                               </div>
-//                             </>
+//                             <div className="text-sm text-gray-600 dark:text-gray-400">
+//                               Due:{" "}
+//                               {mounted
+//                                 ? new Date(
+//                                     po.expected_date
+//                                   ).toLocaleDateString()
+//                                 : po.expected_date}
+//                             </div>
 //                           )}
 
 //                           {/* Items & Units */}
 //                           {totalItemsCount > 0 && (
-//                             <>
-//                               {/* <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
-//                               <div className="flex gap-2 text-sm">
-//                                 <Badge variant="outline" className="text-xs">
-//                                   <Package className="w-3 h-3 mr-1" />
-//                                   {totalItemsCount} items
-//                                 </Badge>
-//                                 <Badge variant="outline" className="text-xs">
-//                                   {mounted
-//                                     ? totalQty.toLocaleString()
-//                                     : totalQty}{" "}
-//                                   units
-//                                 </Badge>
-//                               </div>
-//                             </>
+//                             <div className="flex gap-2 text-sm">
+//                               <Badge variant="outline" className="text-xs">
+//                                 <Package className="w-3 h-3 mr-1" />
+//                                 {totalItemsCount} items
+//                               </Badge>
+//                               <Badge variant="outline" className="text-xs">
+//                                 {mounted ? totalQty.toLocaleString() : totalQty}{" "}
+//                                 units
+//                               </Badge>
+//                             </div>
 //                           )}
 //                         </div>
 //                       </div>
 
-//                       <Button className="ml-4 bg-blue-600 text-white hover:bg-blue-500 transition cursor-pointer">
-//                         <Package className="w-4 h-4 mr-2" />
-//                         Receive
-//                       </Button>
+//                       <div className="flex gap-2 ml-4">
+//                         {/* Generate Barcode Label Button */}
+//                         <GeneratePOBarcodeButton
+//                           poId={po.id}
+//                           poReference={po.reference}
+//                         />
+
+//                         {/* Receive Button */}
+//                         <Button
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+//                             handleReceiveClick(po);
+//                           }}
+//                           disabled={hasPending}
+//                           className={`transition cursor-pointer ${
+//                             hasPending
+//                               ? "bg-gray-400 text-black dark:bg-gray-200 cursor-not-allowed"
+//                               : "bg-blue-600 hover:bg-blue-500 text-white"
+//                           }`}
+//                         >
+//                           <Package className="w-4 h-4 mr-2" />
+//                           {hasPending ? "Pending" : "Receive"}
+//                         </Button>
+//                       </div>
 //                     </div>
 //                   </CardContent>
 //                 </Card>

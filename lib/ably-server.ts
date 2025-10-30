@@ -1,3 +1,5 @@
+// lib/ably-server.ts
+// FIXED VERSION - Prevents duplicate notifications
 import Ably from "ably";
 import { prisma } from "@/lib/prisma";
 
@@ -59,7 +61,7 @@ export async function notifyUser(userId: string, data: any) {
   }
 }
 
-// Helper to notify role (FIXED - now creates DB notifications)
+// ✅ FIXED: Only sends to individual user channels (no duplication)
 export async function notifyRole(role: string, event: string, data: any) {
   try {
     // Get all users with this role
@@ -90,10 +92,8 @@ export async function notifyRole(role: string, event: string, data: any) {
 
     console.log(`✅ Created ${users.length} database notifications`);
 
-    // Publish to Ably role channel (all users with this role will receive)
-    await sendNotification(`role:${role}`, event, data);
-
-    // Also publish to individual user channels for guaranteed delivery
+    // ✅ ONLY send to individual user channels (prevents duplication)
+    // Each user gets exactly ONE notification via their user channel
     for (const user of users) {
       await sendNotification(`user:${user.id}`, "notification", {
         ...data,
@@ -101,8 +101,52 @@ export async function notifyRole(role: string, event: string, data: any) {
       });
     }
 
-    console.log(`✅ Published notifications to Ably for ${users.length} users`);
+    console.log(`✅ Sent ${users.length} individual notifications via Ably`);
 
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to notify role ${role}:`, error);
+    return false;
+  }
+}
+
+// Alternative: Use role channels if you prefer broadcast
+// In this case, REMOVE the loop sending to user channels above
+export async function notifyRoleViaBroadcast(
+  role: string,
+  event: string,
+  data: any
+) {
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: role as any },
+      select: { id: true },
+    });
+
+    if (users.length === 0) {
+      console.warn(`⚠️  No users found with role: ${role}`);
+      return false;
+    }
+
+    console.log(`📢 Broadcasting to role:${role} for ${users.length} users`);
+
+    // Create database notifications
+    await prisma.notification.createMany({
+      data: users.map((user) => ({
+        userId: user.id,
+        type: data.type || "GENERAL",
+        title: data.title,
+        message: data.message,
+        link: data.link || null,
+        read: false,
+        metadata: data.metadata || null,
+      })),
+    });
+
+    // ✅ Only send to role channel (no individual sends)
+    await sendNotification(`role:${role}`, event, data);
+
+    console.log(`✅ Broadcast notification to role:${role}`);
     return true;
   } catch (error) {
     console.error(`❌ Failed to notify role ${role}:`, error);

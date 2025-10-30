@@ -1,4 +1,5 @@
 // app/api/inventory/po-barcode/scan/route.ts
+// FIXED VERSION - Uses your existing BASE_URL
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -57,9 +58,19 @@ export async function POST(request: Request) {
       },
     });
 
+    // ✅ Use BASE_URL from environment (works with Cloudflare Tunnel)
+    const baseUrl =
+      process.env.BASE_URL ||
+      process.env.NEXTAUTH_URL ||
+      "http://localhost:3000";
+
+    console.log(
+      `🔍 Fetching PO from: ${baseUrl}/api/inventory-planner/purchase-orders/${poBarcode.poId}`
+    );
+
     // Fetch full PO details
     const poResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/inventory-planner/purchase-orders/${poBarcode.poId}`,
+      `${baseUrl}/api/inventory-planner/purchase-orders/${poBarcode.poId}`,
       {
         headers: {
           Cookie: request.headers.get("cookie") || "",
@@ -68,10 +79,14 @@ export async function POST(request: Request) {
     );
 
     if (!poResponse.ok) {
+      const errorText = await poResponse.text();
+      console.error("❌ Failed to fetch PO:", errorText);
       throw new Error("Failed to fetch PO details");
     }
 
     const poData = await poResponse.json();
+
+    console.log(`✅ PO loaded successfully for barcode: ${barcodeValue}`);
 
     return NextResponse.json({
       success: true,
@@ -82,7 +97,12 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("❌ Failed to scan barcode:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      {
+        success: false,
+        error: error.message,
+        details:
+          process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }
