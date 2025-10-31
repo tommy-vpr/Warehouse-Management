@@ -24,6 +24,7 @@ import {
   ScanText,
   User,
   File,
+  Scroll,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -65,6 +66,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       showCount: true,
     },
     { id: "inventory/receive/po", label: "Purchase Orders", icon: FileText },
+    { id: "invoice", label: "Invoice", icon: Scroll },
     // { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
     { id: "inventory/transfers", label: "Transfers", icon: ArrowLeftRight },
@@ -108,7 +110,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               )}
             </button>
 
-            <div className="relative hidden md:w-10 md:h-10">
+            <div className="relative hidden md:block md:w-10 md:h-10">
               <Link href={"/dashboard"}>
                 <Image
                   src="/images/headquarter-logo.webp"

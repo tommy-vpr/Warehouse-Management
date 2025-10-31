@@ -9,6 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
   Package,
   CheckCircle2,
   AlertCircle,
@@ -59,6 +67,16 @@ export default function BarcodeScanReceivingPage() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanQty, setScanQty] = useState(1);
 
+  const [selectedApprover, setSelectedApprover] = useState<string>("");
+  const [approvers, setApprovers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+    }>
+  >([]);
+
   const poScanRef = useRef<HTMLInputElement>(null);
   const productScanRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +87,24 @@ export default function BarcodeScanReceivingPage() {
       .replace(/^].*?(?=\d)/, "") // remove GS1 prefixes like ]C1
       .replace(/[^\w\d-]/g, ""); // strip all invisible control chars
   };
+
+  // Fetch approvers when reaching review step
+  useEffect(() => {
+    if (step === "review") {
+      const fetchApprovers = async () => {
+        try {
+          const res = await fetch("/api/users/approvers");
+          const data = await res.json();
+          if (data.success) {
+            setApprovers(data.approvers);
+          }
+        } catch (err) {
+          console.error("Failed to fetch approvers:", err);
+        }
+      };
+      fetchApprovers();
+    }
+  }, [step]);
 
   // Auto-focus on input fields
   useEffect(() => {
@@ -298,9 +334,15 @@ export default function BarcodeScanReceivingPage() {
     },
   });
 
-  // Submit receiving session mutation
+  // Update submitMutation to accept assignedTo
   const submitMutation = useMutation({
-    mutationFn: async (counts: TallyCount) => {
+    mutationFn: async ({
+      tallyCounts,
+      assignedTo,
+    }: {
+      tallyCounts: TallyCount;
+      assignedTo: string;
+    }) => {
       if (!po) throw new Error("No PO loaded");
 
       const expectedQuantities: any = { metadata: {} };
@@ -319,8 +361,9 @@ export default function BarcodeScanReceivingPage() {
           poId: po.id,
           poReference: po.reference,
           vendor: po.vendor_name,
-          lineCounts: counts,
+          lineCounts: tallyCounts,
           expectedQuantities,
+          assignedTo, // ✅ Include selected approver
         }),
       });
 
@@ -331,11 +374,13 @@ export default function BarcodeScanReceivingPage() {
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const approverName = approvers.find(
+        (a) => a.id === selectedApprover
+      )?.name;
       toast({
-        title: "Submitted for Approval!",
-        description: "Receiving session created. Awaiting manager approval.",
-        variant: "success",
+        title: "✅ Submitted for Approval!",
+        description: `Assigned to ${approverName || "manager"} for approval.`,
       });
       queryClient.invalidateQueries({ queryKey: ["pending-receiving"] });
       router.push("/dashboard/inventory/receive/pending");
@@ -343,7 +388,7 @@ export default function BarcodeScanReceivingPage() {
     onError: (error: Error) => {
       toast({
         variant: "destructive",
-        title: "Failed to Submit",
+        title: "❌ Failed to Submit",
         description: error.message,
       });
     },
@@ -436,8 +481,21 @@ export default function BarcodeScanReceivingPage() {
     setStep("scan-products");
   };
 
+  // Update handleSubmit to include selected approver
   const handleSubmit = () => {
-    submitMutation.mutate(tallyCounts);
+    if (!selectedApprover) {
+      toast({
+        variant: "destructive",
+        title: "Approver Required",
+        description: "Please select who should approve this receiving",
+      });
+      return;
+    }
+
+    submitMutation.mutate({
+      tallyCounts,
+      assignedTo: selectedApprover,
+    });
   };
 
   // Calculate totals
@@ -487,8 +545,8 @@ export default function BarcodeScanReceivingPage() {
                 </div>
               )}
 
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-500">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <p className="text-sm text-yellow-900 dark:text-yellow-500">
                   <strong>Tip:</strong> Position scanner over the PO barcode and
                   press trigger, or manually type and press Enter
                 </p>
@@ -799,6 +857,43 @@ export default function BarcodeScanReceivingPage() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Approver Selection */}
+              <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <Label
+                  htmlFor="approver"
+                  className="text-base font-semibold mb-2 block"
+                >
+                  Assign Approver
+                </Label>
+                <Select
+                  value={selectedApprover}
+                  onValueChange={setSelectedApprover}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select who should approve this receiving" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approvers.map((approver) => (
+                      <SelectItem key={approver.id} value={approver.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-medium">
+                            {approver.name || approver.email}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                            ({approver.role})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {approvers.length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Loading approvers...
+                  </p>
+                )}
               </div>
 
               {/* Actions */}

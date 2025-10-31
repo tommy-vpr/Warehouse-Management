@@ -202,6 +202,7 @@ model User {
 
   receivingSessionsCounted  ReceivingSession[] @relation("CountedBy")
   receivingSessionsApproved ReceivingSession[] @relation("ApprovedBy")
+  receivingSessionsAssigned ReceivingSession[] @relation("AssignedReceivingApprover")
 
   inventoryTransactions InventoryTransaction[]
   assignedPickLists     PickList[]
@@ -333,6 +334,7 @@ model ProductVariant {
   purchaseOrderItems    PurchaseOrderItem[]
 
   taskItems TaskItem[]
+  invoiceItems InvoiceItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -446,6 +448,7 @@ model Order {
   notes           String? // Packing/shipping notes
 
   taskItems TaskItem[]
+  invoices Invoice[]
 
   shopifyFulfillmentIds String?
   shopifyLineItems      Json?
@@ -1173,6 +1176,10 @@ model ReceivingSession {
 
   submittedAt DateTime?
 
+  // Assigned approver (who SHOULD approve)
+  assignedTo     String?
+  assignedToUser User?    @relation("AssignedReceivingApprover", fields: [assignedTo], references: [id])
+
   // Approval
   approvedBy      String?
   approvedByUser  User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
@@ -1189,6 +1196,7 @@ model ReceivingSession {
   @@index([poId])
   @@index([status])
   @@index([countedBy])
+  @@index([assignedTo])
   @@map("receiving_sessions")
 }
 
@@ -1298,4 +1306,76 @@ model ReceivingEvent {
   @@index([sessionId])
   @@index([sku])
   @@map("receiving_events")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  barcode         String?  // Base64 barcode image
+  date            DateTime @default(now())
+  dueDate         DateTime?
+  
+  // Vendor/Supplier info (the seller)
+  vendorName      String
+  vendorEmail     String?
+  vendorAddress   String?
+  vendorPhone     String?
+  
+  // Financial
+  subtotal        Decimal  @db.Decimal(10, 2)
+  tax             Decimal  @db.Decimal(10, 2) @default(0)
+  total           Decimal  @db.Decimal(10, 2)
+  
+  // Original invoice storage
+  originalInvoiceUrl String? // GCS URL of uploaded invoice image
+  
+  // Status
+  status          InvoiceStatus @default(DRAFT)
+  
+  // Link to order if exists (for cross-reference)
+  orderId         String?
+  order           Order?   @relation(fields: [orderId], references: [id])
+  
+  items           InvoiceItem[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  
+  @@index([invoiceNumber])
+  @@index([vendorName])
+  @@index([status])
+  @@index([orderId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  sku         String
+  barcode     String?  // Base64 barcode image for SKU
+  description String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  
+  // Link to existing product if found
+  productVariantId String?
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([invoiceId])
+  @@index([sku])
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  CANCELLED
 }
