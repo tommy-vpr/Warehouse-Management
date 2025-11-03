@@ -1311,7 +1311,7 @@ model ReceivingEvent {
 model Invoice {
   id              String   @id @default(cuid())
   invoiceNumber   String   @unique
-  barcode         String?  // Base64 barcode image
+  barcodeValue    String?  
   date            DateTime @default(now())
   dueDate         DateTime?
   
@@ -1324,6 +1324,8 @@ model Invoice {
   // Financial
   subtotal        Decimal  @db.Decimal(10, 2)
   tax             Decimal  @db.Decimal(10, 2) @default(0)
+  shipping        Decimal  @db.Decimal(10, 2) @default(0)
+  fees            Decimal  @db.Decimal(10, 2) @default(0) 
   total           Decimal  @db.Decimal(10, 2)
   
   // Original invoice storage
@@ -1346,6 +1348,7 @@ model Invoice {
   @@index([vendorName])
   @@index([status])
   @@index([orderId])
+  @@index([barcodeValue])
   @@map("invoices")
 }
 
@@ -1355,8 +1358,8 @@ model InvoiceItem {
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   
   sku         String
-  barcode     String?  // Base64 barcode image for SKU
-  description String
+  barcodeValue String?
+  name        String
   quantity    Int
   unitPrice   Decimal  @db.Decimal(10, 2)
   total       Decimal  @db.Decimal(10, 2)
@@ -1370,6 +1373,7 @@ model InvoiceItem {
   
   @@index([invoiceId])
   @@index([sku])
+  @@index([barcodeValue])
   @@map("invoice_items")
 }
 

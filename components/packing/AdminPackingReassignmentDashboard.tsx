@@ -388,21 +388,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
                             </span>
                           )}
                         </div>
-                        {/* <div className="flex flex-wrap gap-1">
-                          {task.taskItems.slice(0, 3).map((item) => (
-                            <span
-                              key={item.id}
-                              className="px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded text-xs"
-                            >
-                              {item.order?.orderNumber || "N/A"}
-                            </span>
-                          ))}
-                          {task.taskItems.length > 3 && (
-                            <span className="px-1.5 py-0.5 text-gray-500 dark:text-gray-400 text-xs">
-                              +{task.taskItems.length - 3} more
-                            </span>
-                          )}
-                        </div> */}
                       </div>
                     )}
                   </div>

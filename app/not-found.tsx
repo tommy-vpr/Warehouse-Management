@@ -19,9 +19,9 @@ export default function NotFound() {
         Oops! The page you’re looking for doesn’t exist.
       </p>
       <Link href="/dashboard">
-        <Button className="bg-yellow-500 hover:bg-yellow-600 text-gray-700 transition">
+        <button className="bg-amber-400 hover:bg-amber-500 text-white transition rounded-full py-2 px-6">
           Return to Dashboard
-        </Button>
+        </button>
       </Link>
     </main>
   );

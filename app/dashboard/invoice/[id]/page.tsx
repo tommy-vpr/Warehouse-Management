@@ -2,7 +2,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { use } from "react";
+import { use, useState } from "react";
 import {
   FileText,
   Download,
@@ -13,11 +13,14 @@ import {
   Mail,
   Phone,
   MapPin,
+  Copy,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 
 export default function InvoiceDetailPage({
@@ -26,6 +29,8 @@ export default function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { toast } = useToast();
+  const [copiedSku, setCopiedSku] = useState<string | null>(null);
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -35,6 +40,24 @@ export default function InvoiceDetailPage({
       return res.json();
     },
   });
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSku(text);
+      toast({
+        title: "Copied!",
+        description: `${label} copied to clipboard`,
+      });
+      setTimeout(() => setCopiedSku(null), 2000);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to copy",
+        description: "Please try again",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -88,6 +111,19 @@ export default function InvoiceDetailPage({
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {invoice.invoiceNumber}
                   </h1>
+                  <button
+                    onClick={() =>
+                      copyToClipboard(invoice.invoiceNumber, "Invoice number")
+                    }
+                    className="p-1.5 hover:bg-white/50 dark:hover:bg-gray-800/50 rounded transition-colors"
+                    title="Copy invoice number"
+                  >
+                    {copiedSku === invoice.invoiceNumber ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {new Date(invoice.date).toLocaleDateString("en-US", {
@@ -97,21 +133,26 @@ export default function InvoiceDetailPage({
                   })}
                 </p>
               </div>
-              {invoice.barcode && (
-                <Image
-                  src={invoice.barcode}
-                  alt="Invoice Barcode"
-                  width={200}
-                  height={60}
-                  className="bg-white p-2 rounded"
-                />
+              {invoice.barcodeValue && (
+                <div className="text-right">
+                  <Image
+                    src={`/api/invoice/barcode/generate?text=${invoice.barcodeValue}`}
+                    alt="Invoice Barcode"
+                    width={200}
+                    height={60}
+                    className="bg-white p-2 rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {invoice.barcodeValue}
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
           {/* Original Invoice Image */}
           {invoice.originalInvoiceUrl && (
-            <div className="p-6 border-b">
+            <div className="p-6 border-b bg-gray-50 dark:bg-transparent">
               <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
                 <ImageIcon className="w-4 h-4" />
                 Original Invoice
@@ -128,39 +169,39 @@ export default function InvoiceDetailPage({
             </div>
           )}
 
-          {/* Customer Info */}
-          {/* <CardContent className="p-6 border-b bg-gray-50 dark:bg-gray-800/50">
+          {/* Vendor Info */}
+          <CardContent className="p-6 border-b bg-gray-50 dark:bg-gray-800/50">
             <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Bill To
+              Vendor
             </h2>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-gray-400" />
                 <p className="font-medium text-gray-900 dark:text-white">
-                  {invoice.customerName}
+                  {invoice.vendorName}
                 </p>
               </div>
-              {invoice.customerEmail && (
+              {invoice.vendorEmail && (
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-gray-400" />
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {invoice.customerEmail}
+                    {invoice.vendorEmail}
                   </p>
                 </div>
               )}
-              {invoice.customerPhone && (
+              {invoice.vendorPhone && (
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-gray-400" />
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {invoice.customerPhone}
+                    {invoice.vendorPhone}
                   </p>
                 </div>
               )}
-              {invoice.customerAddress && (
+              {invoice.vendorAddress && (
                 <div className="flex items-start gap-2">
                   <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
                   <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                    {invoice.customerAddress}
+                    {invoice.vendorAddress}
                   </p>
                 </div>
               )}
@@ -179,7 +220,7 @@ export default function InvoiceDetailPage({
                 </p>
               </div>
             )}
-          </CardContent> */}
+          </CardContent>
 
           {/* Items */}
           <CardContent className="p-6">
@@ -190,25 +231,43 @@ export default function InvoiceDetailPage({
               {invoice.items.map((item: any) => (
                 <div
                   key={item.id}
-                  className="flex items-start gap-4 p-4 bg-gray-100 dark:bg-gray-800/50"
+                  className="flex items-start gap-4 p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg"
                 >
-                  {item.barcode && (
-                    <Image
-                      src={item.barcode}
-                      alt={`SKU ${item.sku}`}
-                      width={100}
-                      height={40}
-                      className="bg-white p-1 rounded"
-                    />
+                  {item.barcodeValue && (
+                    <div className="flex flex-col items-center">
+                      <Image
+                        src={`/api/invoice/barcode/generate?text=${item.barcodeValue}`}
+                        alt={`SKU ${item.sku}`}
+                        width={100}
+                        height={40}
+                        className="bg-white p-1 rounded"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {item.barcodeValue}
+                      </p>
+                    </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {item.description}
+                      {item.name}
                     </p>
                     <div className="flex items-center gap-4 mt-1">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        SKU: {item.sku}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          SKU: {item.sku}
+                        </p>
+                        <button
+                          onClick={() => copyToClipboard(item.sku, "SKU")}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                          title="Copy SKU"
+                        >
+                          {copiedSku === item.sku ? (
+                            <Check className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          )}
+                        </button>
+                      </div>
                       {item.productVariant && (
                         <Badge
                           variant="outline"
@@ -233,7 +292,7 @@ export default function InvoiceDetailPage({
           </CardContent>
 
           {/* Totals */}
-          <CardContent className="px-6 py-4 border-t">
+          <CardContent className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t">
             <div className="max-w-sm ml-auto space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">
@@ -245,6 +304,20 @@ export default function InvoiceDetailPage({
                 <span className="text-gray-600 dark:text-gray-400">Tax</span>
                 <span className="font-medium">${invoice.tax}</span>
               </div>
+              {parseFloat(invoice.shipping) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Shipping
+                  </span>
+                  <span className="font-medium">${invoice.shipping}</span>
+                </div>
+              )}
+              {parseFloat(invoice.fees) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Fees</span>
+                  <span className="font-medium">${invoice.fees}</span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t">
                 <span className="font-semibold text-gray-900 dark:text-white">
                   Total
@@ -257,7 +330,7 @@ export default function InvoiceDetailPage({
           </CardContent>
 
           {/* Footer */}
-          <CardContent className="px-6 py-4 border-t">
+          <CardContent className="px-6 py-4 bg-gray-100 dark:bg-gray-900/50 border-t">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <Calendar className="w-4 h-4" />

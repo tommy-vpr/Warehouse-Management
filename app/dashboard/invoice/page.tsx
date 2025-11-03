@@ -240,7 +240,7 @@ export default function InvoiceDashboardPage() {
               </Button>
               <Button
                 onClick={() => setShowForm(!showForm)}
-                className="cursor-pointer bg-blue-500 hover:bg-blue-600 transition"
+                className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-gray-200 transition"
               >
                 <Plus className="w-4 h-4" />
                 {showForm ? "Hide Form" : "Create Invoice"}
@@ -394,8 +394,8 @@ export default function InvoiceDashboardPage() {
                     <Button
                       onClick={() => setShowForm(true)}
                       className="cursor-pointer"
+                      variant={"outline"}
                     >
-                      <FileText className="w-4 h-4 mr-2" />
                       Create Invoice
                     </Button>
                   )}
