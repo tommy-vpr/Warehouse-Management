@@ -61,6 +61,7 @@ export interface ShippingPackage {
   id: string;
   trackingNumber: string;
   labelUrl: string | null;
+  packingSlipUrl?: string | null;
   cost: string;
   carrierCode: string;
   serviceCode: string;

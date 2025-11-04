@@ -22,6 +22,8 @@ import {
   Repeat2,
   Loader2,
   CloudDownload,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { InventorySkeleton } from "@/components/skeleton/Inventory";
@@ -94,7 +96,7 @@ export default function InventoryDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
-  const [mounted, setMounted] = useState(false); // ✅ hydration guard
+  const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,15 +111,8 @@ export default function InventoryDashboard() {
 
   const { data: session, status } = useSession();
 
-  // Add state for sync status
   const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
   const { toast } = useToast();
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<{
-    show: boolean;
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
 
   const isAdmin =
     session?.user?.role === "ADMIN" || session?.user?.role === "MANAGER";
@@ -313,21 +308,22 @@ export default function InventoryDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-2 sm:p-4 lg:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
+        <div className="mb-4 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 Inventory Management
               </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                Track stock levels, locations, and product details
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Track stock levels & locations
               </p>
             </div>
-            <div className="flex gap-3">
-              {/* Sync Inventory from inventory planner */}
+
+            {/* Desktop Actions */}
+            <div className="hidden lg:flex gap-2">
               {isAdmin && (
                 <Button
                   variant="outline"
@@ -355,7 +351,6 @@ export default function InventoryDashboard() {
                 }
                 disabled={mounted ? isLoading : false}
                 className="cursor-pointer transition"
-                // disabled={isFetching}
               >
                 <RefreshCw
                   className={`w-4 h-4 ${
@@ -369,117 +364,146 @@ export default function InventoryDashboard() {
                 variant="outline"
                 onClick={() => router.push("/dashboard/inventory/receive")}
               >
-                <Plus className="w-4 h-4" />
-                Receive Stock
+                <Plus className="w-4 h-4 mr-2" />
+                Receive
               </Button>
               <Button
                 className="cursor-pointer transition"
                 variant="outline"
                 onClick={() => router.push("/dashboard/inventory/count")}
               >
-                <Repeat2 className="w-4 h-4" />
-                Cycle Count
+                <Repeat2 className="w-4 h-4 mr-2" />
+                Count
               </Button>
               <Button
                 className="cursor-pointer transition"
                 variant="outline"
                 onClick={() => setCreateOpen(true)}
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 mr-2" />
                 New Item
+              </Button>
+            </div>
+
+            {/* Mobile Actions - Icon Only */}
+            <div className="flex lg:hidden gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  queryClient.invalidateQueries({ queryKey: ["inventory"] })
+                }
+                disabled={mounted ? isLoading : false}
+                className="cursor-pointer"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    mounted && (isLoading || isFetching) ? "animate-spin" : ""
+                  }`}
+                />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => setCreateOpen(true)}
+                className="cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
           {/* Statistics Cards */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-              {/* totalProducts */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <Package className="w-6 h-6 text-blue-500" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">{stats.totalProducts}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
+                        {stats.totalProducts}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                         Products
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              {/* totalValue */}
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <BarChart3 className="w-6 h-6 text-green-600" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">
+                    <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
                         $
                         {mounted
                           ? stats.totalValue.toLocaleString()
                           : stats.totalValue}
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Total Value
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                        Value
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              {/* lowStock */}
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <TrendingDown className="w-6 h-6 text-yellow-600" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">{stats.lowStock}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
+                        {stats.lowStock}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                         Low Stock
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              {/* outOfStock */}
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <AlertTriangle className="w-6 h-6 text-red-400" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">{stats.outOfStock}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Out of Stock
+                    <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
+                        {stats.outOfStock}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                        Out
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              {/* overstock */}
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <TrendingUp className="w-6 h-6 text-blue-500" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">{stats.overstock}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
+                        {stats.overstock}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                         Overstock
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              {/* recentTransactions */}
               <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center">
-                    <History className="w-6 h-6 text-purple-600" />
-                    <div className="ml-3">
-                      <p className="text-lg font-bold">
+                    <History className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                    <div className="ml-2 sm:ml-3">
+                      <p className="text-base sm:text-lg font-bold">
                         {stats.recentTransactions}
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Recent Moves
+                      <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                        Moves
                       </p>
                     </div>
                   </div>
@@ -489,61 +513,66 @@ export default function InventoryDashboard() {
           )}
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6 text-sm">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3 mb-4 sm:mb-6 text-sm">
+            {/* Search - Full Width */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                placeholder="Search by SKU, product name, or UPC..."
+                placeholder="Search SKU, product, or UPC..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 dark:border-zinc-700"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                handleFilterChange(setStatusFilter)(e.target.value)
-              }
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Status</option>
-              <option value="OK">In Stock</option>
-              <option value="LOW">Low Stock</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="OVERSTOCK">Overstock</option>
-            </select>
-            <select
-              value={locationFilter}
-              onChange={(e) =>
-                handleFilterChange(setLocationFilter)(e.target.value)
-              }
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Locations</option>
-              <option value="A">Zone A</option>
-              <option value="B">Zone B</option>
-              <option value="C">Zone C</option>
-              <option value="RECEIVING">Receiving</option>
-              <option value="SHIPPING">Shipping</option>
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) =>
-                handleFilterChange(setCategoryFilter)(e.target.value)
-              }
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Categories</option>
-              <option value="ELECTRONICS">Electronics</option>
-              <option value="CLOTHING">Clothing</option>
-              <option value="BOOKS">Books</option>
-              <option value="HOME">Home & Garden</option>
-            </select>
+
+            {/* Filter Dropdowns - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  handleFilterChange(setStatusFilter)(e.target.value)
+                }
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="ALL">All Status</option>
+                <option value="OK">In Stock</option>
+                <option value="LOW">Low Stock</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="OVERSTOCK">Overstock</option>
+              </select>
+              <select
+                value={locationFilter}
+                onChange={(e) =>
+                  handleFilterChange(setLocationFilter)(e.target.value)
+                }
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="ALL">All Locations</option>
+                <option value="A">Zone A</option>
+                <option value="B">Zone B</option>
+                <option value="C">Zone C</option>
+                <option value="RECEIVING">Receiving</option>
+                <option value="SHIPPING">Shipping</option>
+              </select>
+              <select
+                value={categoryFilter}
+                onChange={(e) =>
+                  handleFilterChange(setCategoryFilter)(e.target.value)
+                }
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="ELECTRONICS">Electronics</option>
+                <option value="CLOTHING">Clothing</option>
+                <option value="BOOKS">Books</option>
+                <option value="HOME">Home & Garden</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Inventory Table */}
-        <Card>
+        {/* Inventory Table - Desktop */}
+        <Card className="hidden md:block">
           <CardHeader>
             <CardTitle className="flex items-center">Inventory</CardTitle>
           </CardHeader>
@@ -564,15 +593,9 @@ export default function InventoryDashboard() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Location(s)
                     </th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Value
-                    </th> */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Last Count
                     </th>
-                    {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
-                    </th> */}
                   </tr>
                 </thead>
                 {isFiltering ? (
@@ -665,31 +688,6 @@ export default function InventoryDashboard() {
                               )}
                             </div>
                           </td>
-                          {/* <td className="px-4 py-4">
-                            <div>
-                              {item.costPrice ? (
-                                <div className="text-sm">
-                                  Cost: ${item.costPrice}
-                                </div>
-                              ) : (
-                                "---"
-                              )}
-                              {item.sellingPrice && (
-                                <div className="text-sm font-medium">
-                                  Sell: ${item.sellingPrice}
-                                </div>
-                              )}
-                              {item.costPrice && (
-                                <div className="text-xs text-gray-500">
-                                  Total: $
-                                  {(
-                                    parseFloat(item.costPrice) *
-                                    item.quantityOnHand
-                                  ).toFixed(2)}
-                                </div>
-                              )}
-                            </div>
-                          </td> */}
                           <td className="px-4 py-4">
                             <div className="text-sm">
                               {mounted && item.lastCounted ? (
@@ -713,67 +711,19 @@ export default function InventoryDashboard() {
                               )}
                             </div>
                           </td>
-                          {/* <td className="px-4 py-4">
-                            <div className="flex gap-1">
-                              <Button
-                                className="cursor-pointer"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  navigateToProduct(item.productVariantId)
-                                }
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                className="cursor-pointer"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const qty = prompt("Adjust quantity by:");
-                                  if (qty)
-                                    handleQuickAction(
-                                      "ADJUST",
-                                      item.inventoryId,
-                                      parseInt(qty)
-                                    );
-                                }}
-                                disabled={actionMutation.isPending}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              {item.reorderStatus === "CRITICAL" &&
-                                !item.hasReorderRequest && (
-                                  <Button
-                                    className="cursor-pointer"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleQuickAction(
-                                        "REORDER",
-                                        item.inventoryId
-                                      )
-                                    }
-                                    disabled={actionMutation.isPending}
-                                  >
-                                    <ShoppingCart className="w-4 h-4" />
-                                  </Button>
-                                )}
-                            </div>
-                          </td> */}
                         </tr>
 
                         {/* Expanded Location Details */}
                         {expandedItem === item.inventoryId && (
                           <tr>
-                            <td colSpan={7} className="px-4 py-4 bg-background">
+                            <td colSpan={5} className="px-4 py-4 bg-background">
                               <div className="space-y-2">
                                 <h4 className="font-medium">All Locations:</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                   {item.locations.map((location) => (
                                     <div
                                       key={location.locationId}
-                                      className="bg-white p-3 rounded border"
+                                      className="bg-white dark:bg-gray-800 p-3 rounded border"
                                     >
                                       <div className="font-medium">
                                         {location.locationName}
@@ -806,7 +756,7 @@ export default function InventoryDashboard() {
               {inventory.length === 0 && !isFiltering && (
                 <div className="text-center py-12">
                   <Box className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                     No inventory found
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
@@ -818,11 +768,136 @@ export default function InventoryDashboard() {
           </CardContent>
         </Card>
 
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
+          {isFiltering ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 text-blue-600 mx-auto mb-2 animate-spin" />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Loading...
+              </p>
+            </div>
+          ) : inventory.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Box className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="font-medium text-gray-900 dark:text-white mb-1">
+                  No inventory found
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Try adjusting your filters
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            inventory.map((item) => (
+              <Card
+                key={item.inventoryId}
+                className="cursor-pointer"
+                onClick={() => navigateToProduct(item.productVariantId)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-blue-500 dark:text-gray-200">
+                        {item.productName}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        SKU: {item.sku}
+                      </p>
+                    </div>
+                    <Badge className={getStockStatusColor(item.reorderStatus)}>
+                      {item.reorderStatus}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500">On Hand</p>
+                      <p className="font-medium">{item.quantityOnHand}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Available</p>
+                      <p className="font-medium text-green-600">
+                        {item.quantityAvailable}
+                      </p>
+                    </div>
+                  </div>
+
+                  {item.locations.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 mb-1">Locations</p>
+                      <div className="space-y-1">
+                        {item.locations.slice(0, 2).map((location) => (
+                          <div
+                            key={location.locationId}
+                            className="text-xs flex justify-between"
+                          >
+                            <span className="font-medium">
+                              {location.locationName}
+                            </span>
+                            <span className="text-gray-500">
+                              {location.quantity}
+                            </span>
+                          </div>
+                        ))}
+                        {item.locations.length > 2 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedItem(
+                                expandedItem === item.inventoryId
+                                  ? null
+                                  : item.inventoryId
+                              );
+                            }}
+                            className="text-xs text-blue-500 flex items-center gap-1"
+                          >
+                            {expandedItem === item.inventoryId ? (
+                              <>
+                                <ChevronUp className="w-3 h-3" /> Show less
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-3 h-3" /> Show{" "}
+                                {item.locations.length - 2} more
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expanded Locations */}
+                      {expandedItem === item.inventoryId && (
+                        <div className="mt-2 space-y-1 pt-2 border-t border-gray-100 dark:border-gray-800">
+                          {item.locations.slice(2).map((location) => (
+                            <div
+                              key={location.locationId}
+                              className="text-xs flex justify-between"
+                            >
+                              <span className="font-medium">
+                                {location.locationName}
+                              </span>
+                              <span className="text-gray-500">
+                                {location.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between py-3 mt-4">
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400">
-              Showing page {currentPage} of {totalPages}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3 mt-4">
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              Page {currentPage} of {totalPages}
             </div>
             <div className="flex gap-2">
               <Button
@@ -833,7 +908,9 @@ export default function InventoryDashboard() {
               >
                 Previous
               </Button>
-              <div className="flex gap-1">
+
+              {/* Simplified pagination for mobile */}
+              <div className="hidden sm:flex gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const pageNum =
                     currentPage <= 3
@@ -858,6 +935,7 @@ export default function InventoryDashboard() {
                   );
                 })}
               </div>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -872,7 +950,9 @@ export default function InventoryDashboard() {
           </div>
         )}
       </div>
+
       <CreateItemModal open={createOpen} onOpenChange={setCreateOpen} />
+
       {/* Confirmation Dialog */}
       <AlertDialog open={confirmSyncOpen} onOpenChange={setConfirmSyncOpen}>
         <AlertDialogContent>

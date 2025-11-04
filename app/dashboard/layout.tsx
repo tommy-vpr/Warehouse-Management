@@ -27,6 +27,9 @@ import {
   Scroll,
   Undo,
   Undo2,
+  Home,
+  ScanBarcode,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -71,7 +74,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "inventory/receive/po", label: "Purchase Orders", icon: FileText },
     { id: "returns", label: "Returns", icon: Undo2 },
     { id: "invoice", label: "Invoice", icon: Scroll },
-    // { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
     { id: "inventory/transfers", label: "Transfers", icon: ArrowLeftRight },
     { id: "backorders", label: "Backorders", icon: ShoppingBag },
@@ -80,9 +82,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       label: "Inventory Planner",
       icon: CalendarDays,
     },
-    { id: "picking", label: "Picking", icon: ScanText }, // 🟢
-    { id: "packing", label: "Packing", icon: Package }, // 📦
-
+    { id: "picking", label: "Picking", icon: ScanText },
+    { id: "packing", label: "Packing", icon: Package },
     { id: "shipping", label: "Tracking", icon: Truck },
     { id: "import", label: "Import", icon: Import },
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
@@ -94,6 +95,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     .sort((a, b) => b.id.length - a.id.length)[0]?.id;
 
   const checkActive = (id: string) => id === activeItem;
+
+  // Quick action items for mobile footer
+  const quickActions = [
+    {
+      href: "/dashboard/inventory/receive/scan",
+      icon: ScanBarcode,
+      label: "Scan",
+    },
+    { href: "/dashboard/my-work", icon: ClipboardList, label: "Tasks" },
+    { href: "/dashboard/orders", icon: FileText, label: "Orders" },
+    { href: "/dashboard", icon: Home, label: "Home" },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -145,27 +158,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </Button>
             </Link>
 
-            {/* Mobile: Icon-only buttons */}
-            <Link href="/dashboard/inventory/receive" className="sm:hidden">
-              <Button
-                size="icon"
-                className="bg-blue-600 hover:bg-blue-700 text-gray-200"
-              >
-                <Scan className="w-4 h-4" />
-              </Button>
-            </Link>
-
-            <Link href="/dashboard/picking/scan" className="sm:hidden">
-              <Button
-                size="icon"
-                className="bg-gray-600 hover:bg-gray-700 text-gray-200"
-              >
-                <Scan className="w-4 h-4" />
-              </Button>
-            </Link>
-
             <NotificationBell />
-
             <ThemeToggle />
             <UserMenu />
           </div>
@@ -218,12 +211,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         )}
                     </span>
                   </div>
-
-                  {/* {item.showCount && unreadCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs font-medium px-2 py-0.5 rounded-full w-3 h-3 min-w-3 min-h-3 text-center">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )} */}
                 </Link>
               );
             })}
@@ -238,8 +225,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           />
         )}
 
-        {/* Main content */}
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        {/* Main content - Add padding bottom on mobile for footer */}
+        <main className="flex-1 p-4 sm:p-6 pb-20 sm:pb-6">{children}</main>
+      </div>
+
+      {/* Quick Actions Footer - Mobile Only */}
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg sm:hidden z-50">
+        <div className="grid grid-cols-4 gap-1 p-2">
+          {quickActions.map((action) => {
+            const isActive = pathname === action.href;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={clsx(
+                  "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
+                  isActive ? "bg-gray-200 dark:bg-black" : "hover:bg-accent"
+                )}
+              >
+                <action.icon
+                  className={clsx(
+                    "w-5 h-5",
+                    isActive
+                      ? "text-zinc-900 dark:text-gray-200"
+                      : "text-muted-foreground"
+                  )}
+                />
+                <span
+                  className={clsx(
+                    "text-xs",
+                    isActive
+                      ? "text-zinc-900 dark:text-gray-200 font-medium"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {action.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

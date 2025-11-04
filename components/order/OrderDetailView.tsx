@@ -903,6 +903,71 @@ export default function OrderDetailView({
                                     View Label
                                   </Button>
                                 )}
+
+                                {pkg.packingSlipUrl ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      window.open(pkg.packingSlipUrl!, "_blank")
+                                    }
+                                    className="cursor-pointer"
+                                  >
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    Packing Slip
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      try {
+                                        const response = await fetch(
+                                          `/api/orders/${order.id}/generate-packing-slip`,
+                                          {
+                                            method: "POST",
+                                            headers: {
+                                              "Content-Type":
+                                                "application/json",
+                                            },
+                                            body: JSON.stringify({
+                                              packageId: pkg.id,
+                                            }),
+                                          }
+                                        );
+
+                                        if (!response.ok)
+                                          throw new Error("Failed to generate");
+
+                                        const data = await response.json();
+
+                                        if (data.packingSlipUrl) {
+                                          window.open(
+                                            data.packingSlipUrl,
+                                            "_blank"
+                                          );
+                                          refetch();
+                                          toast({
+                                            title: "Success",
+                                            description:
+                                              "Packing slip generated",
+                                          });
+                                        }
+                                      } catch (error) {
+                                        toast({
+                                          title: "Error",
+                                          description:
+                                            "Failed to generate packing slip",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    Generate Slip
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           )

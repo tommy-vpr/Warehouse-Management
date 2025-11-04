@@ -102,6 +102,7 @@ const BOX_TYPES = [
 export default function EnhancedPackingInterface() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const [packages, setPackages] = useState<any[]>([]);
 
   // Order state
   const [order, setOrder] = useState<OrderDetails | null>(null);
@@ -131,6 +132,8 @@ export default function EnhancedPackingInterface() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPacking, setIsPacking] = useState(false);
   const [isPackingComplete, setIsPackingComplete] = useState(false);
+
+  console.log("Order: ", order);
 
   useEffect(() => {
     loadOrderDetails();
@@ -240,8 +243,96 @@ export default function EnhancedPackingInterface() {
   };
 
   // Handle successful label creation
-  const handleLabelSuccess = (results: any[]) => {
-    console.log("Labels created successfully:", results);
+  // const handleLabelSuccess = async (results: any[]) => {
+  //   if (!order) return;
+
+  //   try {
+  //     // Generate packing slips
+  //     await fetch(`/api/packing/generate-packing-slip`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ orderId: order.id }),
+  //     });
+
+  //     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  //     // Fetch updated order
+  //     const response = await fetch(`/api/orders/${order.id}`);
+  //     const data = await response.json();
+
+  //     if (data?.shippingPackages) {
+  //       setPackages(data.shippingPackages);
+
+  //       // Open documents one at a time with auto-print
+  //       for (let i = 0; i < data.shippingPackages.length; i++) {
+  //         const pkg = data.shippingPackages[i];
+
+  //         // Open label, trigger print
+  //         if (pkg.labelUrl) {
+  //           const labelWin = window.open(
+  //             pkg.labelUrl,
+  //             "_blank", // ✅ Use _blank for new window each time
+  //             "width=800,height=600"
+  //           );
+  //           if (labelWin) {
+  //             labelWin.onload = () => {
+  //               setTimeout(() => {
+  //                 labelWin.print();
+  //               }, 500); // ✅ Reduced from 1000ms
+  //             };
+  //           }
+  //           await new Promise((resolve) => setTimeout(resolve, 500)); // ✅ Reduced from 3000ms
+  //         }
+
+  //         // Open packing slip, trigger print
+  //         if (pkg.packingSlipUrl) {
+  //           const slipWin = window.open(
+  //             pkg.packingSlipUrl,
+  //             "_blank", // ✅ Use _blank for new window each time
+  //             "width=800,height=600"
+  //           );
+  //           if (slipWin) {
+  //             slipWin.onload = () => {
+  //               setTimeout(() => {
+  //                 slipWin.print();
+  //               }, 500); // ✅ Reduced from 1000ms
+  //             };
+  //           }
+  //           await new Promise((resolve) => setTimeout(resolve, 500)); // ✅ Reduced from 3000ms
+  //         }
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
+
+  //   setIsPackingComplete(true);
+  // };
+  const handleLabelSuccess = async (results: any[]) => {
+    if (!order) return;
+
+    try {
+      // Generate packing slips
+      await fetch(`/api/packing/generate-packing-slip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+
+      // Small delay to let packing slips generate
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Fetch updated order with packages
+      const response = await fetch(`/api/orders/${order.id}`);
+      const data = await response.json();
+
+      if (data?.shippingPackages) {
+        setPackages(data.shippingPackages);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
     setIsPackingComplete(true);
   };
 
@@ -298,10 +389,11 @@ export default function EnhancedPackingInterface() {
   }
 
   // Success state
+  // Success state
   if (isPackingComplete) {
     return (
       <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-2xl w-full">
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
             Order Packed & Labeled!
@@ -310,12 +402,166 @@ export default function EnhancedPackingInterface() {
             {order.orderNumber} is ready for shipping
           </p>
 
+          {packages.length > 0 ? (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Print Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {packages.map((pkg, idx) => (
+                    <div
+                      key={pkg.id || idx}
+                      className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded"
+                    >
+                      <div className="text-left">
+                        <p className="font-medium">
+                          Package {pkg.packageNumber || idx + 1} of{" "}
+                          {packages.length}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Tracking: {pkg.trackingNumber}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {/* Print Label Button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const printWindow = window.open(
+                              pkg.labelUrl,
+                              "_blank",
+                              "width=800,height=600"
+                            );
+                            if (printWindow) {
+                              printWindow.onload = () => {
+                                setTimeout(() => {
+                                  printWindow.print();
+                                }, 500);
+                              };
+                            }
+                          }}
+                          className="flex items-center gap-1"
+                        >
+                          🖨️ Print Label
+                        </Button>
+
+                        {/* Print Packing Slip Button */}
+                        {pkg.packingSlipUrl ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const printWindow = window.open(
+                                pkg.packingSlipUrl,
+                                "_blank",
+                                "width=800,height=600"
+                              );
+                              if (printWindow) {
+                                printWindow.onload = () => {
+                                  setTimeout(() => {
+                                    printWindow.print();
+                                  }, 500);
+                                };
+                              }
+                            }}
+                            className="flex items-center gap-1"
+                          >
+                            🖨️ Print Slip
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled>
+                            📄 Generating...
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Print All Documents Button */}
+                  <Button
+                    className="w-full"
+                    onClick={async () => {
+                      for (let i = 0; i < packages.length; i++) {
+                        const pkg = packages[i];
+
+                        // Print label
+                        if (pkg.labelUrl) {
+                          const labelWindow = window.open(
+                            pkg.labelUrl,
+                            "_blank",
+                            "width=800,height=600"
+                          );
+                          if (labelWindow) {
+                            labelWindow.onload = () => {
+                              setTimeout(() => {
+                                labelWindow.print();
+                              }, 500);
+                            };
+                          }
+                          // Wait before opening next document
+                          await new Promise((resolve) =>
+                            setTimeout(resolve, 2000)
+                          );
+                        }
+
+                        // Print packing slip
+                        if (pkg.packingSlipUrl) {
+                          const slipWindow = window.open(
+                            pkg.packingSlipUrl,
+                            "_blank",
+                            "width=800,height=600"
+                          );
+                          if (slipWindow) {
+                            slipWindow.onload = () => {
+                              setTimeout(() => {
+                                slipWindow.print();
+                              }, 500);
+                            };
+                          }
+                          // Wait before next package
+                          await new Promise((resolve) =>
+                            setTimeout(resolve, 2000)
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    🖨️ Print All Documents ({packages.length * 2})
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Fallback message if no packages loaded */
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                📄 Documents opened automatically in new tabs
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                If tabs didn't open, please check popup settings or print from
+                order details page
+              </p>
+            </div>
+          )}
+
           <div className="space-y-3">
             <Button
               onClick={() => (window.location.href = "/dashboard/packing")}
               className="w-full h-12 text-lg"
             >
               Pack Next Order
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                (window.location.href = `/dashboard/orders/${order.id}`)
+              }
+              className="w-full"
+            >
+              View Order Details
             </Button>
           </div>
         </div>

@@ -1005,6 +1005,32 @@ export async function POST(request: NextRequest) {
       userId,
       shippingPackages.length
     );
+
+    // ===================================================================
+    // Auto-generate packing slips for all packages
+    // ===================================================================
+    try {
+      console.log(
+        `📄 Auto-generating packing slips for ${shippingPackages.length} package(s)...`
+      );
+
+      const { generatePackingSlipsForOrder } = await import(
+        "@/lib/packing-slip-generator"
+      );
+      await generatePackingSlipsForOrder(order.id);
+
+      console.log("✅ Packing slips generated successfully");
+    } catch (packingSlipError) {
+      // Don't fail the entire request if packing slip generation fails
+      console.error(
+        "⚠️ Failed to auto-generate packing slips:",
+        packingSlipError
+      );
+      console.error(
+        "Packing slips can be generated manually later from the UI"
+      );
+    }
+
     // ===== SHOPIFY FULFILLMENT (OUTSIDE TRANSACTION) =====
     if (order.shopifyOrderId) {
       const isBackOrderShipment = (backOrderFulfilledDetails?.length ?? 0) > 0;

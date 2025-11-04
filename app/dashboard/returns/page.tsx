@@ -382,8 +382,8 @@ export default function ReturnsDashboard() {
                   onClick={() => setStatusFilter(status)}
                   className={`rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                     statusFilter === status
-                      ? "bg-gray-500 text-white dark:bg-gray-200 dark:text-zinc-800"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-700/30 dark:text-gray-300 dark:hover:bg-zinc-600"
+                      ? "bg-zinc-800 text-white dark:bg-gray-200 dark:text-zinc-800"
+                      : "bg-transparent text-zinc-800 hover:bg-zinc-800 hover:text-white dark:text-gray-200 dark:hover:bg-gray-200 dark:hover:text-zinc-800"
                   }`}
                 >
                   {status.replace(/_/g, " ")}

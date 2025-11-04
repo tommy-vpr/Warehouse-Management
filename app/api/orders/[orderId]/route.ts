@@ -148,7 +148,7 @@ function calculatePriority(order: any): "LOW" | "MEDIUM" | "HIGH" | "URGENT" {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -156,7 +156,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { orderId } = params;
+    const { orderId } = await params;
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -296,12 +296,17 @@ export async function GET(
       id: pkg.id,
       trackingNumber: pkg.trackingNumber,
       labelUrl: pkg.labelUrl,
+      packingSlipUrl: pkg.packingSlipUrl,
       cost: pkg.cost.toString(),
       carrierCode: pkg.carrierCode,
       serviceCode: pkg.serviceCode,
+      packageCode: pkg.packageCode, // Packing slip
+      packageNumber: pkg.packageNumber, // Packing slip
+      totalPackages: pkg.totalPackages, // Packing slip
       weight: pkg.weight ? pkg.weight.toString() : "0",
       dimensions: pkg.dimensions, // This is already Json type
       createdAt: pkg.createdAt.toISOString(),
+      updatedAt: pkg.updatedAt.toISOString(), // Packing slip
       items: pkg.items.map((item) => ({
         id: item.id,
         productName: item.productName,

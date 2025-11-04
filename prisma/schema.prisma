@@ -809,10 +809,15 @@ model ShippingPackage {
   packageCode    String?
   trackingNumber String
   labelUrl       String
+  packingSlipUrl String?
   cost           Decimal  @db.Decimal(10, 2)
   currency       String
   weight         Decimal? @db.Decimal(8, 2)
   dimensions     Json?
+
+  // For multi-package orders
+  packageNumber  Int      @default(1) 
+  totalPackages  Int      @default(1)    
 
   items      PackageItem[]
   backOrders BackOrder[]

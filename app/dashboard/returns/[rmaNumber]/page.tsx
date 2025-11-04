@@ -677,7 +677,6 @@ export default function ReturnDetailPage({
             <div className="bg-white dark:bg-zinc-800/50 rounded-lg shadow-sm dark:shadow-zinc-900/50 border border-gray-200 dark:border-zinc-700/50">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-zinc-700">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2 text-gray-500 dark:text-gray-400" />
                   Financial
                 </h2>
               </div>
