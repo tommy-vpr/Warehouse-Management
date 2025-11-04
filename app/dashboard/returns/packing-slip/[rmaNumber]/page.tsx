@@ -1,0 +1,298 @@
+// dashboard/returns/packing-slip/[rmaNumber]/page.tsx
+// Printable packing slip for customers to include in return package
+
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import Barcode from "react-barcode";
+
+interface ReturnOrder {
+  rmaNumber: string;
+  customerName: string;
+  customerEmail: string;
+  reason: string;
+  reasonDetails?: string;
+  createdAt: string;
+  order: {
+    orderNumber: string;
+  };
+  items: Array<{
+    productVariant: {
+      sku: string;
+      name: string;
+    };
+    quantityRequested: number;
+  }>;
+}
+
+export default function PackingSlipPage({
+  params,
+}: {
+  params: { rmaNumber: string };
+}) {
+  const [returnOrder, setReturnOrder] = useState<ReturnOrder | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchReturnDetails();
+  }, [params.rmaNumber]);
+
+  const fetchReturnDetails = async () => {
+    try {
+      const response = await fetch(`/api/returns/${params.rmaNumber}`);
+      const data = await response.json();
+      setReturnOrder(data);
+    } catch (err) {
+      console.error("Failed to load return details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading packing slip...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!returnOrder) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-600">Return not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Print Button - Hidden when printing */}
+      {/* <div className="print:hidden fixed top-4 right-4 z-10">
+        <button
+          onClick={handlePrint}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg font-medium"
+        >Print Packing Slip
+        </button>
+      </div> */}
+
+      {/* Packing Slip - Optimized for printing */}
+      <div className="max-w-4xl mx-auto p-8 bg-white">
+        <Button
+          variant={"outline"}
+          onClick={handlePrint}
+          className="print:hidden ml-auto block mb-8"
+        >
+          Print Packing Slip
+        </Button>
+        {/* Header */}
+        <div className="border-4 border-gray-900 p-6 mb-6">
+          <div className="text-center mb-4">
+            <h1 className="text-3xl font-bold mb-2">RETURN PACKING SLIP</h1>
+            <p className="text-lg text-gray-600">
+              Please include this slip inside your return package
+            </p>
+          </div>
+
+          {/* RMA Barcode - CRITICAL FOR WAREHOUSE */}
+          <div className="bg-gray-100 p-6 text-center">
+            <p className="text-sm text-gray-700 mb-2">
+              SCAN THIS BARCODE AT WAREHOUSE:
+            </p>
+            <div className="my-4 flex justify-center">
+              <Barcode
+                value={returnOrder.rmaNumber}
+                format="CODE128"
+                width={3}
+                height={80}
+                displayValue={true}
+                fontSize={20}
+                fontOptions="bold"
+                margin={10}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Return Information */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="border border-gray-300 p-4">
+            <h2 className="font-bold text-lg mb-3 border-b pb-2">
+              Return Information
+            </h2>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-gray-600">RMA Number:</p>
+                <p className="font-mono font-bold text-lg">
+                  {returnOrder.rmaNumber}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Original Order:</p>
+                <p className="font-medium">{returnOrder.order.orderNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Return Created:</p>
+                <p className="font-medium">
+                  {new Date(returnOrder.createdAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-gray-300 p-4">
+            <h2 className="font-bold text-lg mb-3 border-b pb-2">
+              Customer Information
+            </h2>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-gray-600">Name:</p>
+                <p className="font-medium">{returnOrder.customerName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Email:</p>
+                <p className="font-medium">{returnOrder.customerEmail}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Return Reason:</p>
+                <p className="font-medium">
+                  {returnOrder.reason.replace(/_/g, " ")}
+                </p>
+                {returnOrder.reasonDetails && (
+                  <p className="text-sm text-gray-600 italic mt-1">
+                    "{returnOrder.reasonDetails}"
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Items Being Returned */}
+        <div className="border border-gray-300 mb-6">
+          <div className="bg-gray-100 p-3 border-b border-gray-300">
+            <h2 className="font-bold text-lg">Items Being Returned</h2>
+          </div>
+          <table className="w-full">
+            <thead className="border-b border-gray-300">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-bold">SKU</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">
+                  Product Name
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-bold">
+                  Quantity
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {returnOrder.items.map((item, index) => (
+                <tr key={index} className="border-b">
+                  <td className="px-4 py-3 font-mono text-sm">
+                    {item.productVariant.sku}
+                  </td>
+                  <td className="px-4 py-3">{item.productVariant.name}</td>
+                  <td className="px-4 py-3 text-center font-bold text-lg">
+                    {item.quantityRequested}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t border-gray-300">
+              <tr>
+                <td colSpan={2} className="px-4 py-3 text-right font-bold">
+                  Total Items:
+                </td>
+                <td className="px-4 py-3 text-center font-bold text-lg">
+                  {returnOrder.items.reduce(
+                    (sum, item) => sum + item.quantityRequested,
+                    0
+                  )}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Instructions */}
+        <div className="border border-blue-300 bg-blue-50 p-4">
+          <h2 className="font-bold text-lg mb-3">Packing Instructions</h2>
+          <ol className="list-decimal list-inside space-y-2">
+            <li>Print this packing slip</li>
+            <li>
+              <strong>Place this slip INSIDE the box</strong> with your items
+            </li>
+            <li>Pack items securely in original packaging if possible</li>
+            <li>Seal the package</li>
+            <li>Attach the shipping label to the OUTSIDE of the box</li>
+            <li>Drop off at your nearest carrier location</li>
+          </ol>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 text-center text-sm text-gray-600 border-t pt-4">
+          <p>Questions? Contact us at support@vprcollection.com</p>
+          <p className="mt-2">
+            This packing slip was generated on {new Date().toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          /* Hide everything first */
+          body * {
+            visibility: hidden;
+          }
+
+          /* Show only the packing slip */
+          .max-w-4xl,
+          .max-w-4xl * {
+            visibility: visible;
+          }
+
+          /* Position it top-left for printing */
+          .max-w-4xl {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+
+          @page {
+            size: letter;
+            margin: 0.5in;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          svg {
+            page-break-inside: avoid;
+          }
+
+          table {
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
+    </>
+  );
+}

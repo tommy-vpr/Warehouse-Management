@@ -204,6 +204,12 @@ model User {
   receivingSessionsApproved ReceivingSession[] @relation("ApprovedBy")
   receivingSessionsAssigned ReceivingSession[] @relation("AssignedReceivingApprover")
 
+  returnOrdersReceived  ReturnOrder[] @relation("ReturnReceivedBy")
+  returnOrdersInspected ReturnOrder[] @relation("ReturnInspectedBy")
+  returnOrdersApproved  ReturnOrder[] @relation("ReturnApprovedBy")
+  returnInspections     ReturnInspection[] @relation("ReturnInspector")
+  returnEvents          ReturnEvent[]
+
   inventoryTransactions InventoryTransaction[]
   assignedPickLists     PickList[]
   pickedItems           PickListItem[]
@@ -332,6 +338,7 @@ model ProductVariant {
   pickListItems         PickListItem[]
   countTasks            CycleCountTask[]
   purchaseOrderItems    PurchaseOrderItem[]
+  returnItems ReturnItem[]
 
   taskItems TaskItem[]
   invoiceItems InvoiceItem[]
@@ -378,6 +385,7 @@ model Location {
   pickListItems         PickListItem[]
   countTasks            CycleCountTask[]
   reservations          InventoryReservation[]
+  returnInspections  ReturnInspection[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -472,6 +480,7 @@ model Order {
   pickListItems PickListItem[]
   packages      ShippingPackage[]
   statusHistory OrderStatusHistory[]
+  returns ReturnOrder[]
 
   reservations InventoryReservation[]
   shopifySyncs ShopifySync[]
@@ -1382,4 +1391,256 @@ enum InvoiceStatus {
   PENDING
   PAID
   CANCELLED
+}
+
+// ---------------------------------------------------
+// 📦 RETURN MANAGEMENT SYSTEM
+// ---------------------------------------------------
+
+model ReturnOrder {
+  id            String       @id @default(cuid())
+  rmaNumber     String       @unique // RMA-2025-0001
+  orderId       String
+  
+  // Customer info (for lookup & verification)
+  customerName  String
+  customerEmail String
+  
+  // Return details
+  status        ReturnStatus @default(PENDING)
+  reason        ReturnReason
+  reasonDetails String?      // Customer's explanation
+  
+  // Financial
+  refundMethod  RefundMethod @default(ORIGINAL_PAYMENT)
+  refundAmount  Decimal?     @db.Decimal(10, 2)
+  refundStatus  RefundStatus @default(PENDING)
+  restockingFee Decimal?     @db.Decimal(10, 2)
+  
+  // Tracking
+  returnTrackingNumber String?
+  returnCarrier        String?
+  customerShippedAt    DateTime?
+  
+  // Warehouse receiving
+  receivedAt        DateTime?
+  receivedBy        String?
+  inspectedAt       DateTime?
+  inspectedBy       String?
+
+  // Return label
+  returnLabelUrl       String?   // Store comma-separated label URLs
+  returnShippingCost   Decimal?  @db.Decimal(10, 2)
+  packagesExpected     Int       @default(1)
+  labelCreatedAt       DateTime?
+  
+  // Approval workflow
+  approvalRequired Boolean @default(false)
+  approvedBy       String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+  
+  // Relations
+  order           Order             @relation(fields: [orderId], references: [id])
+  items           ReturnItem[]
+  inspectionItems ReturnInspection[]
+  events          ReturnEvent[]
+  receivedByUser  User?             @relation("ReturnReceivedBy", fields: [receivedBy], references: [id])
+  inspectedByUser User?             @relation("ReturnInspectedBy", fields: [inspectedBy], references: [id])
+  approvedByUser  User?             @relation("ReturnApprovedBy", fields: [approvedBy], references: [id])
+  
+  // Shopify sync
+  shopifyRefundId String?
+  shopifySyncStatus String? @default("PENDING") // PENDING, SYNCED, FAILED
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([orderId])
+  @@index([status])
+  @@index([customerEmail])
+  @@index([rmaNumber])
+  @@map("return_orders")
+}
+
+model ReturnItem {
+  id               String  @id @default(cuid())
+  returnOrderId    String
+  productVariantId String
+  
+  // Quantities
+  quantityRequested  Int // What customer wants to return
+  quantityReceived   Int @default(0) // What actually arrived
+  quantityRestockable Int @default(0) // Good condition
+  quantityDisposed   Int @default(0) // Damaged/unusable
+  
+  // From original order
+  orderItemId       String?
+  unitPrice         Decimal @db.Decimal(10, 2)
+  refundAmount      Decimal @db.Decimal(10, 2)
+  
+  // Status
+  status            ReturnItemStatus @default(PENDING)
+  
+  // Relations
+  returnOrder      ReturnOrder       @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  productVariant   ProductVariant    @relation(fields: [productVariantId], references: [id])
+  inspections      ReturnInspection[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([returnOrderId])
+  @@index([productVariantId])
+  @@map("return_items")
+}
+
+model ReturnInspection {
+  id             String            @id @default(cuid())
+  returnOrderId  String
+  returnItemId   String
+  
+  // Inspection details
+  condition      ReturnCondition
+  conditionNotes String?
+  
+  // Decision
+  disposition    ReturnDisposition // RESTOCK, DISPOSE, REPAIR, VENDOR_RETURN
+  dispositionNotes String?
+  
+  // Location for restockable items
+  restockLocationId String?
+  
+  // Inspector info
+  inspectedBy String
+  inspectedAt DateTime @default(now())
+  
+  // Photos
+  photoUrls   String[] // Array of GCS URLs
+  
+  // Relations
+  returnOrder    ReturnOrder   @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  returnItem     ReturnItem    @relation(fields: [returnItemId], references: [id], onDelete: Cascade)
+  location       Location?     @relation(fields: [restockLocationId], references: [id])
+  inspector      User          @relation("ReturnInspector", fields: [inspectedBy], references: [id])
+  
+  @@index([returnOrderId])
+  @@index([returnItemId])
+  @@map("return_inspections")
+}
+
+model ReturnEvent {
+  id            String          @id @default(cuid())
+  returnOrderId String
+  eventType     ReturnEventType
+  userId        String?
+  data          Json?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  
+  returnOrder ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id])
+  
+  @@index([returnOrderId])
+  @@map("return_events")
+}
+
+// ---------------------------------------------------
+// ENUMS
+// ---------------------------------------------------
+
+enum ReturnStatus {
+  PENDING           // RMA created, waiting for package
+  APPROVED          // RMA approved (if approval needed)
+  REJECTED          // RMA rejected
+  IN_TRANSIT        // Customer shipped
+  RECEIVED          // Package arrived at warehouse
+  INSPECTING        // Being inspected
+  INSPECTION_COMPLETE // Inspection done
+  RESTOCKING        // Adding good items back to inventory
+  REFUND_PENDING    // Waiting to process refund
+  REFUNDED          // Refund completed
+  PARTIALLY_REFUNDED // Some items refunded
+  CLOSED            // Return fully processed
+  CANCELLED         // Return cancelled
+}
+
+enum ReturnReason {
+  DEFECTIVE         // Product is defective/damaged
+  WRONG_ITEM        // Wrong product sent
+  NOT_AS_DESCRIBED  // Doesn't match description
+  NO_LONGER_NEEDED  // Changed mind
+  ORDERED_BY_MISTAKE // Accidental order
+  BETTER_PRICE      // Found better price elsewhere
+  DAMAGED_SHIPPING  // Damaged during shipping
+  EXPIRED           // Product expired
+  OTHER             // Other reason
+}
+
+enum RefundMethod {
+  ORIGINAL_PAYMENT  // Refund to original payment method
+  STORE_CREDIT      // Issue store credit
+  REPLACEMENT       // Send replacement product
+  NO_REFUND         // No refund (restocking fee, etc)
+}
+
+enum RefundStatus {
+  PENDING           // Not yet processed
+  PROCESSING        // Being processed
+  COMPLETED         // Refund issued
+  FAILED            // Refund failed
+  PARTIAL           // Partial refund issued
+  CANCELLED         // Refund cancelled
+}
+
+enum ReturnItemStatus {
+  PENDING           // Waiting to receive
+  RECEIVED          // Received at warehouse
+  INSPECTED         // Inspection complete
+  RESTOCKED         // Added back to inventory
+  DISPOSED          // Thrown away/recycled
+  VENDOR_RETURN     // Returning to vendor
+  QUARANTINE        // Held for review
+}
+
+enum ReturnCondition {
+  NEW_UNOPENED      // Brand new, unopened
+  NEW_OPENED        // Opened but unused
+  LIKE_NEW          // Minimal use, excellent condition
+  GOOD              // Used, good condition
+  FAIR              // Used, some wear
+  POOR              // Significant wear/damage
+  DEFECTIVE         // Broken/not working
+  DAMAGED           // Physically damaged
+  EXPIRED           // Past expiration date
+  MISSING_PARTS     // Incomplete
+}
+
+enum ReturnDisposition {
+  RESTOCK           // Return to inventory
+  DISPOSE           // Throw away
+  REPAIR            // Send for repair
+  VENDOR_RETURN     // Return to vendor for credit
+  DONATE            // Donate (if applicable)
+  QUARANTINE        // Hold for further review
+  LIQUIDATE         // Sell as damaged/clearance
+}
+
+enum ReturnEventType {
+  RMA_CREATED
+  RMA_APPROVED
+  RMA_REJECTED
+  PACKAGE_SHIPPED
+  PACKAGE_RECEIVED
+  INSPECTION_STARTED
+  ITEM_INSPECTED
+  INSPECTION_COMPLETED
+  ITEM_RESTOCKED
+  ITEM_DISPOSED
+  REFUND_INITIATED
+  REFUND_COMPLETED
+  REFUND_FAILED
+  SHOPIFY_SYNCED
+  NOTE_ADDED
+  STATUS_CHANGED
 }

@@ -25,6 +25,8 @@ import {
   User,
   File,
   Scroll,
+  Undo,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -36,6 +38,7 @@ import clsx from "clsx";
 import GlobalSearch from "@/components/GlobalSearch";
 import NotificationBell from "@/components/notification/NotificationBell";
 import { useQuery } from "@tanstack/react-query";
+import { Label } from "@radix-ui/react-label";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -66,6 +69,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       showCount: true,
     },
     { id: "inventory/receive/po", label: "Purchase Orders", icon: FileText },
+    { id: "returns", label: "Returns", icon: Undo2 },
     { id: "invoice", label: "Invoice", icon: Scroll },
     // { id: "purchasing", label: "Purchasing", icon: DollarSign },
     { id: "locations/print-labels", label: "Locations", icon: MapPin },
