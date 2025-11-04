@@ -1,5 +1,5 @@
 // dashboard/returns/new/page.tsx
-// Customer Return Portal - Order Lookup & RMA Creation
+// Customer Return Portal - UPDATED with Return Label Display
 
 "use client";
 
@@ -10,6 +10,14 @@ import {
   ReturnReason,
   RefundMethod,
 } from "@/types/returns";
+
+// ✅ NEW: Return label type
+type ReturnLabel = {
+  trackingNumber: string;
+  labelUrl: string;
+  cost: number;
+  carrier: string;
+};
 
 export default function NewReturnPage() {
   const [step, setStep] = useState<
@@ -39,9 +47,19 @@ export default function NewReturnPage() {
 
   // Step 3: Result
   const [rmaNumber, setRmaNumber] = useState<string | null>(null);
+  const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [approvalRequired, setApprovalRequired] = useState(false);
+  const [returnLabel, setReturnLabel] = useState<ReturnLabel | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [labelWarning, setLabelWarning] = useState<string | null>(null);
+
+  // ✅ NEW: State for requesting additional labels
+  const [requestingAdditionalLabel, setRequestingAdditionalLabel] =
+    useState(false);
+  const [additionalLabelError, setAdditionalLabelError] = useState<
+    string | null
+  >(null);
 
   // Handle order lookup
   const handleLookup = async (e: React.FormEvent) => {
@@ -116,6 +134,7 @@ export default function NewReturnPage() {
 
     setCreateLoading(true);
     setCreateError(null);
+    setLabelWarning(null);
 
     try {
       const request: CreateReturnRequest = {
@@ -141,7 +160,18 @@ export default function NewReturnPage() {
       }
 
       setRmaNumber(data.returnOrder.rmaNumber);
+      setReturnOrderId(data.returnOrder.id);
       setApprovalRequired(data.returnOrder.approvalRequired);
+
+      // ✅ NEW: Check if label was generated
+      if (data.returnLabel) {
+        setReturnLabel(data.returnLabel);
+        console.log("✅ Return label received:", data.returnLabel);
+      } else if (data.warning) {
+        setLabelWarning(data.warning);
+        console.warn("⚠️ Label warning:", data.warning);
+      }
+
       setStep("complete");
     } catch (error) {
       setCreateError("Failed to create return. Please try again.");
@@ -150,13 +180,52 @@ export default function NewReturnPage() {
     }
   };
 
+  // ✅ NEW: Handle request for additional label
+  const handleRequestAdditionalLabel = async () => {
+    if (!returnOrderId) return;
+
+    setRequestingAdditionalLabel(true);
+    setAdditionalLabelError(null);
+
+    try {
+      const response = await fetch("/api/returns/request-additional-label", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnOrderId }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        setAdditionalLabelError(
+          data.error || "Failed to generate additional label"
+        );
+        return;
+      }
+
+      // Open the new label in a new tab
+      if (data.labelUrl) {
+        window.open(data.labelUrl, "_blank");
+        alert(`Additional label created!\nTracking: ${data.trackingNumber}`);
+      }
+    } catch (error) {
+      setAdditionalLabelError(
+        "Failed to request additional label. Please try again."
+      );
+    } finally {
+      setRequestingAdditionalLabel(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-background py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Start a Return</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Start a Return
+          </h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Returns accepted within 30 days of delivery
           </p>
         </div>
@@ -166,50 +235,54 @@ export default function NewReturnPage() {
           <div className="flex items-center justify-center space-x-4">
             <div
               className={`flex items-center ${
-                step === "lookup" ? "text-blue-600" : "text-gray-400"
+                step === "lookup"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "lookup"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300"
+                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    : "border-gray-300 dark:border-gray-600"
                 }`}
               >
                 1
               </div>
               <span className="ml-2 text-sm font-medium">Find Order</span>
             </div>
-            <div className="w-12 h-0.5 bg-gray-300" />
+            <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-600" />
             <div
               className={`flex items-center ${
                 step === "select-items" || step === "confirm"
-                  ? "text-blue-600"
-                  : "text-gray-400"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "select-items" || step === "confirm"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300"
+                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    : "border-gray-300 dark:border-gray-600"
                 }`}
               >
                 2
               </div>
               <span className="ml-2 text-sm font-medium">Select Items</span>
             </div>
-            <div className="w-12 h-0.5 bg-gray-300" />
+            <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-600" />
             <div
               className={`flex items-center ${
-                step === "complete" ? "text-blue-600" : "text-gray-400"
+                step === "complete"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "complete"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300"
+                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    : "border-gray-300 dark:border-gray-600"
                 }`}
               >
                 3
@@ -221,34 +294,34 @@ export default function NewReturnPage() {
 
         {/* Step 1: Order Lookup */}
         {step === "lookup" && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
+          <div className="bg-white dark:bg-zinc-800/50 shadow-sm dark:shadow-zinc-900/50 rounded-lg p-6 border border-gray-200 dark:border-zinc-700/50">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
               Find Your Order
             </h2>
             <form onSubmit={handleLookup} className="space-y-4">
               <div>
                 <label
                   htmlFor="orderNumber"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   Order Number
                 </label>
 
                 <div className="relative mt-1">
-                  <span className="absolute left-3 top-2.5 text-gray-500 select-none">
+                  <span className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400 select-none">
                     #
                   </span>
                   <input
                     type="text"
                     id="orderNumber"
-                    value={orderNumber.replace(/^#/, "")} // display without #
+                    value={orderNumber.replace(/^#/, "")}
                     onChange={(e) => {
-                      const input = e.target.value.replace(/^#*/, ""); // strip extra #
-                      setOrderNumber("#" + input); // always keep one #
+                      const input = e.target.value.replace(/^#*/, "");
+                      setOrderNumber("#" + input);
                     }}
                     placeholder="1234"
                     required
-                    className="pl-6 p-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-6 p-2 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -256,7 +329,7 @@ export default function NewReturnPage() {
               <div>
                 <label
                   htmlFor="customerEmail"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   Email Address
                 </label>
@@ -267,17 +340,19 @@ export default function NewReturnPage() {
                   onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="mt-1 p-2  block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 p-2 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Enter the email used when placing the order
                 </p>
               </div>
 
               {lookupError && (
-                <div className="rounded-md bg-red-50 p-4">
+                <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-4">
                   <div className="flex">
-                    <div className="text-sm text-red-700">{lookupError}</div>
+                    <div className="text-sm text-red-700 dark:text-red-400">
+                      {lookupError}
+                    </div>
                   </div>
                 </div>
               )}
@@ -285,7 +360,7 @@ export default function NewReturnPage() {
               <button
                 type="submit"
                 disabled={lookupLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition"
               >
                 {lookupLoading ? "Looking up..." : "Find Order"}
               </button>
@@ -295,19 +370,19 @@ export default function NewReturnPage() {
 
         {/* Step 2: Select Items */}
         {step === "select-items" && lookupResult?.order && (
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="bg-white dark:bg-zinc-800/50 shadow-sm dark:shadow-zinc-900/50 rounded-lg p-6 border border-gray-200 dark:border-zinc-700/50">
             <div className="mb-6">
-              <h2 className="text-lg font-medium text-gray-900">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                 Select Items to Return
               </h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Order {lookupResult.order.orderNumber} · Shipped on{" "}
                 {lookupResult.order.shippedAt
                   ? new Date(lookupResult.order.shippedAt).toLocaleDateString()
                   : "N/A"}
               </p>
               {lookupResult.eligibility.daysRemaining !== undefined && (
-                <p className="mt-1 text-sm text-amber-600">
+                <p className="mt-1 text-sm text-amber-600 dark:text-amber-500">
                   {lookupResult.eligibility.daysRemaining} days remaining to
                   return
                 </p>
@@ -319,56 +394,55 @@ export default function NewReturnPage() {
               {lookupResult.order.items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start space-x-4 p-4 border rounded-lg"
+                  className="flex items-start space-x-4 p-4 border border-gray-200 dark:border-zinc-700 rounded-lg"
                 >
-                  {/* Product Image Placeholder */}
                   <div className="flex-shrink-0">
-                    <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <div className="w-20 h-20 bg-gray-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
                       <span className="text-xs text-gray-400">No image</span>
                     </div>
                   </div>
 
-                  {/* Product Info */}
                   <div className="flex-1">
-                    <h3 className="text-sm font-medium text-gray-900">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {item.name}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       SKU: {item.sku}
                     </p>
-                    <p className="mt-1 text-sm text-gray-700">
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
                       ${item.unitPrice.toFixed(2)} each
                     </p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Ordered: {item.quantity} · Available to return:{" "}
                       {item.quantityAvailable}
                     </p>
                   </div>
 
-                  {/* Quantity Selector */}
                   <div className="flex-shrink-0">
-                    <label className="block text-xs text-gray-700 mb-1">
+                    <label className="block text-xs text-gray-700 dark:text-gray-300 mb-1">
                       Return Qty
                     </label>
-                    <select
+                    <input
+                      type="number"
+                      min="0"
+                      max={item.quantityAvailable}
                       value={selectedItems[item.productVariantId] || 0}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        const clampedValue = Math.max(
+                          0,
+                          Math.min(value, item.quantityAvailable)
+                        );
                         handleQuantityChange(
                           item.productVariantId,
-                          parseInt(e.target.value)
-                        )
-                      }
-                      className="block w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                    >
-                      {Array.from(
-                        { length: item.quantityAvailable + 1 },
-                        (_, i) => i
-                      ).map((qty) => (
-                        <option key={qty} value={qty}>
-                          {qty}
-                        </option>
-                      ))}
-                    </select>
+                          clampedValue
+                        );
+                      }}
+                      className="block w-20 rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm p-2"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Max: {item.quantityAvailable}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -377,7 +451,7 @@ export default function NewReturnPage() {
             {/* Return Reason */}
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Reason for Return
                 </label>
                 <select
@@ -385,7 +459,7 @@ export default function NewReturnPage() {
                   onChange={(e) =>
                     setReturnReason(e.target.value as ReturnReason)
                   }
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-2"
                 >
                   <option value={ReturnReason.NO_LONGER_NEEDED}>
                     No longer needed
@@ -414,7 +488,7 @@ export default function NewReturnPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Additional Details (Optional)
                 </label>
                 <textarea
@@ -422,12 +496,12 @@ export default function NewReturnPage() {
                   onChange={(e) => setReasonDetails(e.target.value)}
                   rows={3}
                   placeholder="Please provide any additional details about your return..."
-                  className="p-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="p-2 block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Refund Method
                 </label>
                 <select
@@ -435,7 +509,7 @@ export default function NewReturnPage() {
                   onChange={(e) =>
                     setRefundMethod(e.target.value as RefundMethod)
                   }
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="block w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-2"
                 >
                   <option value={RefundMethod.ORIGINAL_PAYMENT}>
                     Original payment method
@@ -451,14 +525,16 @@ export default function NewReturnPage() {
             </div>
 
             {/* Estimated Refund */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-lg p-4 mb-6 border border-gray-200 dark:border-zinc-700">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Estimated Refund:</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Estimated Refund:
+                </span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
                   ${calculateEstimatedRefund().toFixed(2)}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Final refund amount will be determined after inspection.
                 {returnReason !== ReturnReason.DEFECTIVE &&
                   returnReason !== ReturnReason.WRONG_ITEM &&
@@ -467,8 +543,10 @@ export default function NewReturnPage() {
             </div>
 
             {createError && (
-              <div className="rounded-md bg-red-50 p-4 mb-4">
-                <div className="text-sm text-red-700">{createError}</div>
+              <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-4 mb-4">
+                <div className="text-sm text-red-700 dark:text-red-400">
+                  {createError}
+                </div>
               </div>
             )}
 
@@ -476,7 +554,7 @@ export default function NewReturnPage() {
             <div className="flex space-x-3">
               <button
                 onClick={() => setStep("lookup")}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                className="flex-1 py-2 px-4 border border-gray-300 dark:border-zinc-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition"
               >
                 Back
               </button>
@@ -485,7 +563,7 @@ export default function NewReturnPage() {
                 disabled={
                   createLoading || Object.keys(selectedItems).length === 0
                 }
-                className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50 transition"
               >
                 {createLoading ? "Creating..." : "Create Return"}
               </button>
@@ -493,14 +571,14 @@ export default function NewReturnPage() {
           </div>
         )}
 
-        {/* Step 3: Complete */}
+        {/* Step 3: Complete - ✅ UPDATED with Return Label Display */}
         {step === "complete" && rmaNumber && (
-          <div className="bg-white shadow rounded-lg p-6">
+          <div className="bg-white dark:bg-zinc-800/50 shadow-sm dark:shadow-zinc-900/50 rounded-lg p-6 border border-gray-200 dark:border-zinc-700/50">
             <div className="text-center">
               {/* Success Icon */}
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
                 <svg
-                  className="h-6 w-6 text-green-600"
+                  className="h-6 w-6 text-green-600 dark:text-green-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -514,20 +592,82 @@ export default function NewReturnPage() {
                 </svg>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                 Return Created Successfully!
               </h2>
 
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">Your RMA Number:</p>
-                <p className="text-3xl font-mono font-bold text-blue-600">
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900/50">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Your RMA Number:
+                </p>
+                <p className="text-3xl font-mono font-bold text-blue-600 dark:text-blue-400">
                   {rmaNumber}
                 </p>
               </div>
 
+              {/* ✅ NEW: Display Return Label if generated */}
+              {returnLabel && (
+                <div className="mt-6 p-6 bg-green-50 dark:bg-green-950/30 border-2 border-green-400 dark:border-green-700 rounded-lg">
+                  <div className="flex items-center justify-center mb-4">
+                    <svg
+                      className="h-6 w-6 text-green-600 dark:text-green-400 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <h3 className="text-lg font-bold text-green-900 dark:text-green-200">
+                      Prepaid Return Label Created!
+                    </h3>
+                  </div>
+
+                  <div className="bg-white dark:bg-zinc-900 rounded p-4 mb-4 border border-green-200 dark:border-green-900/50">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Tracking Number:
+                    </p>
+                    <p className="text-xl font-mono font-bold text-gray-900 dark:text-gray-100">
+                      {returnLabel.trackingNumber}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Carrier: {returnLabel.carrier} · Cost: $
+                      {returnLabel.cost.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <a
+                    href={returnLabel.labelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full py-3 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 font-bold text-lg mb-3 transition"
+                  >
+                    📄 Download Return Label
+                  </a>
+
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Print this label and attach it to the outside of your
+                    package
+                  </p>
+                </div>
+              )}
+
+              {/* ✅ NEW: Show warning if label generation failed */}
+              {labelWarning && (
+                <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-400 dark:border-amber-700 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    <strong>⚠️ Note:</strong> {labelWarning}
+                  </p>
+                </div>
+              )}
+
               {approvalRequired ? (
-                <div className="mt-6 p-4 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-amber-800">
+                <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900/50">
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
                     <strong>Approval Required:</strong> Your return requires
                     manager approval. You will receive an email within 1-2
                     business days with further instructions.
@@ -535,63 +675,54 @@ export default function NewReturnPage() {
                 </div>
               ) : (
                 <div className="mt-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    ⚠️ IMPORTANT: Next Steps
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Next Steps
                   </h3>
-                  <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
-                    <ol className="text-left space-y-3 text-sm text-gray-800">
+                  <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-zinc-700">
+                    <ol className="text-left space-y-3 text-sm text-gray-800 dark:text-gray-200">
                       <li className="flex items-start">
                         <span className="font-bold mr-2 text-lg">1.</span>
                         <div>
                           <strong>Print Your Packing Slip</strong>
-                          <p className="text-gray-600 mt-1">
-                            Click the button below to open your packing slip
-                            with barcode.
-                            <strong>
-                              {" "}
-                              The warehouse MUST scan this barcode to process
-                              your return.
-                            </strong>
+                          <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            Click below to print your packing slip with barcode.
+                            The warehouse needs this to process your return.
                           </p>
                         </div>
                       </li>
+                      {returnLabel && (
+                        <li className="flex items-start">
+                          <span className="font-bold mr-2 text-lg">2.</span>
+                          <div>
+                            <strong>Print Your Return Label</strong>
+                            <p className="text-gray-600 dark:text-gray-400 mt-1">
+                              Use the prepaid return label above (already
+                              generated for you!)
+                            </p>
+                          </div>
+                        </li>
+                      )}
                       <li className="flex items-start">
-                        <span className="font-bold mr-2 text-lg">2.</span>
-                        <div>
-                          <strong>Place Packing Slip INSIDE the Box</strong>
-                          <p className="text-gray-600 mt-1">
-                            Put the printed packing slip inside the package with
-                            your items.
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-bold mr-2 text-lg">3.</span>
+                        <span className="font-bold mr-2 text-lg">
+                          {returnLabel ? "3" : "2"}.
+                        </span>
                         <div>
                           <strong>Pack Items Securely</strong>
-                          <p className="text-gray-600 mt-1">
-                            Use original packaging if possible. Seal the box
-                            securely.
+                          <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            Place packing slip INSIDE the box. Use original
+                            packaging if possible.
                           </p>
                         </div>
                       </li>
                       <li className="flex items-start">
-                        <span className="font-bold mr-2 text-lg">4.</span>
-                        <div>
-                          <strong>Attach Shipping Label</strong>
-                          <p className="text-gray-600 mt-1">
-                            Check your email for the return shipping label and
-                            attach it to the OUTSIDE of the box.
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="font-bold mr-2 text-lg">5.</span>
+                        <span className="font-bold mr-2 text-lg">
+                          {returnLabel ? "4" : "3"}.
+                        </span>
                         <div>
                           <strong>Ship It!</strong>
-                          <p className="text-gray-600 mt-1">
-                            Drop off at your nearest carrier location. We'll
-                            email you when we receive it.
+                          <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            Attach return label to OUTSIDE of box and drop off
+                            at USPS.
                           </p>
                         </div>
                       </li>
@@ -602,15 +733,36 @@ export default function NewReturnPage() {
                   <a
                     href={`/dashboard/returns/packing-slip/${rmaNumber}`}
                     target="_blank"
-                    className="block w-full py-4 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-lg mb-3"
+                    className="block w-full py-4 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 font-bold text-lg mb-3 transition"
                   >
                     Print Packing Slip with Barcode
                   </a>
 
-                  <p className="text-xs text-red-600 font-medium mb-4">
-                    ⚠️ Without the packing slip barcode inside your package, we
-                    cannot process your return!
-                  </p>
+                  {/* ✅ NEW: Request Additional Label Button */}
+                  {returnLabel && (
+                    <div className="mt-4 p-4 bg-gray-50 dark:bg-zinc-900/50 border border-gray-300 dark:border-zinc-700 rounded-lg">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                        Need to use multiple boxes?
+                      </p>
+                      {additionalLabelError && (
+                        <div className="mb-3 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded text-sm text-red-700 dark:text-red-400">
+                          {additionalLabelError}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleRequestAdditionalLabel}
+                        disabled={requestingAdditionalLabel}
+                        className="w-full py-2 px-4 border-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 font-medium disabled:opacity-50 transition"
+                      >
+                        {requestingAdditionalLabel
+                          ? "Generating..."
+                          : "📦 Request Additional Return Label"}
+                      </button>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Click to generate another prepaid label for a second box
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -622,7 +774,7 @@ export default function NewReturnPage() {
                       "_blank"
                     )
                   }
-                  className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full py-2 px-4 border border-gray-300 dark:border-zinc-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition"
                 >
                   View Packing Slip Again
                 </button>
@@ -633,8 +785,11 @@ export default function NewReturnPage() {
                     setCustomerEmail("");
                     setSelectedItems({});
                     setRmaNumber(null);
+                    setReturnLabel(null);
+                    setReturnOrderId(null);
+                    setLabelWarning(null);
                   }}
-                  className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700"
+                  className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 transition"
                 >
                   Start Another Return
                 </button>

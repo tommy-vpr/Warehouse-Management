@@ -4,7 +4,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import Barcode from "react-barcode";
 
@@ -70,25 +70,16 @@ export default function PackingSlipPage({
 
   if (!returnOrder) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-600">Return not found</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <p className="text-gray-600 dark:text-gray-400">Return not found</p>
       </div>
     );
   }
 
   return (
     <>
-      {/* Print Button - Hidden when printing */}
-      {/* <div className="print:hidden fixed top-4 right-4 z-10">
-        <button
-          onClick={handlePrint}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg font-medium"
-        >Print Packing Slip
-        </button>
-      </div> */}
-
-      {/* Packing Slip - Optimized for printing */}
-      <div className="max-w-4xl mx-auto p-8 bg-white">
+      {/* Packing Slip - Light for print, dark mode for screen */}
+      <div className="max-w-4xl mx-auto p-8 bg-white dark:bg-zinc-900 min-h-screen">
         <Button
           variant={"outline"}
           onClick={handlePrint}
@@ -96,18 +87,21 @@ export default function PackingSlipPage({
         >
           Print Packing Slip
         </Button>
-        {/* Header */}
-        <div className="border-4 border-gray-900 p-6 mb-6">
+
+        {/* Header - Print styling will override dark mode */}
+        <div className="border-4 border-gray-900 dark:border-gray-700 print:border-gray-900 p-6 mb-6">
           <div className="text-center mb-4">
-            <h1 className="text-3xl font-bold mb-2">RETURN PACKING SLIP</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100 print:text-gray-900">
+              RETURN PACKING SLIP
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400 print:text-gray-600">
               Please include this slip inside your return package
             </p>
           </div>
 
           {/* RMA Barcode - CRITICAL FOR WAREHOUSE */}
-          <div className="bg-gray-100 p-6 text-center">
-            <p className="text-sm text-gray-700 mb-2">
+          <div className="bg-gray-100 dark:bg-zinc-800 print:bg-gray-100 p-6 text-center">
+            <p className="text-sm text-gray-700 dark:text-gray-300 print:text-gray-700 mb-2">
               SCAN THIS BARCODE AT WAREHOUSE:
             </p>
             <div className="my-4 flex justify-center">
@@ -127,24 +121,32 @@ export default function PackingSlipPage({
 
         {/* Return Information */}
         <div className="grid grid-cols-2 gap-6 mb-6">
-          <div className="border border-gray-300 p-4">
-            <h2 className="font-bold text-lg mb-3 border-b pb-2">
+          <div className="border border-gray-300 dark:border-zinc-700 print:border-gray-300 p-4">
+            <h2 className="font-bold text-lg mb-3 border-b border-gray-300 dark:border-zinc-700 print:border-gray-300 pb-2 text-gray-900 dark:text-gray-100 print:text-gray-900">
               Return Information
             </h2>
             <div className="space-y-2">
               <div>
-                <p className="text-sm text-gray-600">RMA Number:</p>
-                <p className="font-mono font-bold text-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  RMA Number:
+                </p>
+                <p className="font-mono font-bold text-gray-900 dark:text-gray-100 print:text-gray-900">
                   {returnOrder.rmaNumber}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Original Order:</p>
-                <p className="font-medium">{returnOrder.order.orderNumber}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  Original Order:
+                </p>
+                <p className="text-gray-900 dark:text-gray-100 print:text-gray-900">
+                  {returnOrder.order.orderNumber}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Return Created:</p>
-                <p className="font-medium">
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  Return Created:
+                </p>
+                <p className="text-gray-900 dark:text-gray-100 print:text-gray-900">
                   {new Date(returnOrder.createdAt).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
@@ -155,26 +157,36 @@ export default function PackingSlipPage({
             </div>
           </div>
 
-          <div className="border border-gray-300 p-4">
-            <h2 className="font-bold text-lg mb-3 border-b pb-2">
+          <div className="border border-gray-300 dark:border-zinc-700 print:border-gray-300 p-4">
+            <h2 className="font-bold text-lg mb-3 border-b border-gray-300 dark:border-zinc-700 print:border-gray-300 pb-2 text-gray-900 dark:text-gray-100 print:text-gray-900">
               Customer Information
             </h2>
             <div className="space-y-2">
               <div>
-                <p className="text-sm text-gray-600">Name:</p>
-                <p className="font-medium">{returnOrder.customerName}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  Name:
+                </p>
+                <p className="text-gray-900 dark:text-gray-100 print:text-gray-900">
+                  {returnOrder.customerName}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Email:</p>
-                <p className="font-medium">{returnOrder.customerEmail}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  Email:
+                </p>
+                <p className="text-gray-900 dark:text-gray-100 print:text-gray-900">
+                  {returnOrder.customerEmail}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Return Reason:</p>
-                <p className="font-medium">
+                <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+                  Return Reason:
+                </p>
+                <p className="text-gray-900 dark:text-gray-100 print:text-gray-900">
                   {returnOrder.reason.replace(/_/g, " ")}
                 </p>
                 {returnOrder.reasonDetails && (
-                  <p className="text-sm text-gray-600 italic mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 italic mt-1">
                     "{returnOrder.reasonDetails}"
                   </p>
                 )}
@@ -184,41 +196,53 @@ export default function PackingSlipPage({
         </div>
 
         {/* Items Being Returned */}
-        <div className="border border-gray-300 mb-6">
-          <div className="bg-gray-100 p-3 border-b border-gray-300">
-            <h2 className="font-bold text-lg">Items Being Returned</h2>
+        <div className="border border-gray-300 dark:border-zinc-700 print:border-gray-300 mb-6">
+          <div className="bg-gray-100 dark:bg-zinc-800 print:bg-gray-100 p-3 border-b border-gray-300 dark:border-zinc-700 print:border-gray-300">
+            <h2 className="font-bold text-lg text-gray-900 dark:text-gray-100 print:text-gray-900">
+              Items Being Returned
+            </h2>
           </div>
           <table className="w-full">
-            <thead className="border-b border-gray-300">
+            <thead className="border-b border-gray-300 dark:border-zinc-700 print:border-gray-300">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-bold">SKU</th>
-                <th className="px-4 py-3 text-left text-sm font-bold">
+                <th className="px-4 py-3 text-left text-sm font-bold text-gray-900 dark:text-gray-100 print:text-gray-900">
+                  SKU
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-bold text-gray-900 dark:text-gray-100 print:text-gray-900">
                   Product Name
                 </th>
-                <th className="px-4 py-3 text-center text-sm font-bold">
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-900 dark:text-gray-100 print:text-gray-900">
                   Quantity
                 </th>
               </tr>
             </thead>
             <tbody>
               {returnOrder.items.map((item, index) => (
-                <tr key={index} className="border-b">
-                  <td className="px-4 py-3 font-mono text-sm">
+                <tr
+                  key={index}
+                  className="border-b border-gray-200 dark:border-zinc-700 print:border-gray-200"
+                >
+                  <td className="px-4 py-3 font-mono text-sm text-gray-900 dark:text-gray-100 print:text-gray-900">
                     {item.productVariant.sku}
                   </td>
-                  <td className="px-4 py-3">{item.productVariant.name}</td>
-                  <td className="px-4 py-3 text-center font-bold text-lg">
+                  <td className="px-4 py-3 text-gray-900 dark:text-gray-100 print:text-gray-900">
+                    {item.productVariant.name}
+                  </td>
+                  <td className="px-4 py-3 text-center font-bold text-lg text-gray-900 dark:text-gray-100 print:text-gray-900">
                     {item.quantityRequested}
                   </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="border-t border-gray-300">
+            <tfoot className="border-t border-gray-300 dark:border-zinc-700 print:border-gray-300">
               <tr>
-                <td colSpan={2} className="px-4 py-3 text-right font-bold">
+                <td
+                  colSpan={2}
+                  className="px-4 py-3 text-right font-bold text-gray-900 dark:text-gray-100 print:text-gray-900"
+                >
                   Total Items:
                 </td>
-                <td className="px-4 py-3 text-center font-bold text-lg">
+                <td className="px-4 py-3 text-center font-bold text-lg text-gray-900 dark:text-gray-100 print:text-gray-900">
                   {returnOrder.items.reduce(
                     (sum, item) => sum + item.quantityRequested,
                     0
@@ -230,22 +254,33 @@ export default function PackingSlipPage({
         </div>
 
         {/* Instructions */}
-        <div className="border border-blue-300 bg-blue-50 p-4">
-          <h2 className="font-bold text-lg mb-3">Packing Instructions</h2>
-          <ol className="list-decimal list-inside space-y-2">
+        <div className="border border-gray-300 dark:border-gray-700 print:border-gray-300 bg-gray-50 dark:bg-gray-800 print:bg-gray-50 p-4">
+          <h2 className="font-bold flex items-center gap-3 text-lg mb-3 text-gray-900 dark:text-gray-100 print:text-gray-900">
+            <Package className="h-6 w-6" /> Packing Instructions
+          </h2>
+          <ol className="list-decimal list-inside space-y-2 text-gray-900 dark:text-gray-300 print:text-gray-900">
             <li>Print this packing slip</li>
             <li>
-              <strong>Place this slip INSIDE the box</strong> with your items
+              <strong className="dark:text-green-400 print:text-black">
+                Place this slip INSIDE the box
+              </strong>{" "}
+              with your items
             </li>
             <li>Pack items securely in original packaging if possible</li>
             <li>Seal the package</li>
-            <li>Attach the shipping label to the OUTSIDE of the box</li>
+            <li>
+              Attach the shipping label to the{" "}
+              <strong className="dark:text-green-400 print:text-black">
+                OUTSIDE
+              </strong>{" "}
+              of the box
+            </li>
             <li>Drop off at your nearest carrier location</li>
           </ol>
         </div>
 
         {/* Footer */}
-        <div className="mt-6 text-center text-sm text-gray-600 border-t pt-4">
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 border-t border-gray-200 dark:border-zinc-700 print:border-gray-200 pt-4">
           <p>Questions? Contact us at support@vprcollection.com</p>
           <p className="mt-2">
             This packing slip was generated on {new Date().toLocaleDateString()}
@@ -273,6 +308,13 @@ export default function PackingSlipPage({
             left: 0;
             top: 0;
             width: 100%;
+            background: white !important;
+          }
+
+          /* Force light mode for print */
+          * {
+            background-color: white !important;
+            color: black !important;
           }
 
           @page {

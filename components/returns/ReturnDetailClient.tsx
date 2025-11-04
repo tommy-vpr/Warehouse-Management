@@ -294,10 +294,12 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
   // ---------- UI ----------
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading inspection...</p>
+          <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading inspection...
+          </p>
         </div>
       </div>
     );
@@ -305,8 +307,8 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
 
   if (!currentItem) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">No items to inspect</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-400">No items to inspect</p>
       </div>
     );
   }
@@ -328,22 +330,26 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-background pb-20">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      <div className="bg-white dark:bg-zinc-800/50 border-b border-gray-200 dark:border-zinc-700 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-lg font-bold">Inspect Return</h1>
-              <p className="text-sm text-gray-600">{rmaNumber}</p>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Inspect Return
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {rmaNumber}
+              </p>
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Item {currentItemIndex + 1} of {items.length}
             </p>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+          <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-2 mt-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -352,21 +358,21 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {/* Item Info */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="font-medium text-gray-900 mb-1">
+        <div className="bg-white dark:bg-zinc-800/50 p-4 rounded-lg shadow-sm dark:shadow-zinc-900/50 border border-gray-200 dark:border-zinc-700/50">
+          <h2 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
             {currentItem.productVariant.name}
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             SKU: {currentItem.productVariant.sku}
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Expected: {currentItem.quantityRequested} units
           </p>
         </div>
 
         {/* Barcode */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white dark:bg-zinc-800/50 p-4 rounded-lg shadow-sm dark:shadow-zinc-900/50 border border-gray-200 dark:border-zinc-700/50">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Scan Product Barcode
           </label>
           <div className="flex space-x-2">
@@ -379,11 +385,11 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   handleBarcodeScanned(barcodeInput);
               }}
               placeholder="Scan or type barcode"
-              className="flex-1 p-2 rounded-md border-gray-300 border"
+              className="flex-1 p-2 rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <button
               onClick={() => barcodeInput && handleBarcodeScanned(barcodeInput)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 transition"
             >
               Verify
             </button>
@@ -393,24 +399,24 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
             <div
               className={`mt-4 rounded-lg border p-4 ${
                 alertState.type === "success"
-                  ? "bg-green-50 border-green-200"
-                  : "bg-red-50 border-red-200"
+                  ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900/50"
+                  : "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50"
               }`}
             >
               <div className="flex gap-3">
                 <div className="flex-shrink-0">
                   {alertState.type === "success" ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
                   )}
                 </div>
                 <div className="flex-1">
                   <h3
                     className={`text-sm font-medium ${
                       alertState.type === "success"
-                        ? "text-green-800"
-                        : "text-red-800"
+                        ? "text-green-800 dark:text-green-200"
+                        : "text-red-800 dark:text-red-200"
                     }`}
                   >
                     {alertState.type === "success" ? "Success" : "Warning"}
@@ -418,8 +424,8 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   <p
                     className={`mt-1 text-sm ${
                       alertState.type === "success"
-                        ? "text-green-700"
-                        : "text-red-700"
+                        ? "text-green-700 dark:text-green-300"
+                        : "text-red-700 dark:text-red-300"
                     }`}
                   >
                     {alertState.message}
@@ -431,8 +437,8 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
         </div>
 
         {/* Quantity */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white dark:bg-zinc-800/50 p-4 rounded-lg shadow-sm dark:shadow-zinc-900/50 border border-gray-200 dark:border-zinc-700/50">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Quantity Received
           </label>
           <input
@@ -441,9 +447,9 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
             max={currentItem.quantityRequested}
             value={quantityReceived}
             onChange={(e) => setQuantityReceived(Number(e.target.value) || 0)}
-            className="block w-full p-2 text-2xl text-center border rounded-md"
+            className="block w-full p-2 text-2xl text-center border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <p className="mt-1 text-sm text-center text-gray-500">
+          <p className="mt-1 text-sm text-center text-gray-500 dark:text-gray-400">
             Max: {currentItem.quantityRequested}
           </p>
         </div>
@@ -456,7 +462,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
               { quantity: 0, condition: "GOOD", disposition: "RESTOCK" },
             ])
           }
-          className="w-full mt-3 text-blue-600 text-sm font-medium border rounded-md py-2 hover:bg-blue-50"
+          className="w-full mt-3 text-blue-600 dark:text-blue-400 text-sm font-medium border border-gray-300 dark:border-zinc-600 rounded-md py-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition"
         >
           + Split Batch
         </button>
@@ -464,7 +470,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
         {inspections.map((insp, i) => (
           <div
             key={i}
-            className="grid grid-cols-4 gap-2 mt-2 bg-gray-50 rounded-lg p-3"
+            className="grid grid-cols-4 gap-2 mt-2 bg-gray-50 dark:bg-zinc-900/50 rounded-lg p-3 border border-gray-200 dark:border-zinc-700"
           >
             <input
               type="number"
@@ -473,7 +479,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
               onChange={(e) =>
                 updateInspection(i, { quantity: Number(e.target.value) })
               }
-              className="text-center border rounded p-2"
+              className="text-center border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded p-2"
               placeholder="Qty"
             />
             <select
@@ -483,7 +489,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   condition: e.target.value as ReturnCondition,
                 })
               }
-              className="border rounded p-2"
+              className="border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded p-2 text-sm"
             >
               {conditionOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -498,7 +504,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   disposition: e.target.value as ReturnDisposition,
                 })
               }
-              className="border rounded p-2"
+              className="border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded p-2 text-sm"
             >
               <option value="RESTOCK">Restock</option>
               <option value="DISPOSE">Dispose</option>
@@ -508,7 +514,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
             </select>
             <button
               onClick={() => removeInspection(i)}
-              className="text-red-500 text-sm hover:text-red-700"
+              className="text-red-500 dark:text-red-400 text-sm hover:text-red-700 dark:hover:text-red-300 transition"
             >
               ✕
             </button>
@@ -521,7 +527,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   onChange={(e) =>
                     updateInspection(i, { restockLocationId: e.target.value })
                   }
-                  className="col-span-4 border rounded p-2 mt-2"
+                  className="col-span-4 border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded p-2 mt-2 text-sm"
                   disabled={locationsLoading}
                 >
                   <option value="">
@@ -556,7 +562,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
                   })}
                 </select>
                 {locations.length > 0 && (
-                  <p className="col-span-4 text-xs text-gray-500 mt-1">
+                  <p className="col-span-4 text-xs text-gray-500 dark:text-gray-400 mt-1">
                     📍 Showing locations with this SKU in stock
                   </p>
                 )}
@@ -570,16 +576,18 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
               onChange={(e) =>
                 updateInspection(i, { conditionNotes: e.target.value })
               }
-              className="col-span-4 mt-2 border rounded p-2 text-sm"
+              className="col-span-4 mt-2 border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded p-2 text-sm"
             />
           </div>
         ))}
 
         {/* Estimated Refund */}
-        <div className="bg-blue-50 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 border border-blue-200 dark:border-blue-900/50">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-700">Estimated Refund:</span>
-            <span className="text-2xl font-bold text-blue-900">
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Estimated Refund:
+            </span>
+            <span className="text-2xl font-bold text-blue-900 dark:text-blue-200">
               ${estimatedRefund.toFixed(2)}
             </span>
           </div>
@@ -587,7 +595,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
 
         {/* Error */}
         {error && (
-          <div className="rounded-md bg-red-50 p-4 text-red-700 text-sm">
+          <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-4 text-red-700 dark:text-red-400 text-sm">
             {error}
           </div>
         )}
@@ -596,7 +604,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
         <button
           onClick={handleInspectItem}
           disabled={saving}
-          className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium text-lg"
+          className="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 disabled:opacity-50 font-medium text-lg transition"
         >
           {saving
             ? "Saving..."
@@ -608,6 +616,7 @@ export default function InspectionClient({ rmaNumber }: { rmaNumber: string }) {
     </div>
   );
 }
+
 // // app/dashboard/warehouse/returns/inspect/[rmaNumber]/client.tsx
 // // Mobile-optimized inspection interface for returned items with batch-splitting support
 
