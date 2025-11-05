@@ -30,6 +30,7 @@ import {
   Home,
   ScanBarcode,
   ClipboardList,
+  Waypoints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserMenu from "@/components/UserMenu";
@@ -87,6 +88,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "shipping", label: "Tracking", icon: Truck },
     { id: "import", label: "Import", icon: Import },
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
+    { id: "tech-stach", label: "Tech Stack", icon: Waypoints },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

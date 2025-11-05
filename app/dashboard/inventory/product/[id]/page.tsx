@@ -361,23 +361,25 @@ export default function ProductDetailPage() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/dashboard/inventory")}
-            className="mr-4 cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {product.name}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              SKU: {product.sku}
-            </p>
+        <div className="flex flex-col sm:flex-row items-center mb-6">
+          <div className="flex items-center w-full">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/dashboard/inventory")}
+              className="mr-4 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {product.name}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                SKU: {product.sku}
+              </p>
+            </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 ml-auto mt-8 sm:mt-0">
             <Button
               variant="outline"
               onClick={() => {

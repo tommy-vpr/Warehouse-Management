@@ -130,10 +130,10 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Bell className="w-6 h-6" />
-              <CardTitle>Notifications</CardTitle>
-              {unreadCount > 0 && (
+              <CardTitle>Notifications</CardTitle>({unreadCount})
+              {/* {unreadCount > 0 && (
                 <Badge variant="destructive">{unreadCount} unread</Badge>
-              )}
+              )} */}
             </div>
             {unreadCount > 0 && (
               <Button
@@ -149,10 +149,7 @@ export default function NotificationsPage() {
                     Marking...
                   </>
                 ) : (
-                  <>
-                    <CheckCheck className="w-4 h-4 mr-2" />
-                    Mark all read
-                  </>
+                  <>Mark all read</>
                 )}
               </Button>
             )}

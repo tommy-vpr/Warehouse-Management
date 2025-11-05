@@ -127,19 +127,19 @@ export default function MyWorkPage() {
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
       case "PENDING":
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800/20 dark:text-gray-400";
       case "ASSIGNED":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-800/20 dark:text-purple-400";
       case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-800/20 dark:text-blue-400";
       case "PAUSED":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-800/20 dark:text-yellow-400";
       case "PARTIALLY_COMPLETED":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-800/20 dark:text-orange-400";
       case "COMPLETED":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-400";
       case "CANCELLED":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-800/20 dark:text-red-400";
     }
   };
 
@@ -154,7 +154,9 @@ export default function MyWorkPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">My Work</h1>
-        <p className="text-gray-600">All tasks assigned to you</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          All tasks assigned to you
+        </p>
       </div>
 
       {/* Stats */}
@@ -163,7 +165,9 @@ export default function MyWorkPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Pending</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Pending
+                </p>
                 <p className="text-2xl font-bold">{stats.pending}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-500" />
@@ -175,7 +179,9 @@ export default function MyWorkPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">In Progress</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  In Progress
+                </p>
                 <p className="text-2xl font-bold">{stats.inProgress}</p>
               </div>
               <PlayCircle className="w-8 h-8 text-blue-500" />
@@ -187,7 +193,9 @@ export default function MyWorkPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Completed
+                </p>
                 <p className="text-2xl font-bold">{stats.completed}</p>
               </div>
               <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -254,7 +262,9 @@ export default function MyWorkPage() {
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading tasks...</p>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">
+                Loading tasks...
+              </p>
             </div>
           ) : error ? (
             <div className="text-center py-12">
@@ -263,7 +273,7 @@ export default function MyWorkPage() {
           ) : tasks.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">No tasks found</p>
+              <p className="text-gray-600 dark:text-gray-400">No tasks found</p>
             </div>
           ) : (
             <>
@@ -299,7 +309,7 @@ export default function MyWorkPage() {
                     {tasks.map((task) => (
                       <tr key={task.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
-                          <span className="text-sm font-mono text-gray-900">
+                          <span className="text-sm font-mono text-gray-900 dark:text-gray-400">
                             {task.taskNumber}
                           </span>
                         </td>
@@ -318,13 +328,13 @@ export default function MyWorkPage() {
                             {task.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {new Date(task.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4">
                           <div className="w-full">
                             <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-gray-600">
+                              <span className="text-gray-600 dark:text-gray-400">
                                 {task.progress}%
                               </span>
                             </div>
@@ -371,7 +381,7 @@ export default function MyWorkPage() {
                             {getTaskIcon(task.type)}
                             <span className="font-medium">{task.type}</span>
                           </div>
-                          <div className="text-xs font-mono text-gray-500">
+                          <div className="text-xs font-mono text-gray-500 dark:text-gray-400">
                             {task.taskNumber}
                           </div>
                         </div>
@@ -385,18 +395,20 @@ export default function MyWorkPage() {
                       </div>
 
                       <div className="space-y-2 mb-4">
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                           Created:{" "}
                           {new Date(task.createdAt).toLocaleDateString()}
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
                           Orders: {task.completedOrders}/{task.totalOrders}
                         </div>
 
                         {/* Progress */}
                         <div>
                           <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-gray-600">Progress</span>
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Progress
+                            </span>
                             <span className="font-medium">
                               {task.progress}%
                             </span>
@@ -431,7 +443,7 @@ export default function MyWorkPage() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     Page {currentPage} of {totalPages}
                   </div>
 

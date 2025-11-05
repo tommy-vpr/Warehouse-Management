@@ -174,7 +174,7 @@ export default function ReturnsDashboard() {
       {/* Header */}
       <div className="">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-200">
                 Returns Management
@@ -183,7 +183,7 @@ export default function ReturnsDashboard() {
                 Monitor and manage product returns
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-2 sm:mt-0">
               <Link href="/dashboard/returns/new">
                 <Button variant={"outline"}>Create Return</Button>
               </Link>
@@ -349,56 +349,77 @@ export default function ReturnsDashboard() {
           </div>
         )}
 
-        {/* Filters and Search */}
+        {/* Filters and Search - Responsive Layout */}
         <div className="bg-white dark:bg-zinc-800/50 rounded-lg shadow-sm dark:shadow-zinc-900/50 p-4 mb-6 border border-gray-200 dark:border-zinc-700/50">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Status Filter */}
-            <div className="flex items-center space-x-2 overflow-x-auto">
-              {(
-                [
-                  "ALL",
-                  "PENDING",
-                  "APPROVED",
-                  "IN_TRANSIT",
-                  "RECEIVED",
-                  "INSPECTING",
-                  "REFUND_PENDING",
-                  "REFUNDED",
-                ] as StatusFilter[]
-              ).map((status) => (
-                // <button
-                //   key={status}
-                //   onClick={() => setStatusFilter(status)}
-                //   className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                //     statusFilter === status
-                //       ? "bg-blue-600 text-white dark:bg-blue-500"
-                //       : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-zinc-700 dark:text-gray-300 dark:hover:bg-zinc-600"
-                //   }`}
-                // >
-                //   {status.replace(/_/g, " ")}
-                // </button>
-                <Button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                    statusFilter === status
-                      ? "bg-zinc-800 text-white dark:bg-gray-200 dark:text-zinc-800"
-                      : "bg-transparent text-zinc-800 hover:bg-zinc-800 hover:text-white dark:text-gray-200 dark:hover:bg-gray-200 dark:hover:text-zinc-800"
-                  }`}
+            <div className="w-full sm:w-auto">
+              {/* Mobile dropdown */}
+              <div className="sm:hidden">
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as StatusFilter)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-100 text-sm"
                 >
-                  {status.replace(/_/g, " ")}
-                </Button>
-              ))}
+                  {(
+                    [
+                      "ALL",
+                      "PENDING",
+                      "APPROVED",
+                      "IN_TRANSIT",
+                      "RECEIVED",
+                      "INSPECTING",
+                      "REFUND_PENDING",
+                      "REFUNDED",
+                    ] as StatusFilter[]
+                  ).map((status) => (
+                    <option key={status} value={status}>
+                      {status.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Desktop button group */}
+              <div className="hidden sm:flex flex-wrap gap-2">
+                {(
+                  [
+                    "ALL",
+                    "PENDING",
+                    "APPROVED",
+                    "IN_TRANSIT",
+                    "RECEIVED",
+                    "INSPECTING",
+                    "REFUND_PENDING",
+                    "REFUNDED",
+                  ] as StatusFilter[]
+                ).map((status) => (
+                  <Button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    size="sm"
+                    className={`rounded-full text-xs font-medium transition-colors ${
+                      statusFilter === status
+                        ? "bg-zinc-800 text-white dark:bg-gray-200 dark:text-zinc-800"
+                        : "bg-transparent text-zinc-800 hover:bg-zinc-800 hover:text-white dark:text-gray-200 dark:hover:bg-gray-200 dark:hover:text-zinc-800"
+                    }`}
+                  >
+                    {status.replace(/_/g, " ")}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             {/* Search */}
-            <div className="flex-1 sm:max-w-xs">
+            <div className="w-full sm:w-auto sm:max-w-xs">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search RMA, customer, order..."
-                className="block p-2 w-full rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:focus:border-blue-400 dark:focus:ring-blue-400 text-sm"
+                className="block w-full px-3 py-2 rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:focus:border-blue-400 dark:focus:ring-blue-400 text-sm"
               />
             </div>
           </div>
@@ -406,7 +427,8 @@ export default function ReturnsDashboard() {
 
         {/* Returns List */}
         <div className="bg-white dark:bg-zinc-800/50 rounded-lg shadow-sm dark:shadow-zinc-900/50 overflow-hidden border border-gray-200 dark:border-zinc-700/50">
-          <div className="overflow-x-auto">
+          {/* TABLE VIEW (Desktop and up) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-700">
               <thead className="bg-gray-50 dark:bg-zinc-900/50">
                 <tr>
@@ -452,10 +474,8 @@ export default function ReturnsDashboard() {
                       key={returnOrder.id}
                       className="hover:bg-gray-50 dark:hover:bg-zinc-700/30 transition-colors"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {returnOrder.rmaNumber}
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {returnOrder.rmaNumber}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-gray-100">
@@ -465,13 +485,13 @@ export default function ReturnsDashboard() {
                           {returnOrder.customerEmail}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         {returnOrder.order.orderNumber}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-zinc-500">
                         {returnOrder.reason.replace(/_/g, " ")}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 inline-flex text-[10px] leading-5 font-semibold rounded-full ${getStatusColor(
                             returnOrder.status
@@ -480,15 +500,15 @@ export default function ReturnsDashboard() {
                           {returnOrder.status.replace(/_/g, " ")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         {returnOrder.refundAmount
                           ? `$${returnOrder.refundAmount.toFixed(2)}`
                           : "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {new Date(returnOrder.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 text-right text-sm font-medium">
                         <Link
                           href={`/dashboard/returns/${returnOrder.rmaNumber}`}
                           className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
@@ -501,6 +521,62 @@ export default function ReturnsDashboard() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* CARD VIEW (Mobile only) */}
+          <div className="sm:hidden space-y-3 p-4">
+            {filteredReturns.length === 0 ? (
+              <p className="text-center text-gray-500 dark:text-gray-400">
+                No returns found
+              </p>
+            ) : (
+              filteredReturns.map((rma) => (
+                <div
+                  key={rma.id}
+                  className="bg-white dark:bg-zinc-800 rounded-md shadow-sm border border-gray-200 dark:border-zinc-700 p-3"
+                >
+                  {/* Header: RMA + Status */}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300">
+                      {rma.rmaNumber}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${getStatusColor(
+                        rma.status
+                      )}`}
+                    >
+                      {rma.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+
+                  {/* Core Info */}
+                  <div className="text-sm text-gray-800 dark:text-gray-200 space-y-1">
+                    <p className="text-xs font-medium">
+                      {rma.customerName}
+                      <span className="text-gray-500 dark:text-gray-400 text-xs ml-1">
+                        ({rma.order.orderNumber})
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {rma.reason.replace(/_/g, " ")}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {new Date(rma.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  {/* Action */}
+                  <div className="mt-2 text-right">
+                    <Link
+                      href={`/dashboard/returns/${rma.rmaNumber}`}
+                      className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      View
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
