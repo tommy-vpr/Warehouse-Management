@@ -22,7 +22,6 @@ import {
   AlertCircle,
   Loader2,
   Send,
-  Scan,
   XCircle,
   ScanBarcode,
 } from "lucide-react";
@@ -531,7 +530,7 @@ export default function BarcodeScanReceivingPage() {
                     value={poBarcode}
                     onChange={(e) => setPOBarcode(e.target.value)}
                     placeholder="Scan or enter PO barcode"
-                    className="pl-12 text-lg py-6"
+                    className="pl-12 text-xs md:text-lg py-6"
                     autoFocus
                   />
                 </div>
@@ -561,20 +560,20 @@ export default function BarcodeScanReceivingPage() {
   // STEP 2: Scan Products
   if (step === "scan-products" && po) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col p-4">
         <Card className="sticky top-0 z-10">
-          <div className="max-w-6xl mx-auto p-6">
+          <div className="max-w-6xl mx-auto p-3 md:p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-2xl font-bold">
-                  Receiving: {po.reference}
-                </h1>
+                <span className="text-md md:text-2xl font-bold flex items-center gap-2">
+                  <Badge variant="outline">Receiving:</Badge> {po.reference}
+                </span>
                 <p className="text-gray-600 dark:text-gray-400">
                   Vendor: {po.vendor_name}
                 </p>
               </div>
               <Badge
-                className="text-lg px-4 py-2 bg-green-50 border-green-400 text-green-600
+                className="text-sm md:text-lg px-2 py-1 md:px-4 md:py-2 bg-green-50 border-green-400 text-green-600
               dark:bg-green-900/20 dark:border-green-400 dark:text-green-400"
               >
                 {itemsCounted} / {po.line_items.length} items
@@ -608,14 +607,14 @@ export default function BarcodeScanReceivingPage() {
             {/* ✅ FIXED: No disabled prop for continuous scanning */}
             <form onSubmit={handleProductScan}>
               <div className="relative">
-                <Scan className="absolute left-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
+                <ScanBarcode className="absolute left-3 top-4 w-5 h-5 text-gray-400 pointer-events-none" />
                 <Input
                   ref={productScanRef}
                   type="text"
                   value={productScanInput}
                   onChange={(e) => setProductScanInput(e.target.value)}
                   placeholder="Scan product UPC or barcode"
-                  className="pl-10 text-lg py-6 bg-white"
+                  className="pl-10 text-sm md:text-lg py-6 bg-white"
                 />
               </div>
               <button type="submit" className="hidden" aria-hidden="true" />
@@ -634,7 +633,7 @@ export default function BarcodeScanReceivingPage() {
         </Card>
 
         {/* Product List */}
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto my-4 md:my-0 p-0 md:p-6">
           <div className="flex flex-col gap-4">
             {po.line_items.map((item) => {
               const counted = tallyCounts[item.sku] || 0;
@@ -660,10 +659,12 @@ export default function BarcodeScanReceivingPage() {
                           {isComplete && (
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
                           )}
-                          <h3 className="font-semibold">{item.product_name}</h3>
+                          <h3 className="font-semibold text-sm md:text-md">
+                            {item.product_name}
+                          </h3>
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-blue-500">
-                          SKU: {item.sku}
+                        <p className="text-sm text-gray-600 dark:text-blue-500 flex items-center gap-2">
+                          <Badge variant="outline">SKU:</Badge> {item.sku}
                         </p>
                         {item.upc && (
                           <p className="text-xs text-gray-500">
@@ -673,7 +674,7 @@ export default function BarcodeScanReceivingPage() {
                       </div>
                       <div className="text-right">
                         <div
-                          className={`text-3xl font-bold ${
+                          className={`text-xl md:text-3xl font-bold ${
                             counted > expected
                               ? "text-orange-600"
                               : counted === expected
@@ -683,7 +684,7 @@ export default function BarcodeScanReceivingPage() {
                         >
                           {counted}
                         </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
                           of {expected}
                         </div>
                       </div>

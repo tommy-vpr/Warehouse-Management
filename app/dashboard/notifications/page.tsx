@@ -124,13 +124,14 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-4">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Bell className="w-6 h-6" />
-              <CardTitle>Notifications</CardTitle>({unreadCount})
+              <CardTitle>Notifications</CardTitle>
+              {unreadCount > 0 && <span>{unreadCount}</span>}
               {/* {unreadCount > 0 && (
                 <Badge variant="destructive">{unreadCount} unread</Badge>
               )} */}

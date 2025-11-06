@@ -1,4 +1,5 @@
 // app/dashboard/invoice/page.tsx
+// Mobile Responsive Version
 "use client";
 
 import { useEffect, useState } from "react";
@@ -196,34 +197,42 @@ export default function InvoiceDashboardPage() {
       0
     ) || 0;
 
+  const statusColors = {
+    DRAFT: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+    PENDING:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background p-3 sm:p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div>
+        <div className="mb-4 sm:mb-8">
           <button
             onClick={() => router.push("/dashboard")}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 mb-4 transition"
           >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Dashboard
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Back to Dashboard</span>
           </button>
 
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <FileText className="w-8 h-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                   Invoices
                 </h1>
               </div>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                 Create and manage invoices with barcode generation
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => {
                   refetch();
                   setRefreshTrigger((prev) => prev + 1);
@@ -236,56 +245,59 @@ export default function InvoiceDashboardPage() {
                     mounted && (isLoading || isFetching) ? "animate-spin" : ""
                   }`}
                 />
-                Refresh
+                <span className="ml-2 sm:hidden lg:inline">Refresh</span>
               </Button>
               <Button
+                size="sm"
                 onClick={() => setShowForm(!showForm)}
-                className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-gray-200 transition"
+                className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white transition sm:flex-none"
               >
                 <Plus className="w-4 h-4" />
-                {showForm ? "Hide Form" : "Create Invoice"}
+                <span className="ml-2">{showForm ? "Hide" : "Create"}</span>
               </Button>
             </div>
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <FileText className="w-8 h-8 text-blue-500" />
-                  <div className="ml-3">
-                    <p className="text-2xl font-bold">{totalInvoices}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Total Invoices
+                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
+                  <div className="ml-2 sm:ml-3">
+                    <p className="text-lg sm:text-2xl font-bold">
+                      {totalInvoices}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      Total
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <DollarSign className="w-8 h-8 text-green-600" />
-                  <div className="ml-3">
-                    <p className="text-2xl font-bold">
+                  <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+                  <div className="ml-2 sm:ml-3">
+                    <p className="text-lg sm:text-2xl font-bold">
                       ${mounted ? totalAmount.toFixed(2) : totalAmount}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Total Amount
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      Amount
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-4">
+            <Card className="col-span-2 sm:col-span-1">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center">
-                  <Package className="w-8 h-8 text-purple-600" />
-                  <div className="ml-3">
-                    <p className="text-2xl font-bold">{paidCount}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Paid Invoices
+                  <Package className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+                  <div className="ml-2 sm:ml-3">
+                    <p className="text-lg sm:text-2xl font-bold">{paidCount}</p>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      Paid
                     </p>
                   </div>
                 </div>
@@ -296,7 +308,7 @@ export default function InvoiceDashboardPage() {
 
         {/* Invoice Form */}
         {showForm && (
-          <div className="animate-in slide-in-from-top duration-300">
+          <div className="animate-in slide-in-from-top duration-300 mb-6">
             <InvoiceForm
               userId={session.user.id}
               onSuccess={(invoice) => {
@@ -315,7 +327,7 @@ export default function InvoiceDashboardPage() {
 
         {/* Divider */}
         {showForm && (
-          <div className="relative">
+          <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300 dark:border-gray-700" />
             </div>
@@ -328,17 +340,17 @@ export default function InvoiceDashboardPage() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 text-sm">
+        <div className="flex flex-col gap-2 sm:gap-4 mb-4 sm:mb-6 text-xs sm:text-sm">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Search by invoice #, customer, or email..."
+              placeholder="Search invoice #, customer..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(0);
               }}
-              className="pl-10 dark:border-zinc-700"
+              className="pl-10 dark:border-zinc-700 text-sm"
             />
           </div>
           <select
@@ -358,34 +370,15 @@ export default function InvoiceDashboardPage() {
         {isFiltering ? (
           <POListSkeleton />
         ) : (
-          //   <div className="space-y-4">
-          //     {[1, 2, 3, 4, 5].map((i) => (
-          //       <Card key={i} className="animate-pulse">
-          //         <CardContent className="p-6">
-          //           <div className="flex items-center justify-between">
-          //             <div className="flex-1">
-          //               <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
-          //                 <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
-          //                 <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded-full" />
-          //                 <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded" />
-          //                 <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-          //               </div>
-          //             </div>
-          //             <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded ml-4" />
-          //           </div>
-          //         </CardContent>
-          //       </Card>
-          //     ))}
-          //   </div>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {data?.invoices && data.invoices.length === 0 && (
               <Card>
-                <CardContent className="p-12 text-center">
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                <CardContent className="p-8 sm:p-12 text-center">
+                  <FileText className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-2">
                     No invoices found
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     {search
                       ? "No invoices match your search"
                       : "Create your first invoice to get started"}
@@ -394,7 +387,7 @@ export default function InvoiceDashboardPage() {
                     <Button
                       onClick={() => setShowForm(true)}
                       className="cursor-pointer"
-                      variant={"outline"}
+                      variant="outline"
                     >
                       Create Invoice
                     </Button>
@@ -403,101 +396,206 @@ export default function InvoiceDashboardPage() {
               </Card>
             )}
 
-            {data?.invoices?.map((invoice: Invoice) => {
-              const statusColors = {
-                DRAFT:
-                  "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
-                PENDING:
-                  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-                PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-                CANCELLED:
-                  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-              };
-
-              return (
-                <Card
-                  key={invoice.id}
-                  className="hover:shadow-lg transition-shadow"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
-                          {/* Invoice Number */}
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-blue-600" />
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                              {invoice.invoiceNumber}
-                            </h3>
-                          </div>
-
-                          {/* Status */}
-                          <select
-                            value={invoice.status}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleStatusUpdate(invoice.id, e.target.value);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${
-                              statusColors[
-                                invoice.status as keyof typeof statusColors
-                              ]
-                            }`}
-                          >
-                            <option value="DRAFT">Draft</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="PAID">Paid</option>
-                            <option value="CANCELLED">Cancelled</option>
-                          </select>
-
-                          {/* Customer */}
-                          {/* <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                            <User className="w-4 h-4" />
-                            <span className="font-medium">
-                              {invoice.customerName}
-                            </span>
-                          </div> */}
-
-                          {/* Date */}
-                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                            <Calendar className="w-4 h-4" />
-                            <span>
-                              {mounted
-                                ? new Date(invoice.date).toLocaleDateString()
-                                : invoice.date}
-                            </span>
-                          </div>
-
-                          {/* Total */}
-                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                            ${invoice.total}
-                          </div>
-
-                          {/* Items Count */}
-                          <Badge variant="outline" className="text-xs">
-                            <Package className="w-3 h-3 mr-1" />
-                            {invoice.items.length} item
-                            {invoice.items.length !== 1 ? "s" : ""}
-                          </Badge>
+            {data?.invoices?.map((invoice: Invoice) => (
+              <Card
+                key={invoice.id}
+                className="hover:shadow-lg transition-shadow"
+              >
+                <CardContent className="p-4 sm:p-6">
+                  {/* Desktop Layout */}
+                  <div className="hidden lg:flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center flex-wrap gap-x-6 gap-y-3">
+                        {/* Invoice Number */}
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {invoice.invoiceNumber}
+                          </h3>
                         </div>
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-2 ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
+                        {/* Status Dropdown */}
+                        <select
+                          value={invoice.status}
+                          onChange={(e) => {
                             e.stopPropagation();
-                            router.push(`/dashboard/invoice/${invoice.id}`);
+                            handleStatusUpdate(invoice.id, e.target.value);
                           }}
-                          className="cursor-pointer"
-                          title="View Details"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${
+                            statusColors[
+                              invoice.status as keyof typeof statusColors
+                            ]
+                          }`}
                         >
-                          {/* <Eye className="w-4 h-4" /> */}
-                          View Invoice
-                        </Button>
+                          <option value="DRAFT">Draft</option>
+                          <option value="PENDING">Pending</option>
+                          <option value="PAID">Paid</option>
+                          <option value="CANCELLED">Cancelled</option>
+                        </select>
+
+                        {/* Date */}
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Calendar className="w-4 h-4" />
+                          <span>
+                            {mounted
+                              ? new Date(invoice.date).toLocaleDateString()
+                              : invoice.date}
+                          </span>
+                        </div>
+
+                        {/* Total */}
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                          ${invoice.total}
+                        </div>
+
+                        {/* Items Count */}
+                        <Badge variant="outline" className="text-xs">
+                          <Package className="w-3 h-3 mr-1" />
+                          {invoice.items.length} item
+                          {invoice.items.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/invoice/${invoice.id}`);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        View Invoice
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(
+                            `/api/invoice/${invoice.id}/pdf`,
+                            "_blank"
+                          );
+                        }}
+                        className="cursor-pointer"
+                        title="Download PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(invoice.id, invoice.invoiceNumber);
+                        }}
+                        className="cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Mobile Layout */}
+                  <div className="lg:hidden space-y-3">
+                    {/* Header Row */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                          {invoice.invoiceNumber}
+                        </h3>
+                      </div>
+                      <Badge
+                        className={`text-[10px] ${
+                          statusColors[
+                            invoice.status as keyof typeof statusColors
+                          ]
+                        }`}
+                      >
+                        {invoice.status}
+                      </Badge>
+                    </div>
+
+                    {/* Customer Info */}
+                    <div className="text-sm">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {invoice.customerName}
+                      </p>
+                      {invoice.customerEmail && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {invoice.customerEmail}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">Date</p>
+                        <p className="font-medium">
+                          {mounted
+                            ? new Date(invoice.date).toLocaleDateString()
+                            : invoice.date}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Total
+                        </p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          ${invoice.total}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Items
+                        </p>
+                        <p className="font-medium">
+                          {invoice.items.length} item
+                          {invoice.items.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Status
+                        </p>
+                        <select
+                          value={invoice.status}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleStatusUpdate(invoice.id, e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-zinc-800 dark:text-gray-300 cursor-pointer"
+                        >
+                          <option value="DRAFT">Draft</option>
+                          <option value="PENDING">Pending</option>
+                          <option value="PAID">Paid</option>
+                          <option value="CANCELLED">Cancelled</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col gap-2 pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/invoice/${invoice.id}`);
+                        }}
+                        className="w-full cursor-pointer"
+                      >
+                        View Invoice
+                      </Button>
+                      <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -508,10 +606,10 @@ export default function InvoiceDashboardPage() {
                               "_blank"
                             );
                           }}
-                          className="cursor-pointer"
-                          title="Download PDF"
+                          className="flex-1 cursor-pointer"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-4 h-4 mr-2" />
+                          PDF
                         </Button>
                         <Button
                           variant="outline"
@@ -520,25 +618,25 @@ export default function InvoiceDashboardPage() {
                             e.stopPropagation();
                             handleDelete(invoice.id, invoice.invoiceNumber);
                           }}
-                          className="cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-                          title="Delete"
+                          className="flex-1 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
-                          <Trash2 className="w-4 h-4 text-red-400" />
+                          <Trash2 className="w-4 h-4 mr-2 text-red-400" />
+                          Delete
                         </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
         {/* Pagination Controls */}
         {totalPages > 1 && !isFiltering && (
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-              Showing page {page + 1} of {totalPages}
+          <div className="flex flex-col sm:flex-row items-center justify-between py-3 mt-4 gap-3">
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              Page {page + 1} of {totalPages}
             </div>
             <div className="flex gap-2">
               <Button
@@ -550,7 +648,9 @@ export default function InvoiceDashboardPage() {
               >
                 Previous
               </Button>
-              <div className="flex gap-1">
+
+              {/* Page numbers - hide on very small screens */}
+              <div className="hidden sm:flex gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const pageNum =
                     page <= 2
@@ -575,6 +675,7 @@ export default function InvoiceDashboardPage() {
                   );
                 })}
               </div>
+
               <Button
                 variant="outline"
                 size="sm"

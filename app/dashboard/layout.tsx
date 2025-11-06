@@ -88,7 +88,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { id: "shipping", label: "Tracking", icon: Truck },
     { id: "import", label: "Import", icon: Import },
     { id: "inventory/count", label: "Cycle Count", icon: RefreshCw },
-    { id: "tech-stach", label: "Tech Stack", icon: Waypoints },
+    { id: "tech-stack", label: "Tech Stack", icon: Waypoints },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -168,20 +168,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex flex-1">
-        {/* Sidebar */}
+        {/* Sidebar - ✅ FIXED: Added overflow-y-auto for scrolling */}
         <aside
           className={clsx(
-            "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out sm:static sm:translate-x-0 sm:transform-none",
+            "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out sm:static sm:translate-x-0 sm:transform-none overflow-y-auto",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="flex justify-end sm:hidden p-2">
+          {/* Close button - sticky at top so it's always visible */}
+          <div className="flex justify-end sm:hidden p-2 sticky top-0 bg-card z-10 border-b border-border">
             <button onClick={() => setMobileMenuOpen(false)}>
               <X className="w-6 h-6 text-foreground" />
             </button>
           </div>
 
-          <nav className="p-4 space-y-2">
+          {/* Navigation - added pb-8 for bottom padding */}
+          <nav className="p-4 space-y-2 pb-8">
             {menuItems.map((item) => {
               const href =
                 item.id === "dashboard"
@@ -228,7 +230,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* Main content - Add padding bottom on mobile for footer */}
-        <main className="flex-1 p-4 sm:p-6 pb-20 sm:pb-6">{children}</main>
+        <main className="flex-1 p-0 sm:p-6 pb-20 sm:pb-6">{children}</main>
       </div>
 
       {/* Quick Actions Footer - Mobile Only */}
@@ -242,14 +244,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 href={action.href}
                 className={clsx(
                   "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-                  isActive ? "bg-gray-200 dark:bg-black" : "hover:bg-accent"
+                  isActive ? "bg-gray-200 dark:bg-black/20" : "hover:bg-accent"
                 )}
               >
                 <action.icon
                   className={clsx(
                     "w-5 h-5",
                     isActive
-                      ? "text-zinc-900 dark:text-gray-200"
+                      ? "text-zinc-900 dark:text-green-500"
                       : "text-muted-foreground"
                   )}
                 />
@@ -257,7 +259,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   className={clsx(
                     "text-xs",
                     isActive
-                      ? "text-zinc-900 dark:text-gray-200 font-medium"
+                      ? "text-zinc-900 dark:text-green-500 font-medium"
                       : "text-muted-foreground"
                   )}
                 >

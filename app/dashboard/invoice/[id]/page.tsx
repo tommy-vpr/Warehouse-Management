@@ -107,8 +107,8 @@ export default function InvoiceDetailPage({
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <Badge variant={"outline"}>PO</Badge>
+                  <h1 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                     {invoice.invoiceNumber}
                   </h1>
                   <button

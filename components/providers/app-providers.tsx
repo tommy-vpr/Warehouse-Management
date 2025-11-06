@@ -66,9 +66,9 @@ export function AppProviders({ children }: Props) {
               storageKey="wms-theme"
             >
               {children}
-              {process.env.NODE_ENV === "development" && (
+              {/* {process.env.NODE_ENV === "development" && (
                 <ReactQueryDevtools initialIsOpen={false} />
-              )}
+              )} */}
             </NextThemesProvider>
           </PersistQueryClientProvider>
         ) : (
@@ -81,9 +81,9 @@ export function AppProviders({ children }: Props) {
               storageKey="wms-theme"
             >
               {children}
-              {process.env.NODE_ENV === "development" && (
+              {/* {process.env.NODE_ENV === "development" && (
                 <ReactQueryDevtools initialIsOpen={false} />
-              )}
+              )} */}
             </NextThemesProvider>
           </QueryClientProvider>
         )}

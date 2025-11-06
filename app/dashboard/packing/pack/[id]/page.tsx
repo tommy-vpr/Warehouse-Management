@@ -17,6 +17,7 @@ import {
   Check,
   Loader2,
   Dot,
+  TriangleAlert,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import ShippingLabelForm from "@/components/shipping/ShippingLabelForm";
@@ -389,41 +390,51 @@ export default function EnhancedPackingInterface() {
   }
 
   // Success state
-  // Success state
   if (isPackingComplete) {
     return (
-      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-3 sm:p-4">
         <div className="text-center max-w-2xl w-full">
-          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
+          {/* Success Icon - Responsive Size */}
+          <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-green-600 mx-auto mb-3 sm:mb-4" />
+
+          {/* Success Message - Responsive Typography */}
+          <h2 className="text-xl sm:text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
             Order Packed & Labeled!
           </h2>
-          <p className="text-green-700 dark:text-green-600 mb-6">
+          <p className="text-sm sm:text-base text-green-700 dark:text-green-600 mb-4 sm:mb-6">
             {order.orderNumber} is ready for shipping
           </p>
 
           {packages.length > 0 ? (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Print Documents</CardTitle>
+            <Card className="mb-4 sm:mb-6">
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">
+                  Print Documents
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
+                  {/* Package Cards - Mobile Optimized */}
                   {packages.map((pkg, idx) => (
                     <div
                       key={pkg.id || idx}
-                      className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded gap-3"
                     >
+                      {/* Package Info */}
                       <div className="text-left">
-                        <p className="font-medium">
-                          Package {pkg.packageNumber || idx + 1} of{" "}
-                          {packages.length}
+                        <p className="font-medium text-sm sm:text-base">
+                          {/* Package {pkg.packageNumber || idx + 1} of{" "}
+                          {packages.length} */}
+                          {/* Package 1 of 2 Package 2 of 2 */}
+                          Package {idx + 1} of {packages.length}
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-all">
                           Tracking: {pkg.trackingNumber}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+
+                      {/* Action Buttons - Stacked on Mobile */}
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {/* Print Label Button */}
                         <Button
                           size="sm"
@@ -442,7 +453,7 @@ export default function EnhancedPackingInterface() {
                               };
                             }
                           }}
-                          className="flex items-center gap-1"
+                          className="flex items-center justify-center gap-1 w-full sm:w-auto"
                         >
                           🖨️ Print Label
                         </Button>
@@ -466,12 +477,17 @@ export default function EnhancedPackingInterface() {
                                 };
                               }
                             }}
-                            className="flex items-center gap-1"
+                            className="flex items-center justify-center gap-1 w-full sm:w-auto"
                           >
                             🖨️ Print Slip
                           </Button>
                         ) : (
-                          <Button size="sm" variant="outline" disabled>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="w-full sm:w-auto"
+                          >
                             📄 Generating...
                           </Button>
                         )}
@@ -479,9 +495,9 @@ export default function EnhancedPackingInterface() {
                     </div>
                   ))}
 
-                  {/* Print All Documents Button */}
+                  {/* Print All Documents Button - Full Width */}
                   <Button
-                    className="w-full"
+                    className="w-full h-10 sm:h-9 text-sm sm:text-base"
                     onClick={async () => {
                       for (let i = 0; i < packages.length; i++) {
                         const pkg = packages[i];
@@ -534,22 +550,23 @@ export default function EnhancedPackingInterface() {
               </CardContent>
             </Card>
           ) : (
-            /* Fallback message if no packages loaded */
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
+            /* Fallback message - Responsive Padding */
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300">
                 📄 Documents opened automatically in new tabs
               </p>
-              <p className="text-xs text-blue-600 mt-2">
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                 If tabs didn't open, please check popup settings or print from
                 order details page
               </p>
             </div>
           )}
 
-          <div className="space-y-3">
+          {/* Navigation Buttons - Full Width on Mobile */}
+          <div className="space-y-2 sm:space-y-3">
             <Button
               onClick={() => (window.location.href = "/dashboard/packing")}
-              className="w-full h-12 text-lg"
+              className="w-full h-11 sm:h-12 text-base sm:text-lg"
             >
               Pack Next Order
             </Button>
@@ -559,7 +576,7 @@ export default function EnhancedPackingInterface() {
               onClick={() =>
                 (window.location.href = `/dashboard/orders/${order.id}`)
               }
-              className="w-full"
+              className="w-full h-10 sm:h-auto text-sm sm:text-base"
             >
               View Order Details
             </Button>
@@ -568,7 +585,6 @@ export default function EnhancedPackingInterface() {
       </div>
     );
   }
-
   // ✅ CORRECT - These calculations are right!
   const totalPackingValue = order.items.reduce((sum, item) => {
     return sum + parseFloat(item.totalPrice);
@@ -787,6 +803,7 @@ export default function EnhancedPackingInterface() {
                     <Package className="w-4 h-4 mr-2" />
                     Items ({order.items.length})
                   </span>
+
                   {currentStep >= 2 && (
                     <Badge
                       variant={
@@ -802,6 +819,12 @@ export default function EnhancedPackingInterface() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
+                  <div className="bg-amber-50 border border-amber-200 dark:border-amber-400 dark:bg-amber-900/20 p-2 rounded-lg">
+                    <p className="text-xs flex justify-center gap-2 items-center text-amber-400">
+                      <TriangleAlert className="h-4 w-4" /> Click each item as
+                      you pack
+                    </p>
+                  </div>
                   {order.items.map((item) => (
                     <div
                       key={item.id}
@@ -919,15 +942,15 @@ export default function EnhancedPackingInterface() {
                   />
 
                   <div className="space-y-4 mt-4">
-                    <div className="bg-red-50 border border-red-200 dark:border-red-400 dark:bg-red-900/20 p-4 rounded-lg">
+                    {/* <div className="bg-red-50 border border-red-200 dark:border-red-400 dark:bg-red-900/20 p-4 rounded-lg">
                       <p className="text-sm flex items-center gap-1 text-red-400">
                         <Dot />
                         Click each item as you pack
-                        {/* <strong>
+                        <strong>
                           {BOX_TYPES.find((b) => b.id === selectedBox)?.name}
-                        </strong> */}
+                        </strong>
                       </p>
-                    </div>
+                    </div> */}
 
                     {/* ... packing photos and materials sections ... */}
 
@@ -950,7 +973,7 @@ export default function EnhancedPackingInterface() {
             {currentStep === 2 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-md md:text-xl">
                     <Truck className="w-5 h-5 mr-2" />
                     Step 2: Create Shipping Label
                   </CardTitle>

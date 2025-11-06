@@ -126,20 +126,20 @@ const WMSCostBreakdown = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-700 dark:to-blue-900 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold">
+              <h1 className="text-2xl md:text-4xl font-bold">
                 WMS Tech Stack Cost Breakdown
               </h1>
-              <p className="mt-2 text-xl text-blue-100 dark:text-blue-200">
+              <p className="mt-2 text-sm md:text-xl text-blue-100 dark:text-blue-200">
                 Complete cost analysis for Supabase + GCP + Vercel
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right ml-auto mt-4 md:mt-0">
               <div className="text-sm text-blue-200 dark:text-blue-300">
                 Estimated Monthly Cost
               </div>
-              <div className="text-5xl font-bold">
+              <div className="text-2xl md:text-5xl font-bold">
                 ${costs.total.toFixed(2)}
               </div>
             </div>
@@ -150,18 +150,18 @@ const WMSCostBreakdown = () => {
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex flex-wrap gap-1 bg-white dark:bg-zinc-800 rounded-lg p-1 shadow-sm dark:shadow-zinc-900/50">
-          {["overview", "calculator", "your-setup"].map((tab) => (
+          {["overview", "calculator", "wms-setup"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-3 px-4 rounded-md font-medium transition-colors ${
                 activeTab === tab
-                  ? "bg-blue-600 dark:bg-blue-700 text-white"
+                  ? "bg-gray-200 dark:bg-zinc-900"
                   : "text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-zinc-700"
               }`}
             >
-              {tab === "your-setup"
-                ? "Your Setup"
+              {tab === "wms-setup"
+                ? "WMS Setup"
                 : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
@@ -336,7 +336,7 @@ const WMSCostBreakdown = () => {
                 </AreaChart>
               </ResponsiveContainer>
               <p className="mt-4 text-sm text-slate-600 dark:text-gray-400 text-center">
-                Costs scale gradually as your order volume grows
+                Costs scale gradually as our order volume grows
               </p>
             </div>
           </div>
@@ -350,7 +350,7 @@ const WMSCostBreakdown = () => {
                 Custom Cost Calculator
               </h3>
               <p className="text-slate-600 dark:text-gray-400 mb-6">
-                Adjust the sliders to estimate costs for your specific WMS needs
+                Adjust the sliders to estimate costs for our specific WMS needs
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -373,7 +373,7 @@ const WMSCostBreakdown = () => {
                     </span>
                     <span>20</span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                  <p className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                     Developers who need to deploy code
                   </p>
                 </div>
@@ -426,7 +426,7 @@ const WMSCostBreakdown = () => {
               {/* Calculated Costs */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 border-2 border-green-200 dark:border-green-800">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
+                  <div className="text-sm text-slate-600 dark:text-gray-200 mb-1">
                     Supabase
                   </div>
                   <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -435,34 +435,34 @@ const WMSCostBreakdown = () => {
                 </div>
 
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 border-2 border-red-200 dark:border-red-800">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
+                  <div className="text-sm text-slate-600 dark:text-gray-200 mb-1">
                     Google Cloud
                   </div>
                   <div className="text-3xl font-bold text-red-600 dark:text-red-400">
                     ${costs.gcp.toFixed(2)}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-500 mt-1">
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                     {((orderVolume * 1.7) / 1024).toFixed(2)}GB/month growth
                   </div>
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border-2 border-blue-200 dark:border-blue-800">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
+                  <div className="text-sm text-slate-600 dark:text-gray-200 mb-1">
                     Vercel Pro
                   </div>
                   <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                     ${costs.vercel.toFixed(2)}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-500 mt-1">
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">
                     ${vercelSeats}/mo + overages
                   </div>
                 </div>
 
-                <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-6 border-2 border-purple-500 dark:border-purple-600">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
+                <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-lg p-6 border-2 border-yellow-500 dark:border-yellow-600">
+                  <div className="text-sm text-slate-600 dark:text-gray-200 mb-1">
                     Total Cost
                   </div>
-                  <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                     ${costs.total.toFixed(2)}
                   </div>
                 </div>
@@ -471,7 +471,6 @@ const WMSCostBreakdown = () => {
               {/* GCP Detailed Breakdown */}
               <div className="mt-8 p-6 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
                 <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-4 flex items-center">
-                  <span className="text-xl mr-2">☁️</span>
                   GCP Cost Breakdown (Images: 2-4 per order, avg 3)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -480,7 +479,7 @@ const WMSCostBreakdown = () => {
                     <div className="font-semibold text-red-600 dark:text-red-400 mb-2">
                       Storage:
                     </div>
-                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-200">
                       <div className="flex justify-between">
                         <span>Current stored:</span>
                         <span className="font-semibold text-slate-800 dark:text-white">
@@ -499,7 +498,7 @@ const WMSCostBreakdown = () => {
                           ${(storageGB * 0.02).toFixed(2)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                         Images per order: ~3 (avg)
                         <br />
                         Size per order: ~1.7MB
@@ -512,7 +511,7 @@ const WMSCostBreakdown = () => {
                     <div className="font-semibold text-red-600 dark:text-red-400 mb-2">
                       Operations:
                     </div>
-                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-200">
                       <div className="flex justify-between">
                         <span>Uploads (Class A):</span>
                         <span className="font-semibold text-slate-800 dark:text-white">
@@ -535,7 +534,7 @@ const WMSCostBreakdown = () => {
                           ).toFixed(3)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                         3 uploads + 4 views per order
                       </div>
                     </div>
@@ -546,7 +545,7 @@ const WMSCostBreakdown = () => {
                     <div className="font-semibold text-red-600 dark:text-red-400 mb-2">
                       Network Egress:
                     </div>
-                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-gray-200">
                       <div className="flex justify-between">
                         <span>Downloads/month:</span>
                         <span className="font-semibold text-slate-800 dark:text-white">
@@ -559,13 +558,10 @@ const WMSCostBreakdown = () => {
                           ${(((orderVolume * 1.5) / 1024) * 0.12).toFixed(3)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                         ~1.5MB downloaded per order
                         <br />
                         (viewing images in app)
-                      </div>
-                      <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/30 rounded text-xs border border-yellow-200 dark:border-yellow-800">
-                        <strong>💡 Tip:</strong> Enable CDN to save 60-70%!
                       </div>
                     </div>
                   </div>
@@ -574,7 +570,7 @@ const WMSCostBreakdown = () => {
                 {/* Monthly Image Growth */}
                 <div className="mt-4 p-4 bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700">
                   <div className="font-semibold text-slate-800 dark:text-white mb-2">
-                    📊 Storage Growth Projection:
+                    Storage Growth Projection:
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-600 dark:text-gray-400">
                     <div>
@@ -599,7 +595,7 @@ const WMSCostBreakdown = () => {
                     </div>
                     <div>
                       <div className="font-semibold text-slate-800 dark:text-white">
-                        Your limit:
+                        our limit:
                       </div>
                       <div className="text-green-600 dark:text-green-400 font-bold">
                         {(storageGB / ((orderVolume * 1.7) / 1024)).toFixed(1)}{" "}
@@ -611,7 +607,7 @@ const WMSCostBreakdown = () => {
               </div>
 
               {/* Annual Projection */}
-              <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="font-bold text-lg text-slate-800 dark:text-white">
@@ -622,7 +618,7 @@ const WMSCostBreakdown = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">
+                    <div className="text-4xl font-bold text-yellow-600 dark:text-yellow-400">
                       ${(costs.total * 12).toFixed(2)}
                     </div>
                     <div className="text-sm text-slate-600 dark:text-gray-400">
@@ -635,51 +631,37 @@ const WMSCostBreakdown = () => {
           </div>
         )}
 
-        {/* Your Setup Tab */}
-        {activeTab === "your-setup" && (
+        {/* our Setup Tab */}
+        {activeTab === "wms-setup" && (
           <div className="space-y-6">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-800 dark:from-purple-700 dark:to-purple-900 text-white rounded-xl shadow-lg p-8">
-              <h3 className="text-3xl font-bold mb-2">
-                Your Specific WMS Setup
-              </h3>
-              <p className="text-purple-100 dark:text-purple-200 text-lg mb-6">
+            <div className="bg-gray-600 dark:bg-zinc-800 text-white rounded-xl shadow-lg p-8">
+              <h3 className="text-3xl font-bold mb-2">Our WMS Setup</h3>
+              <p className="text-gray-100 dark:text-gray-400 text-lg mb-6">
                 1 developer • 10 warehouse workers • 400 orders/month • 20GB
                 storage
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg p-6 text-slate-800 dark:text-white border border-gray-200 dark:border-zinc-700">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
-                    Monthly Cost
-                  </div>
-                  <div className="text-5xl font-bold text-purple-600 dark:text-purple-400">
-                    $46.79
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                  <div className="text-sm mb-1">Monthly Cost</div>
+                  <div className="text-5xl font-bold text-blue-500">$46.79</div>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                     All services included
                   </div>
                 </div>
 
                 <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg p-6 text-slate-800 dark:text-white border border-gray-200 dark:border-zinc-700">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
-                    Annual Cost
-                  </div>
-                  <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">
-                    $561
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                  <div className="text-sm mb-1">Annual Cost</div>
+                  <div className="text-5xl font-bold text-blue-500">$561</div>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                     Projected yearly spend
                   </div>
                 </div>
 
                 <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg p-6 text-slate-800 dark:text-white border border-gray-200 dark:border-zinc-700">
-                  <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">
-                    Per Order
-                  </div>
-                  <div className="text-5xl font-bold text-green-600 dark:text-green-400">
-                    $0.117
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-500 mt-2">
+                  <div className="text-sm mb-1">Per Order</div>
+                  <div className="text-5xl font-bold text-blue-500">$0.117</div>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-2">
                     11.7 cents per order
                   </div>
                 </div>
@@ -689,7 +671,6 @@ const WMSCostBreakdown = () => {
             {/* Bandwidth Optimization Best Practices */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg dark:shadow-zinc-900/50 p-6 border border-gray-200 dark:border-zinc-700">
               <div className="flex items-center mb-6">
-                <span className="text-3xl mr-3">🚀</span>
                 <h4 className="text-2xl font-bold text-slate-800 dark:text-white">
                   Bandwidth Optimization Best Practices
                 </h4>
@@ -699,7 +680,6 @@ const WMSCostBreakdown = () => {
                 {/* Vercel Bandwidth */}
                 <div className="border-2 border-blue-500 dark:border-blue-600 rounded-lg p-6 bg-blue-50 dark:bg-blue-900/20">
                   <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    <span className="text-2xl mr-2">📊</span>
                     Vercel Bandwidth Optimization
                   </h5>
 
@@ -719,7 +699,7 @@ const WMSCostBreakdown = () => {
                       per seat
                       <br />• Status:{" "}
                       <strong className="text-green-600 dark:text-green-400">
-                        Well within limits! ✅
+                        Well within limits!
                       </strong>
                     </div>
                   </div>
@@ -776,7 +756,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> Reduce image bandwidth by
+                        <strong>Savings:</strong> Reduce image bandwidth by
                         50-70%
                       </div>
                     </div>
@@ -832,7 +812,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> Reduce JS bundle size by
+                        <strong>Savings:</strong> Reduce JS bundle size by
                         30-50%
                       </div>
                     </div>
@@ -888,7 +868,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> Reduce repeat bandwidth by
+                        <strong>Savings:</strong> Reduce repeat bandwidth by
                         60-80%
                       </div>
                     </div>
@@ -944,7 +924,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> Already enabled! Free
+                        <strong>Savings:</strong> Already enabled! Free
                         compression
                       </div>
                     </div>
@@ -954,18 +934,17 @@ const WMSCostBreakdown = () => {
                 {/* GCP Bandwidth */}
                 <div className="border-2 border-red-500 dark:border-red-600 rounded-lg p-6 bg-red-50 dark:bg-red-900/20">
                   <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    <span className="text-2xl mr-2">☁️</span>
                     GCP Egress Optimization
                   </h5>
 
                   <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="font-semibold text-slate-800 dark:text-white mb-2">
-                      ⚠️ This is your biggest cost driver!
+                      ⚠️ This is our biggest cost driver!
                     </div>
                     <div className="text-sm text-slate-600 dark:text-gray-400">
                       GCP egress is{" "}
                       <strong className="text-slate-800 dark:text-white">
-                        89% of your GCP costs
+                        89% of the GCP costs
                       </strong>{" "}
                       ($0.24 out of $0.27)
                     </div>
@@ -1023,7 +1002,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> $0.16-0.20/month (67-74%
+                        <strong>Savings:</strong> $0.16-0.20/month (67-74%
                         reduction!)
                       </div>
                     </div>
@@ -1079,7 +1058,7 @@ const WMSCostBreakdown = () => {
                         </li>
                       </ul>
                       <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>💰 Savings:</strong> Cut egress in half!
+                        <strong>Savings:</strong> Cut egress in half!
                       </div>
                     </div>
 
@@ -1170,7 +1149,6 @@ const WMSCostBreakdown = () => {
                 {/* Supabase Bandwidth */}
                 <div className="border-2 border-green-500 dark:border-green-600 rounded-lg p-6 bg-green-50 dark:bg-green-900/20">
                   <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    <span className="text-2xl mr-2">🗄️</span>
                     Supabase Bandwidth Optimization
                   </h5>
 
@@ -1262,7 +1240,6 @@ const WMSCostBreakdown = () => {
                 {/* Monitoring & Alerts */}
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg p-6">
                   <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    <span className="text-2xl mr-2">📊</span>
                     Monitoring & Alerts
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1303,12 +1280,12 @@ const WMSCostBreakdown = () => {
                 </div>
 
                 {/* Quick Wins */}
-                <div className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-800 text-white rounded-lg p-6">
+                {/* <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-800 text-white rounded-lg p-6">
                   <h5 className="text-xl font-bold mb-4">
-                    🎯 Quick Wins (Do These First!)
+                    Quick Wins (Do These First!)
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white text-slate-800 bg-opacity-20 dark:bg-opacity-10 rounded-lg p-4">
+                    <div className="bg-background text-slate-800 bg-opacity-20 dark:bg-opacity-10 rounded-lg p-4">
                       <div className="font-bold mb-2">Immediate Actions:</div>
                       <ol className="space-y-1 text-slate-600 text-sm list-decimal list-inside">
                         <li>Enable GCP Cloud CDN (biggest impact!)</li>
@@ -1333,7 +1310,7 @@ const WMSCostBreakdown = () => {
                       </ul>
                     </div>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 // app/(dashboard)/packing/layout.tsx
+// Compact Segmented Control Approach
 "use client";
 
 import { ReactNode } from "react";
@@ -20,44 +21,59 @@ export default function PackingLayout({ children }: { children: ReactNode }) {
   const role = session?.user?.role;
   const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
 
+  const navItems = [
+    { href: "/dashboard/packing", label: "Assign", fullLabel: "Assign Orders" },
+    {
+      href: "/dashboard/packing/active",
+      label: "Active",
+      fullLabel: "Active Packing Tasks",
+    },
+    {
+      href: "/dashboard/packing/workload",
+      label: "Workload",
+      fullLabel: "Staff Workload",
+    },
+  ];
+
   return (
     <div>
       {isAdminOrManager && (
-        <div className="border-b bg-background mb-6">
-          <div className="max-w-7xl mx-auto px-6">
-            <nav className="flex gap-6">
-              <Link
-                href="/dashboard/packing"
-                className={`px-4 py-3 border-b-2 font-medium transition ${
-                  isActive("/dashboard/packing") &&
-                  !isActive("/dashboard/packing/active") &&
-                  !isActive("/dashboard/packing/workload")
-                    ? "border-gray-700 dark:border-gray-200"
-                    : "border-transparent hover:text-gray-900 dark:hover:text-gray-400 text-zinc-500"
-                }`}
-              >
-                Assign Orders
-              </Link>
-              <Link
-                href="/dashboard/packing/active"
-                className={`px-4 py-3 border-b-2 font-medium transition ${
-                  isActive("/dashboard/packing/active")
-                    ? "border-gray-700 dark:border-gray-200"
-                    : "border-transparent hover:text-gray-900 dark:hover:text-gray-400 text-zinc-500"
-                }`}
-              >
-                Active Packing Tasks
-              </Link>
-              <Link
-                href="/dashboard/packing/workload"
-                className={`px-4 py-3 border-b-2 font-medium transition ${
-                  isActive("/dashboard/packing/workload")
-                    ? "border-gray-700 dark:border-gray-200"
-                    : "border-transparent hover:text-gray-900 dark:hover:text-gray-400 text-zinc-500"
-                }`}
-              >
-                Staff Workload
-              </Link>
+        <div className="border-b bg-background mb-4 sm:mb-6">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+            {/* Mobile: Compact Segmented Control */}
+            <div className="sm:hidden">
+              <div className="inline-flex w-full bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex-1 px-3 py-2 text-sm font-medium text-center rounded-md transition ${
+                      isActive(item.href)
+                        ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Desktop: Tabs */}
+            <nav className="hidden sm:flex gap-6">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-4 py-3 border-b-2 font-medium transition ${
+                    isActive(item.href)
+                      ? "border-gray-700 dark:border-gray-200 text-gray-900 dark:text-white"
+                      : "border-transparent hover:text-gray-900 dark:hover:text-gray-400 text-zinc-500"
+                  }`}
+                >
+                  {item.fullLabel}
+                </Link>
+              ))}
             </nav>
           </div>
         </div>

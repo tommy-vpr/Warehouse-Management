@@ -15,11 +15,11 @@ export default function NotFound() {
         alt="Page not found"
         quality={80}
       />
-      <p className="text-muted-foreground mb-8">
+      <p className="text-muted-foreground my-8">
         Oops! The page you’re looking for doesn’t exist.
       </p>
       <Link href="/dashboard">
-        <button className="bg-amber-400 hover:bg-amber-500 text-white transition rounded-full py-2 px-6">
+        <button className="bg-orange-400 hover:bg-orange-500 text-white transition rounded-full py-2 px-6">
           Return to Dashboard
         </button>
       </Link>
