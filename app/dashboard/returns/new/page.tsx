@@ -10,6 +10,7 @@ import {
   ReturnReason,
   RefundMethod,
 } from "@/types/returns";
+import ButtonSpinningLoader from "@/components/ButtonSpinningLoader";
 
 // ✅ NEW: Return label type
 type ReturnLabel = {
@@ -236,14 +237,14 @@ export default function NewReturnPage() {
             <div
               className={`flex items-center ${
                 step === "lookup"
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "text-green-600 dark:text-green-400"
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "lookup"
-                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    ? "border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-950"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
               >
@@ -255,14 +256,14 @@ export default function NewReturnPage() {
             <div
               className={`flex items-center ${
                 step === "select-items" || step === "confirm"
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "text-green-600 dark:text-green-400"
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "select-items" || step === "confirm"
-                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    ? "border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-950"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
               >
@@ -274,14 +275,14 @@ export default function NewReturnPage() {
             <div
               className={`flex items-center ${
                 step === "complete"
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "text-green-600 dark:text-green-400"
                   : "text-gray-400 dark:text-gray-500"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
                   step === "complete"
-                    ? "border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950"
+                    ? "border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-950"
                     : "border-gray-300 dark:border-gray-600"
                 }`}
               >
@@ -362,7 +363,7 @@ export default function NewReturnPage() {
                 disabled={lookupLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition"
               >
-                {lookupLoading ? "Looking up..." : "Find Order"}
+                {lookupLoading ? <ButtonSpinningLoader /> : "Find Order"}
               </button>
             </form>
           </div>

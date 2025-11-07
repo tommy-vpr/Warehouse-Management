@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { PickListsTableSkeleton } from "@/components/skeleton/PickliststableSkeleton";
 
 interface PickList {
   id: string;
@@ -62,15 +63,15 @@ export default function PickListsDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ASSIGNED":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400";
+        return "rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-400";
       case "IN_PROGRESS":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400";
+        return "rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-800/30 dark:text-yellow-400";
       case "COMPLETED":
-        return "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400";
+        return "rounded-full bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400";
       case "CANCELLED":
-        return "bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400";
+        return "rounded-full bg-red-100 text-red-800 dark:bg-red-800/30 dark:text-red-400";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-600/30 dark:text-gray-400";
+        return "rounded-full bg-gray-100 text-gray-800 dark:bg-gray-600/30 dark:text-gray-400";
     }
   };
 
@@ -86,10 +87,7 @@ export default function PickListsDashboard() {
     <div className="space-y-6 p-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Pick Lists</span>
-            {isFiltering && <Loader2 className="w-5 h-5 animate-spin" />}
-          </CardTitle>
+          <CardTitle>Pick Lists</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Filter Buttons */}
@@ -161,65 +159,73 @@ export default function PickListsDashboard() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {pickLists.map((pickList) => (
-                  <tr
-                    key={pickList.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                  >
-                    <td className="px-4 py-4">
-                      <div className="font-medium">{pickList.batchNumber}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <Badge className={getStatusColor(pickList.status)}>
-                        {pickList.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm">
-                        {pickList.assignedUser?.name || "Unassigned"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium">
-                          {pickList.completionRate}%
+
+              {/* ✅ Show skeleton when filtering, otherwise show actual data */}
+              {isFiltering ? (
+                <PickListsTableSkeleton />
+              ) : (
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {pickLists.map((pickList) => (
+                    <tr
+                      key={pickList.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                    >
+                      <td className="px-4 py-4">
+                        <div className="font-medium">
+                          {pickList.batchNumber}
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-2">
-                          <div
-                            className="bg-green-200 dark:bg-green-600 h-2 rounded-full transition-all"
-                            style={{ width: `${pickList.completionRate}%` }}
-                          />
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge className={getStatusColor(pickList.status)}>
+                          {pickList.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm">
+                          {pickList.assignedUser?.name || "Unassigned"}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm">
-                        {pickList.pickedItems} / {pickList.totalItems}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {pickList.itemsRemaining} remaining
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="text-sm">
-                        {new Date(pickList.createdAt).toLocaleDateString()}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(pickList.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium">
+                            {pickList.completionRate}%
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-2">
+                            <div
+                              className="bg-green-200 dark:bg-green-600 h-2 rounded-full transition-all"
+                              style={{ width: `${pickList.completionRate}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm">
+                          {pickList.pickedItems} / {pickList.totalItems}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {pickList.itemsRemaining} remaining
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm">
+                          {new Date(pickList.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(pickList.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              )}
             </table>
 
             {pickLists.length === 0 && !isFiltering && (
               <div className="text-center py-12">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-2">
                   No pick lists found
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">

@@ -124,7 +124,7 @@ export default function SignUp() {
     <div className="flex items-center justify-center">
       <Card
         className="w-full max-w-md 
-             bg-white/10 backdrop-blur-xl 
+             text-sm bg-white/10 backdrop-blur-xl 
              border border-white/20 
              shadow-xl rounded-2xl 
              text-gray-100"
@@ -146,22 +146,22 @@ export default function SignUp() {
 
         <CardContent className="space-y-4">
           {error && (
-            <div className="flex items-center space-x-2 text-red-300 bg-red-500/10 p-3 rounded-md border border-red-500/30">
-              <AlertCircle className="h-4 w-4" />
+            <div className="flex items-start space-x-2 text-red-700 bg-red-200 p-3 rounded-md">
+              <AlertCircle className="h-6 w-6" />
               <span className="text-sm">{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="flex items-center space-x-2 text-green-300 bg-green-500/10 p-3 rounded-md border border-green-500/30">
-              <CheckCircle className="h-4 w-4" />
+            <div className="flex items-start space-x-2 text-green-700 bg-green-200 p-3 rounded-md">
+              <CheckCircle className="h-6 w-6" />
               <span className="text-sm">{success}</span>
             </div>
           )}
 
           {isRateLimited && (
-            <div className="flex items-center justify-center space-x-2 text-orange-400 bg-orange-700/10 p-3 rounded-md border border-orange-400">
-              <Clock className="h-4 w-4 flex-shrink-0" />
+            <div className="flex items-start space-x-2 text-orange-700 bg-orange-200 p-3 rounded-md">
+              <Clock className="h-6 w-6 flex-shrink-0" />
               <span className="text-sm font-medium">
                 Try again in {formatCountdown(countdown)}
               </span>
@@ -182,7 +182,7 @@ export default function SignUp() {
                 onChange={handleInputChange}
                 required
                 disabled={isLoading || success !== "" || !!isRateLimited}
-                className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
+                className="text-sm bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
                      focus:ring-2 focus:ring-blue-400 focus:outline-none
                      disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -196,12 +196,12 @@ export default function SignUp() {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="name@company.com"
+                placeholder="Name@company.com"
                 value={formData.email}
                 onChange={handleInputChange}
                 required
                 disabled={isLoading || success !== "" || !!isRateLimited}
-                className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
+                className="text-sm bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
                      focus:ring-2 focus:ring-blue-400 focus:outline-none
                      disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -221,7 +221,7 @@ export default function SignUp() {
                 required
                 disabled={isLoading || success !== "" || !!isRateLimited}
                 minLength={6}
-                className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
+                className="text-sm bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
                      focus:ring-2 focus:ring-blue-400 focus:outline-none
                      disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -241,7 +241,7 @@ export default function SignUp() {
                 required
                 disabled={isLoading || success !== "" || !!isRateLimited}
                 minLength={6}
-                className={`bg-white/10 border text-white placeholder:text-zinc-400
+                className={`text-sm bg-white/10 border text-white placeholder:text-zinc-400
                      focus:ring-2 focus:outline-none
                      disabled:opacity-50 disabled:cursor-not-allowed
                      ${

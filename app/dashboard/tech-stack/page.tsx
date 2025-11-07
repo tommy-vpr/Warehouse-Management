@@ -139,7 +139,7 @@ const WMSCostBreakdown = () => {
               <div className="text-sm text-blue-200 dark:text-blue-300">
                 Estimated Monthly Cost
               </div>
-              <div className="text-2xl md:text-5xl font-bold">
+              <div className="text-2xl md:text-4xl font-bold">
                 ${costs.total.toFixed(2)}
               </div>
             </div>
@@ -161,7 +161,7 @@ const WMSCostBreakdown = () => {
               }`}
             >
               {tab === "wms-setup"
-                ? "WMS Setup"
+                ? "Our Setup"
                 : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
@@ -173,6 +173,298 @@ const WMSCostBreakdown = () => {
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="space-y-6">
+            {/* What Each Technology Does - NEW SECTION */}
+            <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg dark:shadow-zinc-900/50 p-6 border border-gray-200 dark:border-zinc-700">
+              <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">
+                What Each Technology Does in Our WMS
+              </h3>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Supabase */}
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 border-2 border-green-200 dark:border-green-800">
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3">
+                      S
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-slate-800 dark:text-white">
+                        Supabase
+                      </h4>
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        Backend Infrastructure
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        PostgreSQL Database
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Stores all WMS data: orders, inventory, products, staff,
+                        warehouse locations, cycle counts, purchase orders
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Authentication & Authorization
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        User login, email verification, role-based permissions
+                        (admin, warehouse staff, managers)
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Real-time Subscriptions
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Live updates for order status changes, inventory
+                        movements, staff assignments via Ably integration
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Edge Functions
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Server-side logic for webhooks (Shopify sync), API
+                        integrations (ShipEngine, Inventory Planner)
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Row-Level Security
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Ensures warehouse staff only see assigned tasks, admins
+                        see everything
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Google Cloud Platform */}
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 border-2 border-red-200 dark:border-red-800">
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3">
+                      G
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-slate-800 dark:text-white">
+                        Google Cloud
+                      </h4>
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        File Storage & CDN
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Product Images
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        High-res photos of products for picking, packing
+                        verification, and customer returns
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Shipping Labels
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Generated label PDFs from ShipEngine, stored for
+                        reprinting and record-keeping
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Documents & Invoices
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Packing slips, commercial invoices, return labels,
+                        barcode sheets for cycle counts
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Package Photos
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Proof-of-pack images taken by warehouse staff before
+                        shipping
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Fast Delivery
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Cloud Storage CDN ensures images load quickly for mobile
+                        devices in warehouse
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vercel */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border-2 border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-3">
+                      V
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-slate-800 dark:text-white">
+                        Vercel Pro
+                      </h4>
+                      <p className="text-sm text-blue-600 dark:text-blue-400">
+                        Frontend Hosting
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Next.js Application
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Hosts entire WMS web application with server-side
+                        rendering for optimal performance
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Global Edge Network
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Fast loading times worldwide with automatic CDN
+                        distribution
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Instant Deployments
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Push code changes live in seconds with automatic builds
+                        and preview URLs
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Mobile-Responsive UI
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        Warehouse staff use Zebra TC22 devices to scan barcodes,
+                        update inventory, and process orders
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Serverless Functions
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        API routes for processing data, generating reports, and
+                        handling webhooks
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-white mb-1">
+                        Team Collaboration
+                      </div>
+                      <p className="text-slate-600 dark:text-gray-400">
+                        $20/seat allows multiple developers to deploy and manage
+                        the application
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* How They Work Together */}
+              <div className="mt-6 p-6 bg-slate-50 dark:bg-slate-900/20 rounded-lg border-2 border-slate-300 dark:border-slate-700">
+                <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-3">
+                  How They Work Together
+                </h4>
+                <div className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
+                  <p>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      Vercel
+                    </span>{" "}
+                    hosts the Next.js frontend that warehouse staff interact
+                    with on their devices →
+                  </p>
+                  <p>
+                    <span className="font-semibold text-green-600 dark:text-green-400">
+                      Supabase
+                    </span>{" "}
+                    provides the database, authentication, and real-time
+                    features to manage all WMS operations →
+                  </p>
+                  <p>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      GCP
+                    </span>{" "}
+                    stores all images and documents, delivering them quickly
+                    when staff need to verify products or print labels
+                  </p>
+                  <div className="mt-4 p-3 bg-white dark:bg-zinc-900/30 rounded border border-gray-300 dark:border-zinc-700">
+                    <p className="text-slate-800 dark:text-white font-semibold">
+                      Example: Processing an Order
+                    </p>
+                    <ol className="list-decimal list-inside mt-2 space-y-1 text-slate-600 dark:text-gray-400">
+                      <li>
+                        Order comes from Shopify →{" "}
+                        <span className="font-semibold">Supabase</span> webhook
+                        stores it
+                      </li>
+                      <li>
+                        Warehouse staff opens{" "}
+                        <span className="font-semibold">Vercel</span> app on
+                        Zebra device
+                      </li>
+                      <li>
+                        Staff scans barcode →{" "}
+                        <span className="font-semibold">Supabase</span> updates
+                        inventory
+                      </li>
+                      <li>
+                        Product images load from{" "}
+                        <span className="font-semibold">GCP</span> for
+                        verification
+                      </li>
+                      <li>
+                        Shipping label generates → stored in{" "}
+                        <span className="font-semibold">GCP</span>, printed from
+                        app
+                      </li>
+                      <li>
+                        Real-time update via{" "}
+                        <span className="font-semibold">Supabase</span> notifies
+                        everyone order shipped
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
             {/* Current Cost Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Pie Chart */}
@@ -665,652 +957,6 @@ const WMSCostBreakdown = () => {
                     11.7 cents per order
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Bandwidth Optimization Best Practices */}
-            <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-lg dark:shadow-zinc-900/50 p-6 border border-gray-200 dark:border-zinc-700">
-              <div className="flex items-center mb-6">
-                <h4 className="text-2xl font-bold text-slate-800 dark:text-white">
-                  Bandwidth Optimization Best Practices
-                </h4>
-              </div>
-
-              <div className="space-y-6">
-                {/* Vercel Bandwidth */}
-                <div className="border-2 border-blue-500 dark:border-blue-600 rounded-lg p-6 bg-blue-50 dark:bg-blue-900/20">
-                  <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    Vercel Bandwidth Optimization
-                  </h5>
-
-                  <div className="mb-4 p-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="font-semibold text-slate-800 dark:text-white mb-2">
-                      Current Usage Estimate:
-                    </div>
-                    <div className="text-sm text-slate-600 dark:text-gray-400">
-                      • 400 orders/month × 20MB ={" "}
-                      <strong className="text-slate-800 dark:text-white">
-                        8GB/month
-                      </strong>
-                      <br />• Included:{" "}
-                      <strong className="text-slate-800 dark:text-white">
-                        1,000GB (1TB)
-                      </strong>{" "}
-                      per seat
-                      <br />• Status:{" "}
-                      <strong className="text-green-600 dark:text-green-400">
-                        Well within limits!
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        1. Optimize Images
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Use Next.js Image component:
-                            </strong>{" "}
-                            Automatic optimization, lazy loading
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Enable WebP format:
-                            </strong>{" "}
-                            25-35% smaller than JPEG
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Responsive images:
-                            </strong>{" "}
-                            Serve different sizes per device
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Set quality to 75-80:
-                            </strong>{" "}
-                            Barely noticeable difference
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> Reduce image bandwidth by
-                        50-70%
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        2. Code Splitting
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Dynamic imports:
-                            </strong>{" "}
-                            Load components on demand
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Route-based splitting:
-                            </strong>{" "}
-                            Automatic in Next.js
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Tree shaking:
-                            </strong>{" "}
-                            Remove unused code
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Bundle analysis:
-                            </strong>{" "}
-                            Use @next/bundle-analyzer
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> Reduce JS bundle size by
-                        30-50%
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        3. Caching Strategy
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Static assets:
-                            </strong>{" "}
-                            Cache-Control: public, max-age=31536000
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              API responses:
-                            </strong>{" "}
-                            Use stale-while-revalidate
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              ISR for pages:
-                            </strong>{" "}
-                            Incremental Static Regeneration
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              CDN at edge:
-                            </strong>{" "}
-                            Vercel Edge Network handles this
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> Reduce repeat bandwidth by
-                        60-80%
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        4. Compression
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Brotli compression:
-                            </strong>{" "}
-                            Automatic on Vercel (20% better than gzip)
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Minify CSS/JS:
-                            </strong>{" "}
-                            Next.js does this automatically
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Remove source maps:
-                            </strong>{" "}
-                            In production builds
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 dark:text-blue-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Compress fonts:
-                            </strong>{" "}
-                            Use woff2 format
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> Already enabled! Free
-                        compression
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* GCP Bandwidth */}
-                <div className="border-2 border-red-500 dark:border-red-600 rounded-lg p-6 bg-red-50 dark:bg-red-900/20">
-                  <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    GCP Egress Optimization
-                  </h5>
-
-                  <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
-                    <div className="font-semibold text-slate-800 dark:text-white mb-2">
-                      ⚠️ This is our biggest cost driver!
-                    </div>
-                    <div className="text-sm text-slate-600 dark:text-gray-400">
-                      GCP egress is{" "}
-                      <strong className="text-slate-800 dark:text-white">
-                        89% of the GCP costs
-                      </strong>{" "}
-                      ($0.24 out of $0.27)
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        1. Enable Cloud CDN
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Cache at edge:
-                            </strong>{" "}
-                            Serve from Google's global network
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Reduce origin hits:
-                            </strong>{" "}
-                            70-90% reduction in egress
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Set cache headers:
-                            </strong>{" "}
-                            Cache-Control for images
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Cost:
-                            </strong>{" "}
-                            $0.04-0.08/GB (vs $0.12/GB egress)
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> $0.16-0.20/month (67-74%
-                        reduction!)
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        2. Image Optimization
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Compress before upload:
-                            </strong>{" "}
-                            Use imagemin or sharp
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Target 100-200KB per image:
-                            </strong>{" "}
-                            Instead of 400KB
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Use WebP/AVIF:
-                            </strong>{" "}
-                            30-50% smaller than JPEG
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Generate thumbnails:
-                            </strong>{" "}
-                            Serve smaller versions in lists
-                          </span>
-                        </li>
-                      </ul>
-                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/30 rounded text-xs border border-green-200 dark:border-green-800">
-                        <strong>Savings:</strong> Cut egress in half!
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        3. Signed URLs & Caching
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Use signed URLs:
-                            </strong>{" "}
-                            Enable CDN caching with security
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Long TTL for images:
-                            </strong>{" "}
-                            1 year cache for product photos
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Browser caching:
-                            </strong>{" "}
-                            Set cache headers properly
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        4. Lazy Loading
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Load on demand:
-                            </strong>{" "}
-                            Only fetch images when visible
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Intersection Observer:
-                            </strong>{" "}
-                            Load as user scrolls
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-red-600 dark:text-red-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Loading="lazy":
-                            </strong>{" "}
-                            Native browser lazy loading
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Supabase Bandwidth */}
-                <div className="border-2 border-green-500 dark:border-green-600 rounded-lg p-6 bg-green-50 dark:bg-green-900/20">
-                  <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    Supabase Bandwidth Optimization
-                  </h5>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        Query Optimization
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Select specific columns:
-                            </strong>{" "}
-                            .select('id, name') not .select('*')
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Paginate results:
-                            </strong>{" "}
-                            Limit to 50-100 per query
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Use count():
-                            </strong>{" "}
-                            Instead of fetching all rows
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-3">
-                        Frontend Caching
-                      </h6>
-                      <ul className="space-y-2 text-sm text-slate-600 dark:text-gray-400">
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              React Query / SWR:
-                            </strong>{" "}
-                            Cache API responses
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Dedupe requests:
-                            </strong>{" "}
-                            Automatic with SWR
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-green-600 dark:text-green-400 mr-2">
-                            ✓
-                          </span>
-                          <span>
-                            <strong className="text-slate-800 dark:text-white">
-                              Stale-while-revalidate:
-                            </strong>{" "}
-                            Instant UI updates
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monitoring & Alerts */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg p-6">
-                  <h5 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center">
-                    Monitoring & Alerts
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-2">
-                        Vercel
-                      </h6>
-                      <ul className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
-                        <li>• Analytics dashboard</li>
-                        <li>• Spend Management (enabled by default)</li>
-                        <li>• Set budget alerts at 50%, 75%, 90%</li>
-                        <li>• Default $200/month limit</li>
-                      </ul>
-                    </div>
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-2">
-                        GCP
-                      </h6>
-                      <ul className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
-                        <li>• Cloud Monitoring</li>
-                        <li>• Budget alerts in Billing</li>
-                        <li>• Track egress by bucket</li>
-                        <li>• Set up usage quotas</li>
-                      </ul>
-                    </div>
-                    <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-gray-200 dark:border-zinc-700">
-                      <h6 className="font-semibold text-slate-800 dark:text-white mb-2">
-                        Supabase
-                      </h6>
-                      <ul className="space-y-1 text-sm text-slate-600 dark:text-gray-400">
-                        <li>• Usage dashboard</li>
-                        <li>• Bandwidth graphs</li>
-                        <li>• Email alerts at 80%</li>
-                        <li>• API analytics</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Wins */}
-                {/* <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-800 text-white rounded-lg p-6">
-                  <h5 className="text-xl font-bold mb-4">
-                    Quick Wins (Do These First!)
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-background text-slate-800 bg-opacity-20 dark:bg-opacity-10 rounded-lg p-4">
-                      <div className="font-bold mb-2">Immediate Actions:</div>
-                      <ol className="space-y-1 text-slate-600 text-sm list-decimal list-inside">
-                        <li>Enable GCP Cloud CDN (biggest impact!)</li>
-                        <li>Use Next.js Image component everywhere</li>
-                        <li>Compress images before upload (imagemin)</li>
-                        <li>Set proper Cache-Control headers</li>
-                      </ol>
-                    </div>
-                    <div className="bg-white text-slate-800 bg-opacity-20 dark:bg-opacity-10 rounded-lg p-4">
-                      <div className="font-bold mb-2">Expected Savings:</div>
-                      <ul className="space-y-1 text-sm text-slate-600">
-                        <li>
-                          • GCP egress: <strong>-$0.16/month (67%)</strong>
-                        </li>
-                        <li>• Vercel bandwidth: Already optimized ✓</li>
-                        <li>
-                          • Supabase: <strong>-$0.01/month</strong>
-                        </li>
-                        <li>
-                          • <strong>Total: Save ~$0.17/month</strong>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div> */}
               </div>
             </div>
           </div>

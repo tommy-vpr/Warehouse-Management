@@ -34,6 +34,8 @@ export async function GET(
             productVariant: {
               select: {
                 sku: true,
+                upc: true, // ✅ ADD: UPC for barcode scanning
+                barcode: true, // ✅ ADD: Alternative barcode field
                 name: true,
                 costPrice: true,
                 sellingPrice: true,
@@ -85,9 +87,10 @@ export async function GET(
         .length,
       skippedItems: pickList.items.filter((item) => item.status === "SKIPPED")
         .length,
-      estimatedTimeRemaining: Math.ceil(
-        (pickList.totalItems - pickList.pickedItems) * 1.5
-      ), // 1.5 min per item
+
+      // ✅ UPDATED: Smart time calculation
+      estimatedTimeRemaining: calculateTimeRemaining(pickList),
+
       uniqueOrders: [
         ...new Set(pickList.items.map((item) => item.order.orderNumber)),
       ],
@@ -102,6 +105,19 @@ export async function GET(
       ),
     };
 
+    // Add helper function above or below the GET function
+    function calculateTimeRemaining(pickList: any) {
+      if (!pickList.startTime || pickList.pickedItems === 0) {
+        return Math.ceil((pickList.totalItems - pickList.pickedItems) * 1.5);
+      }
+
+      const elapsedMs = Date.now() - new Date(pickList.startTime).getTime();
+      const elapsedMinutes = elapsedMs / (1000 * 60);
+      const actualRatePerItem = elapsedMinutes / pickList.pickedItems;
+      const itemsRemaining = pickList.totalItems - pickList.pickedItems;
+
+      return Math.ceil(itemsRemaining * actualRatePerItem);
+    }
     return NextResponse.json({
       pickList: {
         id: pickList.id,
@@ -122,6 +138,8 @@ export async function GET(
         order: item.order,
         product: {
           sku: item.productVariant.sku,
+          upc: item.productVariant.upc, // ✅ ADD: UPC for scanning
+          barcode: item.productVariant.barcode, // ✅ ADD: Alternative barcode
           name: item.productVariant.name,
           costPrice: item.productVariant.costPrice,
           sellingPrice: item.productVariant.sellingPrice,

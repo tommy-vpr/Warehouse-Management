@@ -137,12 +137,12 @@ export default function SignIn() {
               <Input
                 id="email"
                 type="email"
-                placeholder="name@company.com"
+                placeholder="Name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading || !!isRateLimited}
-                className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400
+                className="text-sm bg-white/10 border border-white/20 text-white placeholder:text-gray-400
                      focus:ring-2 focus:ring-blue-400 focus:outline-none
                      disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -161,7 +161,7 @@ export default function SignIn() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading || !!isRateLimited}
-                  className="bg-white/10 border border-white/20 text-white placeholder:text-gray-400
+                  className="text-sm bg-white/10 border border-white/20 text-white placeholder:text-gray-400
                        focus:ring-2 focus:ring-blue-400 focus:outline-none
                        disabled:opacity-50 disabled:cursor-not-allowed"
                 />
@@ -183,7 +183,7 @@ export default function SignIn() {
 
             <Button
               type="submit"
-              className="cursor-pointer w-full bg-gradient-to-r from-blue-600 to-violet-600 
+              className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-violet-500 
                    text-white font-semibold rounded-xl py-2 
                    hover:shadow-[0_0_20px_rgba(59,130,246,0.6)] 
                    transition-all duration-300

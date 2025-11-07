@@ -1,3 +1,4 @@
+// app/api/orders/management/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
@@ -17,7 +18,6 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    // ✅ NEW: Get pagination parameters
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
@@ -48,7 +48,6 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // ✅ NEW: Get total count for pagination
     const totalCount = await prisma.order.count({ where: whereClause });
     const totalPages = Math.ceil(totalCount / limit);
 
@@ -73,6 +72,8 @@ export async function GET(request: NextRequest) {
                 batchNumber: true,
                 status: true,
                 startTime: true,
+                pickedItems: true, // ✅ ADD: Number of items picked
+                totalItems: true, // ✅ ADD: Total items in pick list
                 assignedUser: {
                   select: { name: true },
                 },
@@ -82,8 +83,8 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: [{ createdAt: "desc" }],
-      skip, // ✅ NEW: Use pagination
-      take: limit, // ✅ NEW: Use limit from params
+      skip,
+      take: limit,
     });
 
     // Transform orders for management view
@@ -105,6 +106,7 @@ export async function GET(request: NextRequest) {
         (pli) => pli.orderId === order.id
       );
 
+      // ✅ UPDATED: Include picked items and total items
       const pickListInfo = pickListItem?.pickList
         ? {
             pickListId: pickListItem.pickList.id,
@@ -112,11 +114,19 @@ export async function GET(request: NextRequest) {
             pickStatus: pickListItem.pickList.status,
             assignedTo: pickListItem.pickList.assignedUser?.name,
             startTime: pickListItem.pickList.startTime,
+            pickedItems: pickListItem.pickList.pickedItems || 0,
+            totalItems: pickListItem.pickList.totalItems || 0,
+            hasStarted:
+              !!pickListItem.pickList.startTime ||
+              (pickListItem.pickList.pickedItems || 0) > 0,
           }
         : null;
 
-      // Determine next actions based on status
-      const getNextActions = (status: string) => {
+      // ✅ UPDATED: Determine next actions with smart button labels
+      const getNextActions = (
+        status: string,
+        pickInfo: typeof pickListInfo
+      ) => {
         switch (status) {
           case "PENDING":
             return [
@@ -140,15 +150,16 @@ export async function GET(request: NextRequest) {
               },
             ];
           case "PICKING":
+            const hasStarted = pickInfo?.hasStarted || false;
             return [
               {
                 action: "VIEW_PICK_PROGRESS",
-                label: "View Pick Progress",
+                label: "View Progress",
                 variant: "default",
               },
               {
                 action: "MOBILE_PICK",
-                label: "Start Pick",
+                label: hasStarted ? "Continue Picking" : "Start Picking",
                 variant: "outline",
               },
             ];
@@ -231,7 +242,7 @@ export async function GET(request: NextRequest) {
           country: shippingAddr?.country_code || "US",
         },
         pickListInfo,
-        nextActions: getNextActions(order.status),
+        nextActions: getNextActions(order.status, pickListInfo),
         items: order.items.map((item) => ({
           id: item.id,
           productName: item.productVariant.product?.name || "Unnamed Product",
@@ -259,14 +270,13 @@ export async function GET(request: NextRequest) {
       high: managementOrders.filter((o) => o.priority === "HIGH").length,
     };
 
-    // ✅ NEW: Return with pagination metadata
     return NextResponse.json({
       success: true,
       orders: managementOrders,
       stats,
-      totalCount, // ✅ NEW
-      totalPages, // ✅ NEW
-      currentPage: page, // ✅ NEW
+      totalCount,
+      totalPages,
+      currentPage: page,
       filters: {
         status: status || "ALL",
         search: search || "",
@@ -301,6 +311,11 @@ export async function GET(request: NextRequest) {
 //     const dateFrom = searchParams.get("dateFrom");
 //     const dateTo = searchParams.get("dateTo");
 
+//     // ✅ NEW: Get pagination parameters
+//     const page = parseInt(searchParams.get("page") || "1");
+//     const limit = parseInt(searchParams.get("limit") || "20");
+//     const skip = (page - 1) * limit;
+
 //     // Build dynamic where clause
 //     const whereClause: any = {};
 
@@ -326,6 +341,10 @@ export async function GET(request: NextRequest) {
 //         lte: new Date(dateTo),
 //       };
 //     }
+
+//     // ✅ NEW: Get total count for pagination
+//     const totalCount = await prisma.order.count({ where: whereClause });
+//     const totalPages = Math.ceil(totalCount / limit);
 
 //     // Get orders with related data
 //     const orders = await prisma.order.findMany({
@@ -357,7 +376,8 @@ export async function GET(request: NextRequest) {
 //         },
 //       },
 //       orderBy: [{ createdAt: "desc" }],
-//       take: 100, // Limit for performance
+//       skip, // ✅ NEW: Use pagination
+//       take: limit, // ✅ NEW: Use limit from params
 //     });
 
 //     // Transform orders for management view
@@ -422,7 +442,7 @@ export async function GET(request: NextRequest) {
 //               },
 //               {
 //                 action: "MOBILE_PICK",
-//                 label: "Go to Mobile",
+//                 label: "Start Pick",
 //                 variant: "outline",
 //               },
 //             ];
@@ -533,10 +553,14 @@ export async function GET(request: NextRequest) {
 //       high: managementOrders.filter((o) => o.priority === "HIGH").length,
 //     };
 
+//     // ✅ NEW: Return with pagination metadata
 //     return NextResponse.json({
 //       success: true,
 //       orders: managementOrders,
 //       stats,
+//       totalCount, // ✅ NEW
+//       totalPages, // ✅ NEW
+//       currentPage: page, // ✅ NEW
 //       filters: {
 //         status: status || "ALL",
 //         search: search || "",

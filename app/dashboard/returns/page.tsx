@@ -488,7 +488,7 @@ export default function ReturnsDashboard() {
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         {returnOrder.order.orderNumber}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-zinc-500">
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {returnOrder.reason.replace(/_/g, " ")}
                       </td>
                       <td className="px-6 py-4">

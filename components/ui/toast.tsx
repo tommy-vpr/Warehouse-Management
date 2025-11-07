@@ -23,14 +23,6 @@ const ToastViewport = React.forwardRef<
   />
 ));
 
-// const icons = {
-//   success: "✅",
-//   info: "ℹ️",
-//   warning: "⚠️",
-//   destructive: "❌",
-//   default: "",
-// };
-
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName;
 
 const toastVariants = cva(

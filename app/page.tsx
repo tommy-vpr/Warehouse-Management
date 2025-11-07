@@ -25,7 +25,7 @@ const Page = () => {
         alt="HQ logo"
       />
 
-      <div className="w-full max-w-[1400px] flex flex-col lg:flex-row items-center gap-8 lg:gap-4">
+      <div className="w-full max-w-[1400px] flex flex-col-reverse lg:flex-row items-center gap-8 lg:gap-4">
         {/* Left Section with AnimatePresence */}
         <div className="w-full lg:w-1/2 xl:w-1/3 p-4 md:p-8 flex flex-col overflow-hidden">
           <AnimatePresence mode="wait">
@@ -38,10 +38,10 @@ const Page = () => {
                 transition={{ duration: 0.4 }}
                 className="flex flex-col"
               >
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-gray-100 mb-6 md:mb-12 font-semibold">
+                <h1 className="hidden sm:inline-block text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-gray-100 mb-6 md:mb-12 font-semibold">
                   Warehouse Management System
                 </h1>
-                <p className="text-sm md:text-base text-gray-200 mb-6">
+                <p className="hidden sm:inline-block text-sm md:text-base text-gray-200 mb-6">
                   Streamline your operations with our modern Warehouse
                   Management System. From real-time inventory tracking to
                   automated order fulfillment and smart reporting, manage your

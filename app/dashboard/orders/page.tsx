@@ -55,6 +55,17 @@ interface NextAction {
   variant: "default" | "outline" | "destructive";
 }
 
+interface PickListInfo {
+  pickListId: string;
+  batchNumber: string;
+  pickStatus: string;
+  assignedTo?: string;
+  startTime?: string;
+  pickedItems: number; // ✅ NEW
+  totalItems: number; // ✅ NEW
+  hasStarted: boolean; // ✅ NEW
+}
+
 interface ManagementOrder {
   id: string;
   orderNumber: string;
@@ -73,13 +84,7 @@ interface ManagementOrder {
     state: string;
     country: string;
   };
-  pickListInfo?: {
-    pickListId: string;
-    batchNumber: string;
-    pickStatus: string;
-    assignedTo?: string;
-    startTime?: string;
-  };
+  pickListInfo?: PickListInfo;
   nextActions: NextAction[];
   items: OrderItem[];
 }
@@ -267,9 +272,7 @@ export default function OrdersManagementDashboard() {
           description: "Inventory allocated successfully",
           variant: "success",
         });
-      }
-      // ✅ SIMPLIFIED: Call /api/picking/generate directly
-      else if (action === "GENERATE_SINGLE_PICK") {
+      } else if (action === "GENERATE_SINGLE_PICK") {
         const response = await fetch("/api/picking/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -292,9 +295,21 @@ export default function OrdersManagementDashboard() {
           description: `Pick list ${data.pickList.batchNumber} generated`,
           variant: "success",
         });
-      } else if (action === "VIEW_PICK_PROGRESS") {
-        // Navigate to picking dashboard
-        window.location.href = "/dashboard/picking";
+      }
+      // ✅ UPDATED: Navigate to progress view instead of generic picking dashboard
+      else if (action === "VIEW_PICK_PROGRESS") {
+        const order = orders.find((o) => o.id === orderId);
+        if (order?.pickListInfo?.pickListId) {
+          router.push(
+            `/dashboard/picking/progress/${order.pickListInfo.pickListId}`
+          );
+        } else {
+          toast({
+            title: "Error",
+            description: "No pick list found for this order",
+            variant: "destructive",
+          });
+        }
         return;
       } else if (action === "MOBILE_PICK") {
         const order = orders.find((o) => o.id === orderId);
@@ -311,15 +326,12 @@ export default function OrdersManagementDashboard() {
         }
         return;
       } else if (action === "PACK_ORDER") {
-        // Navigate to packing page
-        window.location.href = `/dashboard/packing/pack/${orderId}`;
+        router.push(`/dashboard/packing/pack/${orderId}`);
         return;
       } else if (action === "CREATE_LABEL") {
-        // Navigate to shipping label creation
-        window.location.href = `/dashboard/packing/pack/${orderId}`;
+        router.push(`/dashboard/packing/pack/${orderId}`);
         return;
       } else if (action === "MARK_FULFILLED") {
-        // Mark order as fulfilled
         const response = await fetch("/api/orders/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -338,8 +350,7 @@ export default function OrdersManagementDashboard() {
           variant: "success",
         });
       } else if (action === "VIEW_DETAILS" || action === "VIEW_TRACKING") {
-        // Navigate to order details
-        window.location.href = `/dashboard/orders/${orderId}`;
+        router.push(`/dashboard/orders/${orderId}`);
         return;
       } else {
         console.warn(`Unhandled action: ${action}`);
@@ -363,6 +374,127 @@ export default function OrdersManagementDashboard() {
       setLoadingAction(null);
     }
   };
+
+  // const handleOrderAction = async (action: string, orderId: string) => {
+  //   setLoadingAction({ orderId, action });
+
+  //   try {
+  //     if (action === "ALLOCATE") {
+  //       const response = await fetch("/api/orders/allocate", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ orderId, action: "check" }),
+  //       });
+
+  //       const data = await response.json();
+
+  //       if (!response.ok && data.error === "INSUFFICIENT_INVENTORY") {
+  //         const order = orders.find((o) => o.id === orderId);
+  //         setInsufficientModal({
+  //           items: data.insufficientItems,
+  //           orderNumber: order?.orderNumber || "",
+  //           orderId,
+  //         });
+  //         setLoadingAction(null);
+  //         return;
+  //       }
+
+  //       await refetch();
+  //       toast({
+  //         title: "Success",
+  //         description: "Inventory allocated successfully",
+  //         variant: "success",
+  //       });
+  //     }
+  //     else if (action === "GENERATE_SINGLE_PICK") {
+  //       const response = await fetch("/api/picking/generate", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({
+  //           orderIds: [orderId],
+  //           pickingStrategy: "SINGLE",
+  //           priority: "FIFO",
+  //         }),
+  //       });
+
+  //       const data = await response.json();
+
+  //       if (!response.ok) {
+  //         throw new Error(data.error || "Failed to generate pick list");
+  //       }
+
+  //       await refetch();
+  //       toast({
+  //         title: "Success",
+  //         description: `Pick list ${data.pickList.batchNumber} generated`,
+  //         variant: "success",
+  //       });
+  //     } else if (action === "VIEW_PICK_PROGRESS") {
+  //       window.location.href = "/dashboard/picking";
+  //       return;
+  //     } else if (action === "MOBILE_PICK") {
+  //       const order = orders.find((o) => o.id === orderId);
+  //       if (order?.pickListInfo?.pickListId) {
+  //         router.push(
+  //           `/dashboard/picking/mobile/${order.pickListInfo.pickListId}`
+  //         );
+  //       } else {
+  //         toast({
+  //           title: "Error",
+  //           description: "No pick list found for this order",
+  //           variant: "destructive",
+  //         });
+  //       }
+  //       return;
+  //     } else if (action === "PACK_ORDER") {
+  //       window.location.href = `/dashboard/packing/pack/${orderId}`;
+  //       return;
+  //     } else if (action === "CREATE_LABEL") {
+  //       window.location.href = `/dashboard/packing/pack/${orderId}`;
+  //       return;
+  //     } else if (action === "MARK_FULFILLED") {
+  //       const response = await fetch("/api/orders/actions", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ action: "MARK_FULFILLED", orderId }),
+  //       });
+
+  //       if (!response.ok) {
+  //         const errorData = await response.json();
+  //         throw new Error(errorData.error || "Failed to mark as fulfilled");
+  //       }
+
+  //       await refetch();
+  //       toast({
+  //         title: "Success",
+  //         description: "Order marked as fulfilled",
+  //         variant: "success",
+  //       });
+  //     } else if (action === "VIEW_DETAILS" || action === "VIEW_TRACKING") {
+  //       window.location.href = `/dashboard/orders/${orderId}`;
+  //       return;
+  //     } else {
+  //       console.warn(`Unhandled action: ${action}`);
+  //       toast({
+  //         title: "Info",
+  //         description: "This action is not yet implemented",
+  //         variant: "warning",
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error(`Failed to perform ${action}:`, error);
+  //     toast({
+  //       title: "Error",
+  //       description:
+  //         error instanceof Error
+  //           ? error.message
+  //           : `Failed to perform ${action}`,
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setLoadingAction(null);
+  //   }
+  // };
 
   const handleInsufficientAction = async (
     action: "count" | "backorder" | "cancel"
@@ -807,7 +939,7 @@ export default function OrdersManagementDashboard() {
                     <OrdersTableSkeleton />
                   ) : (
                     <tbody className="bg-background divide-y divide-gray-200 dark:divide-zinc-700">
-                      {orders.map((order) => (
+                      {/* {orders.map((order) => (
                         <React.Fragment key={order.id}>
                           <tr className="hover:bg-background">
                             <td className="px-4 py-4">
@@ -938,6 +1070,174 @@ export default function OrdersManagementDashboard() {
                                 href={`/dashboard/orders/${order.id}`}
                                 className="cursor-pointer text-xs dark:text-gray-200 
                                dark:hover:text-gray-100 transition flex items-center gap-2"
+                              >
+                                View
+                                <SquareArrowOutUpRight size={12} />
+                              </Link>
+                            </td>
+                          </tr>
+                        </React.Fragment>
+                      ))} */}
+                      {orders.map((order) => (
+                        <React.Fragment key={order.id}>
+                          <tr className="hover:bg-background">
+                            <td className="px-4 py-4">
+                              <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={selectedOrders.has(order.id)}
+                                onChange={() => toggleOrderSelection(order.id)}
+                              />
+                            </td>
+                            <td className="px-4 py-4">
+                              <div>
+                                <div className="font-medium">
+                                  {order.orderNumber}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {new Date(
+                                    order.createdAt
+                                  ).toLocaleDateString()}
+                                </div>
+                                {/* ✅ NEW: Enhanced pick list info with progress */}
+                                {order.pickListInfo && (
+                                  <div className="mt-1">
+                                    <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                                      <span>
+                                        Pick: {order.pickListInfo.batchNumber}
+                                      </span>
+                                      {order.pickListInfo.hasStarted && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {order.pickListInfo.pickedItems}/
+                                          {order.pickListInfo.totalItems}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {/* Mini progress bar */}
+                                    {order.pickListInfo.totalItems > 0 && (
+                                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-1">
+                                        <div
+                                          className="bg-blue-600 h-1 rounded-full transition-all"
+                                          style={{
+                                            width: `${
+                                              (order.pickListInfo.pickedItems /
+                                                order.pickListInfo.totalItems) *
+                                              100
+                                            }%`,
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div>
+                                <div className="font-medium">
+                                  {order.customerName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {order.customerEmail}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge
+                                className={getStatusColor(
+                                  order.status as OrderStatus
+                                )}
+                              >
+                                {order.status.replace("_", " ")}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div>
+                                <div className="text-sm">
+                                  {order.items.reduce(
+                                    (sum, item) => sum + item.quantity,
+                                    0
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="text-sm">
+                                ${order.totalAmount}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="text-sm">
+                                <div>{order.shippingLocation.city}</div>
+                                <div className="text-gray-500">
+                                  {order.shippingLocation.state}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex gap-1 flex-wrap">
+                                {order.nextActions
+                                  .slice(0, 2)
+                                  .map((action, index) => {
+                                    const isLoading = isActionLoading(
+                                      order.id,
+                                      action.action
+                                    );
+
+                                    return (
+                                      <Button
+                                        key={index}
+                                        variant={action.variant}
+                                        size="sm"
+                                        onClick={() =>
+                                          handleOrderAction(
+                                            action.action,
+                                            order.id
+                                          )
+                                        }
+                                        disabled={
+                                          isLoading ||
+                                          loadingAction !== null ||
+                                          orderActionMutation.isPending
+                                        }
+                                        className="text-xs px-2 py-1 cursor-pointer"
+                                      >
+                                        {isLoading ? (
+                                          <>
+                                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                            {action.label}...
+                                          </>
+                                        ) : (
+                                          action.label
+                                        )}
+                                      </Button>
+                                    );
+                                  })}
+                                {order.nextActions.length > 2 && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleOrderAction(
+                                        "VIEW_DETAILS",
+                                        order.id
+                                      )
+                                    }
+                                    className="text-xs px-2 py-1 cursor-pointer"
+                                  >
+                                    +{order.nextActions.length - 2}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Link
+                                href={`/dashboard/orders/${order.id}`}
+                                className="cursor-pointer text-xs dark:text-gray-200 
+           dark:hover:text-gray-100 transition flex items-center gap-2"
                               >
                                 View
                                 <SquareArrowOutUpRight size={12} />

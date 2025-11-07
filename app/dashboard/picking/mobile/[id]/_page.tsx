@@ -1,8 +1,6 @@
-// Added scan confirm product before picking
-
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,9 +20,6 @@ import {
   Home,
   RefreshCw,
   Loader2,
-  ScanBarcode,
-  Check,
-  XCircle,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -43,8 +38,6 @@ interface PickListItem {
     sku: string;
     name: string;
     sellingPrice: string;
-    upc?: string; // ✅ ADD: UPC/barcode field
-    barcode?: string; // ✅ ADD: Alternative barcode field
   };
   location: {
     name: string;
@@ -114,8 +107,8 @@ const usePickList = (id: string) => {
   return useQuery({
     queryKey: ["pickList", id],
     queryFn: () => fetchPickList(id),
-    staleTime: 10 * 1000,
-    refetchInterval: 30 * 1000,
+    staleTime: 10 * 1000, // 10 seconds for picking operations
+    refetchInterval: 30 * 1000, // Auto-refresh every 30 seconds
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: 3,
@@ -129,6 +122,7 @@ const usePickAction = () => {
   return useMutation({
     mutationFn: performPickAction,
     onSuccess: (data, variables) => {
+      // Invalidate and refetch the pick list to get updated status
       queryClient.invalidateQueries({ queryKey: ["pickList"] });
     },
     onError: (error) => {
@@ -137,6 +131,8 @@ const usePickAction = () => {
   });
 };
 
+// Removed useStartPickList - API auto-starts on first pick
+
 export default function MobilePickingInterface() {
   const { id } = useParams<{ id: string }>();
   const [currentItemIndex, setCurrentItemIndex] = useState(0);
@@ -144,14 +140,9 @@ export default function MobilePickingInterface() {
   const [shortPickQuantity, setShortPickQuantity] = useState("");
   const [shortPickReason, setShortPickReason] = useState("");
 
-  // ✅ NEW: Barcode scanning state
-  const [scannedBarcode, setScannedBarcode] = useState("");
-  const [isProductVerified, setIsProductVerified] = useState(false);
-  const [scanError, setScanError] = useState("");
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
-
   const router = useRouter();
 
+  // TanStack Query hooks
   const {
     data: pickList,
     isLoading,
@@ -162,6 +153,8 @@ export default function MobilePickingInterface() {
   } = usePickList(id);
 
   const pickActionMutation = usePickAction();
+
+  console.log(pickList);
 
   // Memoized calculations
   const { currentItem, pendingItems } = useMemo(() => {
@@ -176,58 +169,9 @@ export default function MobilePickingInterface() {
     };
   }, [pickList, currentItemIndex]);
 
-  // ✅ NEW: Reset verification when item changes
-  useEffect(() => {
-    setIsProductVerified(false);
-    setScannedBarcode("");
-    setScanError("");
+  console.log(pickList);
 
-    // Auto-focus barcode input when item changes
-    if (currentItem?.status === "PENDING") {
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 100);
-    }
-  }, [currentItemIndex, currentItem?.id]);
-
-  // ✅ NEW: Handle barcode scan
-  const handleBarcodeScan = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const scanned = e.target.value.trim();
-    setScannedBarcode(scanned);
-
-    if (!scanned) {
-      setScanError("");
-      setIsProductVerified(false);
-      return;
-    }
-
-    if (!currentItem) return;
-
-    // Get expected barcode/UPC from product
-    const expectedBarcode =
-      currentItem.product.upc ||
-      currentItem.product.barcode ||
-      currentItem.product.sku;
-
-    // Check if scanned code matches
-    if (scanned === expectedBarcode) {
-      setIsProductVerified(true);
-      setScanError("");
-    } else {
-      setIsProductVerified(false);
-      setScanError(`❌ Wrong product! Expected: ${expectedBarcode}`);
-    }
-  };
-
-  // ✅ NEW: Manual verification bypass (optional)
-  const handleManualVerify = () => {
-    if (confirm("Are you sure you want to proceed without scanning?")) {
-      setIsProductVerified(true);
-      setScanError("");
-    }
-  };
-
-  // Auto-advance to next pending item
+  // Auto-advance to next pending item when data updates
   React.useEffect(() => {
     if (!pickList) return;
 
@@ -236,6 +180,7 @@ export default function MobilePickingInterface() {
     );
 
     if (nextPendingIndex === -1) {
+      // No more pending items from current position, find first pending
       const firstPendingIndex = pickList.items.findIndex(
         (item) => item.status === "PENDING"
       );
@@ -253,13 +198,6 @@ export default function MobilePickingInterface() {
   ) => {
     if (!currentItem) return;
 
-    // ✅ NEW: Enforce verification for PICK and SHORT_PICK
-    if ((action === "PICK" || action === "SHORT_PICK") && !isProductVerified) {
-      alert("Please scan the product barcode first!");
-      barcodeInputRef.current?.focus();
-      return;
-    }
-
     try {
       await pickActionMutation.mutateAsync({
         itemId: currentItem.id,
@@ -270,17 +208,14 @@ export default function MobilePickingInterface() {
         notes: options.notes,
       });
 
+      // Close modal if short pick
       if (action === "SHORT_PICK") {
         setShowShortPickModal(false);
         setShortPickQuantity("");
         setShortPickReason("");
       }
-
-      // ✅ Reset verification for next item
-      setIsProductVerified(false);
-      setScannedBarcode("");
-      setScanError("");
     } catch (error) {
+      // Error is already logged in the mutation
       alert(
         `Failed to ${action.toLowerCase()}: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -322,6 +257,7 @@ export default function MobilePickingInterface() {
     });
   };
 
+  // Add this near the top of your component, after the useMemo
   const totalQuantityToPick = useMemo(() => {
     if (!pickList) return 0;
     return pickList.items.reduce((sum, item) => sum + item.quantityToPick, 0);
@@ -371,7 +307,7 @@ export default function MobilePickingInterface() {
     );
   }
 
-  if (!pickList || !currentItem) {
+  if (!pickList) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="text-center">
@@ -421,6 +357,17 @@ export default function MobilePickingInterface() {
     );
   }
 
+  if (!currentItem) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600">No current item available</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -442,7 +389,7 @@ export default function MobilePickingInterface() {
         </div>
       </div>
 
-      {/* Progress Bar Section */}
+      {/* Progress Bar Section - Update this */}
       <div className="bg-background border-b">
         <div className="max-w-md mx-auto px-4 py-3">
           <div className="flex justify-between text-sm mb-2">
@@ -459,6 +406,7 @@ export default function MobilePickingInterface() {
             />
           </div>
 
+          {/* ✅ ADD THIS: Show both task count AND unit count */}
           <div className="flex justify-between text-xs text-gray-500 mt-1">
             <span>
               Task {currentItemIndex + 1} of {pickList.items.length}
@@ -466,6 +414,7 @@ export default function MobilePickingInterface() {
             <span>{pendingItems.length} tasks remaining</span>
           </div>
 
+          {/* ✅ NEW: Show unit progress */}
           <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
             <span>
               Units: {totalQuantityPicked} / {totalQuantityToPick}
@@ -539,25 +488,13 @@ export default function MobilePickingInterface() {
                 <div>
                   <span className="text-gray-500">Price:</span>
                   <div className="font-medium">
-                    $
+                    {/* ${currentItem.product.sellingPrice} */}$
                     {Number.parseFloat(currentItem.order.totalAmount).toFixed(
                       2
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* ✅ NEW: Show expected barcode */}
-              {(currentItem.product.upc || currentItem.product.barcode) && (
-                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    Expected UPC:
-                  </span>
-                  <div className="font-mono font-bold text-blue-900 dark:text-blue-300">
-                    {currentItem.product.upc || currentItem.product.barcode}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Quantity */}
@@ -593,81 +530,14 @@ export default function MobilePickingInterface() {
           </CardContent>
         </Card>
 
-        {/* ✅ NEW: Barcode Scanning Section */}
-        {currentItem.status === "PENDING" && (
-          <Card className="mb-4">
-            <CardContent className="pt-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold flex items-center">
-                    <ScanBarcode className="w-4 h-4 mr-2" />
-                    Scan Product Barcode
-                  </label>
-                  {isProductVerified && (
-                    <Badge className="bg-green-100 text-green-800 dark:text-green-400 dark:bg-green-800/20">
-                      <Check className="w-3 h-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <Input
-                    ref={barcodeInputRef}
-                    type="text"
-                    value={scannedBarcode}
-                    onChange={handleBarcodeScan}
-                    placeholder="Scan or enter UPC code..."
-                    className={`bg-white text-xs md:text-sm font-mono ${
-                      isProductVerified
-                        ? "border-green-500 bg-green-50 dark:bg-green-900/20"
-                        : scanError
-                        ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                        : ""
-                    }`}
-                    disabled={pickActionMutation.isPending}
-                  />
-                  {isProductVerified && (
-                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-600" />
-                  )}
-                  {scanError && (
-                    <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-600" />
-                  )}
-                </div>
-
-                {scanError && (
-                  <p className="text-sm text-red-600 font-medium">
-                    {scanError}
-                  </p>
-                )}
-
-                {!isProductVerified && (
-                  <Button
-                    onClick={handleManualVerify}
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs"
-                  >
-                    Skip Scan (Manual Verify)
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Action Buttons */}
         {currentItem.status === "PENDING" && (
           <div className="space-y-3">
             {/* Pick Button */}
             <Button
               onClick={() => processItem("PICK")}
-              disabled={!isProductVerified || pickActionMutation.isPending}
-              className={`cursor-pointer w-full h-14 text-lg font-semibold ${
-                isProductVerified
-                  ? "bg-green-500 hover:bg-green-600"
-                  : "bg-gray-400"
-              }`}
+              disabled={pickActionMutation.isPending}
+              className="cursor-pointer w-full h-14 text-lg font-semibold bg-blue-500 hover:bg-blue-600"
             >
               {pickActionMutation.isPending ? (
                 <>
@@ -683,7 +553,7 @@ export default function MobilePickingInterface() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => setShowShortPickModal(true)}
-                disabled={!isProductVerified || pickActionMutation.isPending}
+                disabled={pickActionMutation.isPending}
                 variant="outline"
                 className="h-12"
               >
