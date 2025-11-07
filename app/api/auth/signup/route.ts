@@ -1,26 +1,28 @@
 // app/api/auth/signup/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
-import { UserRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
+import { sendVerificationEmail } from "@/lib/email";
+import {
+  signupRateLimit,
+  getIdentifier,
+  rateLimitResponse,
+} from "@/lib/rate-limit";
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { name, email, password } = await request.json();
+    // ✅ Rate limit check
+    const identifier = getIdentifier(req);
+    const { success, limit, remaining, reset } = await signupRateLimit.limit(
+      identifier
+    );
 
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: "Name, email, and password are required" },
-        { status: 400 }
-      );
+    if (!success) {
+      return rateLimitResponse(success, limit, remaining, reset);
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
+    const { email, password, name } = await req.json();
 
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
@@ -28,31 +30,48 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "User with this email already exists" },
-        { status: 409 }
+        { error: "Email already registered" },
+        { status: 400 }
       );
     }
 
-    const userCount = await prisma.user.count();
-    const role = userCount === 0 ? UserRole.ADMIN : UserRole.STAFF;
-
     const hashedPassword = await hash(password, 12);
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = await prisma.user.create({
       data: {
-        name,
         email: email.toLowerCase(),
         password: hashedPassword,
-        role,
+        name,
+        verificationToken: token,
+        tokenExpires: expires,
+        emailVerified: null,
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "User created successfully",
-      userId: user.id,
-      role: user.role,
-    });
+    const verificationUrl = `${process.env.NEXTAUTH_URL}/verify-email?token=${token}`;
+    await sendVerificationEmail(
+      user.email,
+      user.name || "User",
+      verificationUrl
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        message:
+          "Account created! Please check your email to verify your account.",
+      },
+      {
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
   } catch (error) {
     console.error("Signup error:", error);
     return NextResponse.json(

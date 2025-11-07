@@ -18,6 +18,7 @@ import {
   Loader2,
   Dot,
   TriangleAlert,
+  Printer,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import ShippingLabelForm from "@/components/shipping/ShippingLabelForm";
@@ -132,7 +133,8 @@ export default function EnhancedPackingInterface() {
   // Process state
   const [currentStep, setCurrentStep] = useState(1);
   const [isPacking, setIsPacking] = useState(false);
-  const [isPackingComplete, setIsPackingComplete] = useState(false);
+
+  const isPackingComplete = order?.status === "SHIPPED";
 
   console.log("Order: ", order);
 
@@ -147,6 +149,12 @@ export default function EnhancedPackingInterface() {
 
       if (response.ok) {
         setOrder(data.order);
+
+        // Set packages if order is already SHIPPED
+        if (data.order?.shippingPackages) {
+          setPackages(data.order.shippingPackages);
+        }
+
         setPackingInfo(data.packingInfo);
 
         // Pre-select suggested box
@@ -320,21 +328,14 @@ export default function EnhancedPackingInterface() {
         body: JSON.stringify({ orderId: order.id }),
       });
 
-      // Small delay to let packing slips generate
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Fetch updated order with packages
+      // ✅ Fetch updated order to get new status
       const response = await fetch(`/api/orders/${order.id}`);
       const data = await response.json();
-
-      if (data?.shippingPackages) {
-        setPackages(data.shippingPackages);
-      }
+      setOrder(data); // ← This will update isPackingComplete automatically
+      setPackages(data.shippingPackages || []);
     } catch (error) {
       console.error(error);
     }
-
-    setIsPackingComplete(true);
   };
 
   // Packing steps
@@ -392,17 +393,20 @@ export default function EnhancedPackingInterface() {
   // Success state
   if (isPackingComplete) {
     return (
-      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-background dark:bg-background flex items-center justify-center p-3 sm:p-4">
         <div className="text-center max-w-2xl w-full">
           {/* Success Icon - Responsive Size */}
-          <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-green-600 mx-auto mb-3 sm:mb-4" />
+          <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-green-500 mx-auto mb-3 sm:mb-4" />
 
           {/* Success Message - Responsive Typography */}
-          <h2 className="text-xl sm:text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-green-500 dark:text-green-600 mb-2">
             Order Packed & Labeled!
           </h2>
-          <p className="text-sm sm:text-base text-green-700 dark:text-green-600 mb-4 sm:mb-6">
-            {order.orderNumber} is ready for shipping
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
+            <Badge variant="outline" className="text-sm">
+              {order.orderNumber}
+            </Badge>{" "}
+            is ready for shipping
           </p>
 
           {packages.length > 0 ? (
@@ -455,7 +459,7 @@ export default function EnhancedPackingInterface() {
                           }}
                           className="flex items-center justify-center gap-1 w-full sm:w-auto"
                         >
-                          🖨️ Print Label
+                          Print Label
                         </Button>
 
                         {/* Print Packing Slip Button */}
@@ -479,7 +483,7 @@ export default function EnhancedPackingInterface() {
                             }}
                             className="flex items-center justify-center gap-1 w-full sm:w-auto"
                           >
-                            🖨️ Print Slip
+                            Print Slip
                           </Button>
                         ) : (
                           <Button
@@ -488,7 +492,7 @@ export default function EnhancedPackingInterface() {
                             disabled
                             className="w-full sm:w-auto"
                           >
-                            📄 Generating...
+                            Generating...
                           </Button>
                         )}
                       </div>
@@ -497,7 +501,8 @@ export default function EnhancedPackingInterface() {
 
                   {/* Print All Documents Button - Full Width */}
                   <Button
-                    className="w-full h-10 sm:h-9 text-sm sm:text-base"
+                    variant="default"
+                    className="w-full h-10"
                     onClick={async () => {
                       for (let i = 0; i < packages.length; i++) {
                         const pkg = packages[i];
@@ -544,7 +549,7 @@ export default function EnhancedPackingInterface() {
                       }
                     }}
                   >
-                    🖨️ Print All Documents ({packages.length * 2})
+                    <Printer /> Print All Documents ({packages.length * 2})
                   </Button>
                 </div>
               </CardContent>
@@ -563,10 +568,11 @@ export default function EnhancedPackingInterface() {
           )}
 
           {/* Navigation Buttons - Full Width on Mobile */}
-          <div className="space-y-2 sm:space-y-3">
+          <div className="flex gap-2 items-center w-full">
             <Button
               onClick={() => (window.location.href = "/dashboard/packing")}
-              className="w-full h-11 sm:h-12 text-base sm:text-lg"
+              className="w-1/2 h-10"
+              variant="outline"
             >
               Pack Next Order
             </Button>
@@ -576,7 +582,7 @@ export default function EnhancedPackingInterface() {
               onClick={() =>
                 (window.location.href = `/dashboard/orders/${order.id}`)
               }
-              className="w-full h-10 sm:h-auto text-sm sm:text-base"
+              className="w-1/2 h-10"
             >
               View Order Details
             </Button>

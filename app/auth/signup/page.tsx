@@ -1,33 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Package, AlertCircle, Loader2, CheckCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle, Loader2, CheckCircle, Clock } from "lucide-react";
 import Image from "next/image";
-import { startRegistration } from "@simplewebauthn/browser";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    company: "",
+    confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [rateLimitExpiry, setRateLimitExpiry] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const [passwordsMatch, setPasswordsMatch] = useState(true);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!rateLimitExpiry) return;
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((rateLimitExpiry - now) / 1000));
+
+      setCountdown(remaining);
+
+      if (remaining === 0) {
+        setRateLimitExpiry(null);
+        setError("");
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [rateLimitExpiry]);
+
+  // Check if passwords match
+  useEffect(() => {
+    if (formData.confirmPassword === "") {
+      setPasswordsMatch(true);
+      return;
+    }
+    setPasswordsMatch(formData.password === formData.confirmPassword);
+  }, [formData.password, formData.confirmPassword]);
+
+  const formatCountdown = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,26 +62,47 @@ export default function SignUp() {
     setError("");
     setSuccess("");
 
+    // Validate passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // Create user account
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess("Account created! Check your email for a sign-in link.");
-
-        // Automatically send sign-in email
-        await signIn("email", {
-          email: formData.email,
-          redirect: false,
+        setSuccess(
+          "Account created! Please check your email to verify your account."
+        );
+        // Clear form
+        setFormData({
+          name: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
         });
       } else {
-        setError(data.error || "Failed to create account. Please try again.");
+        if (response.status === 429) {
+          const expiryTime = Date.now() + data.retryAfter * 1000;
+          setRateLimitExpiry(expiryTime);
+          setError(
+            "Too many signup attempts. Please wait before trying again."
+          );
+        } else {
+          setError(data.error || "Failed to create account. Please try again.");
+        }
       }
     } catch (error) {
       setError("An unexpected error occurred. Please try again.");
@@ -63,39 +111,14 @@ export default function SignUp() {
     }
   };
 
-  async function handlePasskeySignup(email: string) {
-    // Step 1. Ask server for registration challenge
-    const options = await fetch("/api/webauthn/register", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-      headers: { "Content-Type": "application/json" },
-    }).then((r) => r.json());
-
-    // Step 2. Run WebAuthn registration in browser
-    const attResp = await startRegistration(options);
-
-    // Step 3. Send result back to server
-    const verifyRes = await fetch("/api/webauthn/register/verify", {
-      method: "POST",
-      body: JSON.stringify({ email, attResp }),
-      headers: { "Content-Type": "application/json" },
-    }).then((r) => r.json());
-
-    if (verifyRes.success) {
-      setSuccess(
-        "Passkey created! You can now sign in with Face ID / Touch ID."
-      );
-    } else {
-      setError("Passkey registration failed.");
-    }
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
   };
+
+  const isRateLimited = rateLimitExpiry && countdown > 0;
 
   return (
     <div className="flex items-center justify-center">
@@ -119,9 +142,6 @@ export default function SignUp() {
           <CardTitle className="text-xl text-white">
             Create your account
           </CardTitle>
-          <CardDescription className="text-gray-300 hidden">
-            Set up your warehouse management system
-          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -139,6 +159,15 @@ export default function SignUp() {
             </div>
           )}
 
+          {isRateLimited && (
+            <div className="flex items-center justify-center space-x-2 text-orange-400 bg-orange-700/10 p-3 rounded-md border border-orange-400">
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="text-sm font-medium">
+                Try again in {formatCountdown(countdown)}
+              </span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-gray-100">
@@ -152,9 +181,10 @@ export default function SignUp() {
                 value={formData.name}
                 onChange={handleInputChange}
                 required
-                disabled={isLoading}
+                disabled={isLoading || success !== "" || !!isRateLimited}
                 className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
-                     focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                     focus:ring-2 focus:ring-blue-400 focus:outline-none
+                     disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -170,9 +200,10 @@ export default function SignUp() {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                disabled={isLoading}
+                disabled={isLoading || success !== "" || !!isRateLimited}
                 className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
-                     focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                     focus:ring-2 focus:ring-blue-400 focus:outline-none
+                     disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -188,28 +219,40 @@ export default function SignUp() {
                 value={formData.password}
                 onChange={handleInputChange}
                 required
-                disabled={isLoading}
+                disabled={isLoading || success !== "" || !!isRateLimited}
                 minLength={6}
                 className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
-                     focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                     focus:ring-2 focus:ring-blue-400 focus:outline-none
+                     disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="company" className="text-gray-100">
-                Company name
+              <Label htmlFor="confirmPassword" className="text-gray-100">
+                Confirm password
               </Label>
               <Input
-                id="company"
-                name="company"
-                type="text"
-                placeholder="Your Company Inc."
-                value={formData.company}
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
                 onChange={handleInputChange}
-                disabled={isLoading}
-                className="bg-white/10 border border-white/20 text-white placeholder:text-zinc-400
-                     focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                required
+                disabled={isLoading || success !== "" || !!isRateLimited}
+                minLength={6}
+                className={`bg-white/10 border text-white placeholder:text-zinc-400
+                     focus:ring-2 focus:outline-none
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     ${
+                       !passwordsMatch && formData.confirmPassword !== ""
+                         ? "border-red-500 focus:ring-red-400"
+                         : "border-white/20 focus:ring-blue-400"
+                     }`}
               />
+              {!passwordsMatch && formData.confirmPassword !== "" && (
+                <p className="text-xs text-red-400">Passwords do not match</p>
+              )}
             </div>
 
             <Button
@@ -217,40 +260,27 @@ export default function SignUp() {
               className="w-full bg-gradient-to-r from-blue-500 to-violet-500 
                    text-white font-semibold rounded-xl py-2 
                    hover:shadow-[0_0_20px_rgba(59,130,246,0.6)] 
-                   transition-all duration-300 cursor-pointer"
-              disabled={isLoading || success !== ""}
+                   transition-all duration-300 cursor-pointer
+                   disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+              disabled={
+                isLoading ||
+                success !== "" ||
+                !!isRateLimited ||
+                !passwordsMatch
+              }
             >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Create Account (Email)
-            </Button>
-
-            {typeof window !== "undefined" &&
-              "PublicKeyCredential" in window && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full bg-white/10 border border-white/20 text-white rounded-xl py-2
-                     hover:bg-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] 
-                     transition-all duration-300 cursor-pointer"
-                  onClick={() => handlePasskeySignup(formData.email)}
-                >
-                  Sign up with Passkey
-                </Button>
+              {isRateLimited ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Locked ({formatCountdown(countdown)})
+                </>
+              ) : (
+                "Create Account"
               )}
+            </Button>
           </form>
         </CardContent>
-
-        {/* <CardFooter>
-          <p className="text-center text-sm text-gray-300 w-full">
-            Already have an account?{" "}
-            <Link
-              href="/auth/signin"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </CardFooter> */}
       </Card>
     </div>
   );

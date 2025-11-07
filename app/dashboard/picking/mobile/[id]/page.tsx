@@ -329,29 +329,27 @@ export default function MobilePickingInterface() {
   // Check if all items are completed
   if (pendingItems.length === 0) {
     return (
-      <div className="min-h-screen bg-green-50 dark:bg-background flex items-center justify-center p-4">
+      <div className="bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-green-800 dark:text-green-600 mb-2">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-green-500 mb-2">
             Pick List Complete!
           </h2>
-          <p className="text-green-700 mb-6">
+          <p className="text-gray-700 dark:text-gray-400 mb-6">
             All items have been processed for {pickList.pickList.batchNumber}
           </p>
           <div className="flex flex-col gap-4">
-            <Link
-              href="/dashboard"
-              className="m-auto rounded w-fit px-4 py-2 flex gap-2 items-center justify-center bg-zinc-900 text-white"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Return to Dashboard
+            <Link href="/dashboard">
+              <Button variant="default" className="w-full">
+                <Home className="w-4 h-4 mr-2" />
+                Return to Dashboard
+              </Button>
             </Link>
-            <Link
-              href={`/dashboard/packing/pack/${currentItem?.order.id}`}
-              className="m-auto rounded w-fit px-4 py-2 flex gap-2 items-center justify-center bg-green-400 text-green-900"
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Pack Order
+            <Link href={`/dashboard/packing/pack/${currentItem?.order.id}`}>
+              <Button variant="outline" className="w-full">
+                <Package className="w-4 h-4 mr-2" />
+                Pack Order
+              </Button>
             </Link>
           </div>
         </div>

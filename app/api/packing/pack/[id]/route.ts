@@ -36,6 +36,15 @@ export async function GET(
             createdAt: "desc",
           },
         },
+        packages: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            labelUrl: true,
+            packingSlipUrl: true,
+            trackingNumber: true,
+          },
+        },
       },
     });
 
@@ -365,6 +374,7 @@ export async function GET(
             : 3.31,
           dimensions: item.productVariant.dimensions,
         })),
+        shippingPackages: order.packages,
       },
       packingInfo: {
         totalWeightGrams: Math.round(totalWeightGrams * 100) / 100,

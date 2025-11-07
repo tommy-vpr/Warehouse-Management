@@ -52,7 +52,7 @@ const Page = () => {
                   <button
                     onClick={() => setActiveForm("signin")}
                     className="w-full sm:w-2/3 text-center py-3 md:py-2 px-6 rounded-4xl text-white font-semibold
-                               bg-gradient-to-br from-violet-500 to-blue-500 
+                               bg-gradient-to-br from-violet-600 to-blue-600 
                                hover:-translate-y-0.5
                                hover:shadow-[0_0_20px_rgba(139,92,246,0.8)] transition-all duration-300 cursor-pointer"
                   >
@@ -61,7 +61,7 @@ const Page = () => {
                   <button
                     onClick={() => setActiveForm("signup")}
                     className="w-full sm:w-2/3 text-center py-3 md:py-2 px-6 rounded-4xl text-white font-semibold
-                               bg-gradient-to-br from-orange-400 to-yellow-400 
+                               bg-gradient-to-br from-orange-400 to-yellow-500 
                                hover:-translate-y-0.5
                                hover:shadow-[0_0_20px_rgba(251,191,36,0.8)] transition-all duration-300 cursor-pointer"
                   >
@@ -83,7 +83,7 @@ const Page = () => {
                 <SignIn />
                 <button
                   onClick={() => setActiveForm(null)}
-                  className="mt-4 text-orange-400 text-sm hover:text-orange-300 cursor-pointer flex items-center gap-1 mx-auto"
+                  className="mt-4 text-gray-400 text-sm hover:text-gray-300 cursor-pointer flex items-center gap-1 mx-auto"
                 >
                   <ArrowLeft size={16} />
                   Back
@@ -103,7 +103,7 @@ const Page = () => {
                 <SignUp />
                 <button
                   onClick={() => setActiveForm(null)}
-                  className="mt-4 text-orange-400 text-sm hover:text-orange-300 cursor-pointer flex items-center gap-1 mx-auto"
+                  className="mt-4 text-gray-400 text-sm hover:text-gray-300 cursor-pointer flex items-center gap-1 mx-auto"
                 >
                   <ArrowLeft size={16} />
                   Back

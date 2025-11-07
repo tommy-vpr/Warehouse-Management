@@ -921,9 +921,9 @@ export default function ShippingLabelForm({
             items: distributedItems[idx],
           });
 
-          if (label?.labelUrl) {
-            window.open(label.labelUrl, "_blank");
-          }
+          // if (label?.labelUrl) {
+          //   window.open(label.labelUrl, "_blank");
+          // }
         });
       } else {
         for (const shipment of validShipments) {
@@ -1026,9 +1026,9 @@ export default function ShippingLabelForm({
             items: itemsToShip,
           });
 
-          if (result.label?.labelUrl) {
-            window.open(result.label.labelUrl, "_blank");
-          }
+          // if (result.label?.labelUrl) {
+          //   window.open(result.label.labelUrl, "_blank");
+          // }
         }
       }
 

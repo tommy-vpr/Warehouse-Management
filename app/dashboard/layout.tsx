@@ -244,14 +244,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 href={action.href}
                 className={clsx(
                   "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors",
-                  isActive ? "bg-gray-200 dark:bg-black/20" : "hover:bg-accent"
+                  isActive ? "bg-gray-200 dark:bg-black/30" : "hover:bg-accent"
                 )}
               >
                 <action.icon
                   className={clsx(
                     "w-5 h-5",
                     isActive
-                      ? "text-zinc-900 dark:text-green-500"
+                      ? "text-zinc-900 dark:text-white"
                       : "text-muted-foreground"
                   )}
                 />
@@ -259,7 +259,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   className={clsx(
                     "text-xs",
                     isActive
-                      ? "text-zinc-900 dark:text-green-500 font-medium"
+                      ? "text-zinc-900 dark:text-white font-medium"
                       : "text-muted-foreground"
                   )}
                 >

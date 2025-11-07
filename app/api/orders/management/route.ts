@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
               },
               {
                 action: "MOBILE_PICK",
-                label: "Mobile Pick",
+                label: "Start Pick",
                 variant: "outline",
               },
             ];

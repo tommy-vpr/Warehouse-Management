@@ -194,6 +194,9 @@ model User {
 
   currentChallenge String?
 
+  verificationToken String?   @unique
+  tokenExpires      DateTime?
+
   accounts    Account[]
   sessions    Session[]
   credentials UserCredential[]

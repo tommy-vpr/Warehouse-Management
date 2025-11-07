@@ -38,7 +38,7 @@ function getNextActions(order: any) {
         });
         actions.push({
           action: "MOBILE_PICK",
-          label: "Mobile Pick",
+          label: "Start Pick",
           variant: "outline",
         });
         actions.push({

@@ -434,6 +434,20 @@ export default function ReturnDetailPage({
                   </Button>
                 </Link>
 
+                {/* Inspect button - only shows when status is RECEIVED */}
+                {returnOrder.status === "RECEIVED" && (
+                  <Link
+                    href={`/dashboard/warehouse/returns/inspect/${returnOrder.rmaNumber}`}
+                  >
+                    <Button
+                      variant="default"
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      Inspect Return
+                    </Button>
+                  </Link>
+                )}
+
                 {/* Return Label Button(s) */}
                 {returnOrder.returnLabelUrl && (
                   <>

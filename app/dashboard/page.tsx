@@ -23,6 +23,7 @@ import {
   RefreshCcw,
   Settings,
   Home,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -172,6 +173,11 @@ function MobileDashboard({ stats }: { stats: any }) {
       href: "/dashboard/inventory/receive/po",
     },
     {
+      icon: Undo2,
+      label: "Returns",
+      href: "/dashboard/inventory/returns",
+    },
+    {
       icon: MapPin,
       label: "Locations",
       href: "/dashboard/locations/print-labels",
@@ -244,11 +250,13 @@ function MobileDashboard({ stats }: { stats: any }) {
               className={`text-white bg-linear-to-br from-gray-100 to-white dark:from-zinc-800 dark:to-zinc-900 rounded-xl p-6 flex flex-col items-center justify-center 
                 gap-3 active:scale-95 transform transition-transform border-2 border-gray-200 dark:border-zinc-800`}
             >
-              <div className="p-2 rounded-full bg-gradient-to-tr from-violet-500 to-blue-600 text-white">
+              <div className="p-2 rounded-full bg-gradient-to-tr from-violet-600 to-blue-700 text-white">
                 <item.icon className="w-5 h-5" />
               </div>
 
-              <span className="text-gray-400 text-sm">{item.label}</span>
+              <span className="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                {item.label}
+              </span>
             </Link>
           ))}
         </div>
