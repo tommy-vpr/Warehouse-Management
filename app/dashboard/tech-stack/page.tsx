@@ -1,5 +1,6 @@
 "use client";
 
+import ScrollTest from "@/components/ScrollTest";
 import React, { useState } from "react";
 import {
   BarChart,
@@ -120,6 +121,8 @@ const WMSCostBreakdown = () => {
       total: 176.24,
     },
   ];
+
+  return <ScrollTest />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black">

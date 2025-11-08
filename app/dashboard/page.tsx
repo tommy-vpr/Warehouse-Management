@@ -5,7 +5,6 @@ import {
   Package,
   ShoppingCart,
   Truck,
-  Scan,
   Loader2,
   ClipboardCheck,
   ListCheck,
@@ -16,13 +15,11 @@ import {
   ArrowLeftRight,
   ShoppingBag,
   CalendarDays,
-  LaptopMinimal,
   ScanBarcode,
   ClipboardList,
   PackageCheck,
   RefreshCcw,
   Settings,
-  Home,
   Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -587,7 +584,7 @@ function DesktopDashboard({
                   variant="outline"
                   className="h-20 flex-col w-full cursor-pointer"
                 >
-                  <Scan className="w-6 h-6 mb-2" />
+                  <ScanBarcode className="w-6 h-6 mb-2" />
                   <span className="text-sm">Receive Stock</span>
                 </Button>
               </Link>

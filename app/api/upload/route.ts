@@ -47,6 +47,7 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(arrayBuffer);
 
     const optimized = await sharp(buffer)
+      .rotate()
       .resize(1024, 1024, { fit: "inside" })
       .jpeg({ quality: 75 })
       .toBuffer();

@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { PickListsTableSkeleton } from "@/components/skeleton/PickliststableSkeleton";
+import { useRouter } from "next/navigation";
 
 interface PickList {
   id: string;
@@ -59,6 +60,8 @@ export default function PickListsDashboard() {
   const isFiltering = isFetching && data !== undefined;
   const pickLists = data?.pickLists || [];
   const totalPages = data?.totalPages || 1;
+
+  const router = useRouter();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -168,6 +171,11 @@ export default function PickListsDashboard() {
                   {pickLists.map((pickList) => (
                     <tr
                       key={pickList.id}
+                      onClick={() =>
+                        router.push(
+                          `/dashboard/picking/progress/${pickList.id}`
+                        )
+                      }
                       className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                     >
                       <td className="px-4 py-4">
@@ -192,7 +200,7 @@ export default function PickListsDashboard() {
                           </div>
                           <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-2">
                             <div
-                              className="bg-green-200 dark:bg-green-600 h-2 rounded-full transition-all"
+                              className="bg-blue-400 dark:bg-blue-500 h-2 rounded-full transition-all"
                               style={{ width: `${pickList.completionRate}%` }}
                             />
                           </div>

@@ -2,7 +2,6 @@
 
 import { ReactNode, useState } from "react";
 import {
-  BarChart3,
   Bell,
   Package,
   Scan,
@@ -21,11 +20,8 @@ import {
   ShoppingBag,
   LaptopMinimal,
   ChartColumn,
-  ScanText,
   User,
-  File,
   Scroll,
-  Undo,
   Undo2,
   Home,
   ScanBarcode,
@@ -83,7 +79,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       label: "Inventory Planner",
       icon: CalendarDays,
     },
-    { id: "picking", label: "Picking", icon: ScanText },
+    { id: "picking", label: "Picking", icon: ScanBarcode },
     { id: "packing", label: "Packing", icon: Package },
     { id: "shipping", label: "Tracking", icon: Truck },
     { id: "import", label: "Import", icon: Import },
@@ -155,7 +151,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               className="hidden sm:block"
             >
               <Button className="cursor-pointer bg-blue-600 hover:bg-blue-700 dark:text-gray-200">
-                <Scan className="w-4 h-4" />
+                <ScanBarcode className="w-4 h-4" />
                 Receive
               </Button>
             </Link>
