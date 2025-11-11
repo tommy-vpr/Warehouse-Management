@@ -245,7 +245,7 @@ export default function InvoiceDashboardPage() {
                     mounted && (isLoading || isFetching) ? "animate-spin" : ""
                   }`}
                 />
-                <span className="ml-2 sm:hidden lg:inline">Refresh</span>
+                <span className="sm:hidden lg:inline">Refresh</span>
               </Button>
               <Button
                 size="sm"
@@ -253,7 +253,7 @@ export default function InvoiceDashboardPage() {
                 className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white transition sm:flex-none"
               >
                 <Plus className="w-4 h-4" />
-                <span className="ml-2">{showForm ? "Hide" : "Create"}</span>
+                <span>{showForm ? "Hide" : "Create"}</span>
               </Button>
             </div>
           </div>

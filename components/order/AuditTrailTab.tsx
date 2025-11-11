@@ -42,7 +42,8 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
   });
 
   const getEventIcon = (event: AuditEvent) => {
-    const iconClass = "w-4 h-4 text-gray-600 dark:text-gray-400";
+    const iconClass =
+      "w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 dark:text-gray-400";
 
     // Reassignment events
     if (
@@ -102,13 +103,6 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
     }
 
     // Shipping events
-    // if (event.type === "SHIPPING") {
-    //   if (event.eventType === "LABEL_CREATED") {
-    //     return <FileText className={iconClass} />;
-    //   }
-    //   return <Truck className={iconClass} />;
-    // }
-    // Add to getEventIcon function in AuditTrailTab.tsx
     if (event.type === "SHIPPING") {
       switch (event.eventType) {
         case "TASK_STARTED":
@@ -119,7 +113,9 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
         case "LABEL_CREATED":
           return <FileText className={iconClass} />;
         case "LABEL_PRINTED":
-          return <FileText className="w-4 h-4 text-green-600" />;
+          return (
+            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600" />
+          );
         case "LABEL_VOIDED":
         case "SHIPMENT_VOIDED":
           return <XCircle className={iconClass} />;
@@ -135,13 +131,15 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
         case "TRACKING_NUMBER_ASSIGNED":
           return <Barcode className={iconClass} />;
         case "SHIPMENT_MANIFESTED":
-          return <CheckCircle className="w-4 h-4 text-green-600" />;
+          return (
+            <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600" />
+          );
         case "PICKUP_SCHEDULED":
           return <Clock className={iconClass} />;
         case "PACKAGE_SCANNED":
           return <ScanLine className={iconClass} />;
         case "PACKAGE_SHIPPED":
-          return <Truck className="w-4 h-4 text-green-600" />;
+          return <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600" />;
         case "TASK_REASSIGNED":
           return <Users className={iconClass} />;
         default:
@@ -236,13 +234,6 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
     }
 
     // Shipping events
-    // if (type === "SHIPPING") {
-    //   if (eventType === "LABEL_CREATED") {
-    //     return "Shipping label created";
-    //   }
-    //   return "Package shipped";
-    // }
-    // Add to getEventTitle function
     if (type === "SHIPPING") {
       const taskNum = metadata.taskNumber;
       switch (eventType) {
@@ -283,10 +274,10 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
           return `Tracking number: ${metadata.trackingNumber}`;
         case "SHIPMENT_MANIFESTED":
           return "Shipment manifested";
-        case "PICKUP_SCHEDULED":
-          return `Pickup scheduled: ${new Date(
-            metadata.pickupDate
-          ).toLocaleDateString()}`;
+        // case "PICKUP_SCHEDULED":
+        //   return `Pickup scheduled: ${new Date(
+        //     metadata.pickupDate
+        //   ).toLocaleDateString()}`;
         case "PACKAGE_SCANNED":
           return "Package scanned";
         case "SHIPMENT_VOIDED":
@@ -299,8 +290,8 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
     }
 
     // Back order events
-    if (type === "BACK_ORDER") {
-      if (eventType === "FULFILLED") {
+    if (event.type === "BACK_ORDER") {
+      if (event.eventType === "FULFILLED") {
         return "Back order fulfilled";
       }
       return "Back order created";
@@ -363,12 +354,6 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
     }
 
     // Shipping descriptions
-    // if (type === "SHIPPING") {
-    //   if (metadata.trackingNumber) parts.push(metadata.trackingNumber);
-    //   if (metadata.carrier) parts.push(metadata.carrier);
-    //   if (metadata.service) parts.push(metadata.service);
-    // }
-    // Add to getEventDescription function
     if (type === "SHIPPING") {
       const parts: string[] = [];
 
@@ -377,15 +362,26 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
       if (metadata.carrier) parts.push(metadata.carrier);
       if (metadata.serviceLevel) parts.push(metadata.serviceLevel);
       if (metadata.weight) parts.push(`${metadata.weight}oz`);
-      if (metadata.shippingCost) parts.push(`$${metadata.shippingCost}`);
+
+      // Handle shippingCost as string or number
+      if (metadata.shippingCost) {
+        const cost =
+          typeof metadata.shippingCost === "string"
+            ? metadata.shippingCost
+            : metadata.shippingCost.toFixed(2);
+        parts.push(`$${cost}`);
+      }
+
       if (metadata.insuranceAmount)
         parts.push(`Insurance: $${metadata.insuranceAmount}`);
       if (metadata.voidReason) parts.push(`Reason: ${metadata.voidReason}`);
 
-      // Dimensions
+      // Dimensions with safety check
       if (metadata.dimensions) {
         const dims = metadata.dimensions;
-        parts.push(`${dims.length}×${dims.width}×${dims.height}in`);
+        if (dims.length && dims.width && dims.height) {
+          parts.push(`${dims.length}×${dims.width}×${dims.height}in`);
+        }
       }
 
       // Reassignment details
@@ -451,51 +447,60 @@ export default function AuditTrailTab({ orderId }: AuditTrailTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-2 sm:px-0">
       {/* Timeline */}
       <div className="relative">
         {/* Vertical line */}
-        <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
+        <div className="absolute left-3 sm:left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
 
         {/* Events */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {timeline.map((event: AuditEvent) => (
-            <div key={event.id} className="relative pl-12">
+            <div key={event.id} className="relative pl-9 sm:pl-12">
               {/* Icon circle - centered on vertical line */}
-              <div className="absolute left-0 w-8 h-8 rounded-full flex items-center justify-center bg-white dark:bg-zinc-900 border-2 border-gray-200 dark:border-gray-700">
+              <div className="absolute left-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center bg-white dark:bg-zinc-900 border-2 border-gray-200 dark:border-gray-700">
                 {getEventIcon(event)}
               </div>
 
               {/* Event card */}
-              <div className="p-4 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-zinc-900">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h4 className="font-semibold">{getEventTitle(event)}</h4>
+              <div className="p-3 sm:p-4 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-zinc-900">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-sm sm:text-base break-words">
+                      {getEventTitle(event)}
+                    </h4>
                     {getEventDescription(event) && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 break-words">
                         {getEventDescription(event)}
                       </p>
                     )}
                     {event.notes && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 italic">
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500 mt-1 italic break-words">
                         Note: {event.notes}
                       </p>
                     )}
                   </div>
-                  <Badge variant="outline" className="ml-2 whitespace-nowrap">
+                  <Badge
+                    variant="outline"
+                    className="text-xs shrink-0 self-start"
+                  >
                     {event.eventType?.replace(/_/g, " ") || event.type}
                   </Badge>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex items-center gap-1 text-blue-500">
-                    <Clock className="w-3 h-3" />
-                    {new Date(event.timestamp).toLocaleString()}
+                    <Clock className="w-3 h-3 shrink-0" />
+                    <span className="truncate">
+                      {new Date(event.timestamp).toLocaleString()}
+                    </span>
                   </div>
                   {event.user && (
                     <div className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      {event.user.name || event.user.email}
+                      <User className="w-3 h-3 shrink-0" />
+                      <span className="truncate">
+                        {event.user.name || event.user.email}
+                      </span>
                     </div>
                   )}
                 </div>

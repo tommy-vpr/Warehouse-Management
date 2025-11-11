@@ -246,7 +246,7 @@ export default function OrderDetailView({
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6">
+    <div className="min-h-screen bg-background p-3 sm:p-6 overflow-x-hidden">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-4 sm:mb-6">
@@ -510,8 +510,8 @@ export default function OrderDetailView({
         <Card>
           <CardHeader className="pb-0">
             {/* Mobile: Scrollable tabs */}
-            <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-              <div className="flex gap-2 sm:gap-4 border-b min-w-max sm:min-w-0">
+            <div className="overflow-x-auto scrollbar-hide -mx-6 px-6 sm:mx-0 sm:px-0">
+              <div className="flex w-max md:w-full gap-2 sm:gap-4 border-b sm:min-w-0">
                 <button
                   className={`cursor-pointer pb-2 px-1 text-xs sm:text-sm whitespace-nowrap ${
                     activeTab === "items"
@@ -574,6 +574,7 @@ export default function OrderDetailView({
                     Back Orders ({order.backOrders.length})
                   </button>
                 )}
+                <div className="w-4 shrink-0 sm:w-0" /> {/* right-end spacer */}
               </div>
             </div>
           </CardHeader>

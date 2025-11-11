@@ -489,7 +489,7 @@ function PickListItemCard({
                   <span>Picked by {item.pickedBy}</span>
                   {item.pickedAt && (
                     <span className="ml-2">
-                      at {new Date(item.pickedAt).toLocaleTimeString()}
+                      at {new Date(item.pickedAt).toLocaleString()}
                     </span>
                   )}
                 </div>

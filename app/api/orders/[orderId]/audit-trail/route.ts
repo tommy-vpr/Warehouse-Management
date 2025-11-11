@@ -9,7 +9,7 @@ interface AuditEvent {
   timestamp: string;
   user: {
     id: string;
-    name: string;
+    name: string | null;
     email: string;
   } | null;
   notes?: string;
@@ -91,11 +91,11 @@ export async function GET(
           where: {
             orderId,
             ...(Object.keys(dateFilter).length > 0 && {
-              createdAt: dateFilter,
+              changedAt: dateFilter,
             }),
           },
           include: {
-            user: {
+            changedByUser: {
               select: {
                 id: true,
                 name: true,
@@ -103,19 +103,19 @@ export async function GET(
               },
             },
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { changedAt: "desc" },
         });
 
         for (const status of statusHistory) {
           timeline.push({
             id: `status-${status.id}`,
             type: "ORDER_STATUS",
-            timestamp: status.createdAt.toISOString(),
-            user: status.user,
-            notes: status.notes,
+            timestamp: status.changedAt.toISOString(),
+            user: status.changedByUser,
+            notes: status.notes ?? undefined,
             metadata: {
-              fromStatus: status.fromStatus,
-              toStatus: status.toStatus,
+              fromStatus: status.previousStatus,
+              toStatus: status.newStatus,
             },
           });
         }
@@ -198,7 +198,7 @@ export async function GET(
               eventType: event.eventType,
               timestamp: event.createdAt.toISOString(),
               user: event.user,
-              notes: event.notes,
+              notes: event.notes ?? undefined,
               metadata,
               data: event.data as Record<string, any>,
             });
@@ -295,7 +295,7 @@ export async function GET(
               eventType: event.eventType,
               timestamp: event.createdAt.toISOString(),
               user: event.user,
-              notes: event.notes,
+              notes: event.notes ?? undefined,
               metadata,
               data: event.data as Record<string, any>,
             });
@@ -309,67 +309,6 @@ export async function GET(
     }
 
     // 4. Fetch shipping events
-    // if (!eventType || eventType === "SHIPPING") {
-    //   try {
-    //     const packages = await prisma.shippingPackage.findMany({
-    //       where: {
-    //         orderId,
-    //         ...(Object.keys(dateFilter).length > 0 && {
-    //           createdAt: dateFilter,
-    //         }),
-    //       },
-    //       include: {
-    //         createdBy: {
-    //           select: { id: true, name: true, email: true },
-    //         },
-    //         shippedBy: {
-    //           select: { id: true, name: true, email: true },
-    //         },
-    //       },
-    //       orderBy: { createdAt: "desc" },
-    //     });
-
-    //     for (const pkg of packages) {
-    //       // Label created
-    //       if (pkg.trackingNumber) {
-    //         timeline.push({
-    //           id: `label-${pkg.id}`,
-    //           type: "SHIPPING",
-    //           eventType: "LABEL_CREATED",
-    //           timestamp: pkg.createdAt.toISOString(),
-    //           user: pkg.createdBy,
-    //           metadata: {
-    //             trackingNumber: pkg.trackingNumber,
-    //             carrier: pkg.carrier || "Unknown",
-    //             service: pkg.serviceLevel || "Standard",
-    //             weight: pkg.weight,
-    //             cost: pkg.shippingCost,
-    //           },
-    //         });
-    //       }
-
-    //       // Package shipped
-    //       if (pkg.shippedAt && pkg.shippedBy) {
-    //         timeline.push({
-    //           id: `shipped-${pkg.id}`,
-    //           type: "SHIPPING",
-    //           eventType: "PACKAGE_SHIPPED",
-    //           timestamp: pkg.shippedAt.toISOString(),
-    //           user: pkg.shippedBy,
-    //           metadata: {
-    //             trackingNumber: pkg.trackingNumber,
-    //             carrier: pkg.carrier || "Unknown",
-    //           },
-    //         });
-    //       }
-    //     }
-    //     summary.byCategory.shipping = packages.length;
-    //   } catch (error) {
-    //     console.error("Error fetching shipping packages:", error);
-    //   }
-    // }
-
-    // 4. Fetch shipping TASK events (more detailed than just packages)
     if (!eventType || eventType === "SHIPPING") {
       try {
         // Get shipping tasks for this order
@@ -476,7 +415,7 @@ export async function GET(
               eventType: event.eventType,
               timestamp: event.createdAt.toISOString(),
               user: event.user,
-              notes: event.notes,
+              notes: event.notes ?? undefined,
               metadata,
               data: event.data as Record<string, any>,
             });
@@ -485,7 +424,7 @@ export async function GET(
           summary.byCategory.shipping += shippingTaskEvents.length;
         }
 
-        // Also fetch shipping packages (existing code - keep this too)
+        // Also fetch shipping packages
         const packages = await prisma.shippingPackage.findMany({
           where: {
             orderId,
@@ -494,10 +433,10 @@ export async function GET(
             }),
           },
           include: {
-            createdBy: {
+            createdByUser: {
               select: { id: true, name: true, email: true },
             },
-            shippedBy: {
+            shippedByUser: {
               select: { id: true, name: true, email: true },
             },
           },
@@ -512,36 +451,36 @@ export async function GET(
               type: "SHIPPING",
               eventType: "LABEL_CREATED",
               timestamp: pkg.createdAt.toISOString(),
-              user: pkg.createdBy,
+              user: pkg.createdByUser,
               metadata: {
                 trackingNumber: pkg.trackingNumber,
-                carrier: pkg.carrier || "Unknown",
-                service: pkg.serviceLevel || "Standard",
-                weight: pkg.weight,
-                cost: pkg.shippingCost,
+                carrier: pkg.carrierCode,
+                service: pkg.serviceCode,
+                weight: pkg.weight ? Number(pkg.weight) : undefined,
+                cost: pkg.cost.toString(),
                 packageId: pkg.id,
               },
             });
           }
 
           // Package shipped
-          if (pkg.shippedAt && pkg.shippedBy) {
+          if (pkg.shippedAt && pkg.shippedByUser) {
             timeline.push({
               id: `shipped-${pkg.id}`,
               type: "SHIPPING",
               eventType: "PACKAGE_SHIPPED",
               timestamp: pkg.shippedAt.toISOString(),
-              user: pkg.shippedBy,
+              user: pkg.shippedByUser,
               metadata: {
                 trackingNumber: pkg.trackingNumber,
-                carrier: pkg.carrier || "Unknown",
+                carrier: pkg.carrierCode,
                 packageId: pkg.id,
               },
             });
           }
         }
 
-        summary.byCategory.shipping += packages.length * 2; // Each package has 2 events
+        summary.byCategory.shipping += packages.length * 2;
       } catch (error) {
         console.error("Error fetching shipping events:", error);
       }
@@ -558,16 +497,16 @@ export async function GET(
             }),
           },
           include: {
-            item: {
+            productVariant: {
               select: {
                 sku: true,
                 name: true,
               },
             },
-            createdBy: {
+            createdByUser: {
               select: { id: true, name: true, email: true },
             },
-            fulfilledBy: {
+            fulfilledByUser: {
               select: { id: true, name: true, email: true },
             },
           },
@@ -581,28 +520,28 @@ export async function GET(
             type: "BACK_ORDER",
             eventType: "CREATED",
             timestamp: backOrder.createdAt.toISOString(),
-            user: backOrder.createdBy,
+            user: backOrder.createdByUser,
             metadata: {
-              quantity: backOrder.quantity,
-              sku: backOrder.item.sku,
-              itemName: backOrder.item.name,
-              reason: backOrder.reason || "INSUFFICIENT_STOCK",
+              quantity: backOrder.quantityBackOrdered,
+              sku: backOrder.productVariant.sku,
+              itemName: backOrder.productVariant.name,
+              reason: backOrder.reason,
               expectedDate: backOrder.expectedRestockDate?.toISOString(),
             },
           });
 
           // Back order fulfilled
-          if (backOrder.fulfilledAt && backOrder.fulfilledBy) {
+          if (backOrder.fulfilledAt && backOrder.fulfilledByUser) {
             timeline.push({
               id: `backorder-fulfilled-${backOrder.id}`,
               type: "BACK_ORDER",
               eventType: "FULFILLED",
               timestamp: backOrder.fulfilledAt.toISOString(),
-              user: backOrder.fulfilledBy,
+              user: backOrder.fulfilledByUser,
               metadata: {
-                quantity: backOrder.quantity,
-                sku: backOrder.item.sku,
-                itemName: backOrder.item.name,
+                quantity: backOrder.quantityBackOrdered,
+                sku: backOrder.productVariant.sku,
+                itemName: backOrder.productVariant.name,
               },
             });
           }
@@ -655,546 +594,3 @@ export async function GET(
     );
   }
 }
-
-// // app/api/orders/[orderId]/audit-trail/route.ts (Complete Updated Version)
-// import { prisma } from "@/lib/prisma";
-// import { NextRequest, NextResponse } from "next/server";
-
-// interface AuditEvent {
-//   id: string;
-//   type: string;
-//   eventType?: string;
-//   timestamp: string;
-//   user: {
-//     id: string;
-//     name: string;
-//     email: string;
-//   } | null;
-//   notes?: string;
-//   metadata?: Record<string, any>;
-//   data?: Record<string, any>;
-// }
-
-// interface AuditTrailResponse {
-//   timeline: AuditEvent[];
-//   summary: {
-//     byCategory: {
-//       orderStatus: number;
-//       picking: number;
-//       packing: number;
-//       shipping: number;
-//       backOrders: number;
-//     };
-//     totalEvents: number;
-//   };
-//   pagination?: {
-//     total: number;
-//     page: number;
-//     pageSize: number;
-//     hasMore: boolean;
-//   };
-// }
-
-// export async function GET(
-//   req: NextRequest,
-//   { params }: { params: Promise<{ orderId: string }> }
-// ) {
-//   try {
-//     const { orderId } = await params;
-//     const { searchParams } = new URL(req.url);
-
-//     // Optional query parameters
-//     const eventType = searchParams.get("type");
-//     const startDate = searchParams.get("startDate");
-//     const endDate = searchParams.get("endDate");
-//     const page = parseInt(searchParams.get("page") || "1");
-//     const pageSize = parseInt(searchParams.get("pageSize") || "100");
-
-//     // Verify order exists
-//     const order = await prisma.order.findUnique({
-//       where: { id: orderId },
-//       select: {
-//         id: true,
-//         orderNumber: true,
-//         createdAt: true,
-//       },
-//     });
-
-//     if (!order) {
-//       return NextResponse.json({ error: "Order not found" }, { status: 404 });
-//     }
-
-//     const timeline: AuditEvent[] = [];
-//     const summary = {
-//       byCategory: {
-//         orderStatus: 0,
-//         picking: 0,
-//         packing: 0,
-//         shipping: 0,
-//         backOrders: 0,
-//       },
-//       totalEvents: 0,
-//     };
-
-//     // Date filters
-//     const dateFilter = {
-//       ...(startDate && { gte: new Date(startDate) }),
-//       ...(endDate && { lte: new Date(endDate) }),
-//     };
-
-//     // 1. Fetch order status changes
-//     if (!eventType || eventType === "ORDER_STATUS") {
-//       try {
-//         const statusHistory = await prisma.orderStatusHistory.findMany({
-//           where: {
-//             orderId,
-//             ...(Object.keys(dateFilter).length > 0 && {
-//               createdAt: dateFilter,
-//             }),
-//           },
-//           include: {
-//             user: {
-//               select: {
-//                 id: true,
-//                 name: true,
-//                 email: true,
-//               },
-//             },
-//           },
-//           orderBy: { createdAt: "desc" },
-//         });
-
-//         for (const status of statusHistory) {
-//           timeline.push({
-//             id: `status-${status.id}`,
-//             type: "ORDER_STATUS",
-//             timestamp: status.createdAt.toISOString(),
-//             user: status.user,
-//             notes: status.notes,
-//             metadata: {
-//               fromStatus: status.fromStatus,
-//               toStatus: status.toStatus,
-//             },
-//           });
-//         }
-//         summary.byCategory.orderStatus = statusHistory.length;
-//       } catch (error) {
-//         console.error("Error fetching status history:", error);
-//       }
-//     }
-
-//     // 2. Fetch picking events (from PickEvent table)
-//     if (!eventType || eventType === "PICKING") {
-//       try {
-//         // Get all pick lists for this order
-//         const pickListIds = await prisma.pickList.findMany({
-//           where: {
-//             items: {
-//               some: { orderId },
-//             },
-//           },
-//           select: { id: true, batchNumber: true },
-//         });
-
-//         const pickListIdArray = pickListIds.map((pl) => pl.id);
-
-//         if (pickListIdArray.length > 0) {
-//           // Fetch all pick events for these pick lists
-//           const pickEvents = await prisma.pickEvent.findMany({
-//             where: {
-//               pickListId: { in: pickListIdArray },
-//               ...(Object.keys(dateFilter).length > 0 && {
-//                 createdAt: dateFilter,
-//               }),
-//             },
-//             include: {
-//               user: {
-//                 select: { id: true, name: true, email: true },
-//               },
-//               fromUser: {
-//                 select: { id: true, name: true, email: true },
-//               },
-//               toUser: {
-//                 select: { id: true, name: true, email: true },
-//               },
-//               pickList: {
-//                 select: { batchNumber: true, status: true },
-//               },
-//             },
-//             orderBy: { createdAt: "desc" },
-//           });
-
-//           // Transform pick events to audit events
-//           for (const event of pickEvents) {
-//             const metadata: any = {
-//               batchNumber: event.pickList.batchNumber,
-//             };
-
-//             // Add location info if present
-//             if (event.location) metadata.location = event.location;
-//             if (event.scannedCode) metadata.scannedCode = event.scannedCode;
-
-//             // Add reassignment info if present
-//             if (event.fromUser) {
-//               metadata.fromUserId = event.fromUser.id;
-//               metadata.fromUserName = event.fromUser.name;
-//             }
-//             if (event.toUser) {
-//               metadata.toUserId = event.toUser.id;
-//               metadata.toUserName = event.toUser.name;
-//             }
-
-//             // Add any additional data from the data JSON field
-//             if (event.data) {
-//               metadata.reassignmentReason = (event.data as any).reason;
-//               metadata.progress = (event.data as any).progress;
-//             }
-
-//             timeline.push({
-//               id: `pick-event-${event.id}`,
-//               type: "PICKING",
-//               eventType: event.eventType,
-//               timestamp: event.createdAt.toISOString(),
-//               user: event.user,
-//               notes: event.notes,
-//               metadata,
-//               data: event.data as Record<string, any>,
-//             });
-//           }
-
-//           summary.byCategory.picking = pickEvents.length;
-//         }
-//       } catch (error) {
-//         console.error("Error fetching pick events:", error);
-//       }
-//     }
-
-//     // 3. Fetch packing events (from PackingEvent table if you have it, or WorkTask)
-//     if (!eventType || eventType === "PACKING") {
-//       try {
-//         // First, get all packing tasks for this order
-//         const packingTasks = await prisma.workTask.findMany({
-//           where: {
-//             type: "PACKING",
-//             orderIds: { has: orderId },
-//             ...(Object.keys(dateFilter).length > 0 && {
-//               createdAt: dateFilter,
-//             }),
-//           },
-//           select: { id: true, taskNumber: true },
-//         });
-
-//         const taskIdArray = packingTasks.map((t) => t.id);
-
-//         if (taskIdArray.length > 0) {
-//           // Check if PackingEvent table exists, otherwise fall back to WorkTask events
-//           try {
-//             const packingEvents = await prisma.packingEvent.findMany({
-//               where: {
-//                 taskId: { in: taskIdArray },
-//                 ...(Object.keys(dateFilter).length > 0 && {
-//                   createdAt: dateFilter,
-//                 }),
-//               },
-//               include: {
-//                 user: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//                 fromUser: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//                 toUser: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//                 task: {
-//                   select: { taskNumber: true, status: true },
-//                 },
-//               },
-//               orderBy: { createdAt: "desc" },
-//             });
-
-//             for (const event of packingEvents) {
-//               const metadata: any = {
-//                 taskNumber: event.task.taskNumber,
-//               };
-
-//               // Add reassignment info if present
-//               if (event.fromUser) {
-//                 metadata.fromUserId = event.fromUser.id;
-//                 metadata.fromUserName = event.fromUser.name;
-//               }
-//               if (event.toUser) {
-//                 metadata.toUserId = event.toUser.id;
-//                 metadata.toUserName = event.toUser.name;
-//               }
-
-//               // Add any additional data from the data JSON field
-//               if (event.data) {
-//                 metadata.reassignmentReason = (event.data as any).reason;
-//                 metadata.progress = (event.data as any).progress;
-//               }
-
-//               timeline.push({
-//                 id: `packing-event-${event.id}`,
-//                 type: "PACKING",
-//                 eventType: event.eventType,
-//                 timestamp: event.createdAt.toISOString(),
-//                 user: event.user,
-//                 notes: event.notes,
-//                 metadata,
-//                 data: event.data as Record<string, any>,
-//               });
-//             }
-
-//             summary.byCategory.packing = packingEvents.length;
-//           } catch (packingEventError) {
-//             // PackingEvent table doesn't exist yet, fall back to WorkTask milestones
-//             console.log(
-//               "PackingEvent table not found, using WorkTask milestones"
-//             );
-
-//             const workTasks = await prisma.workTask.findMany({
-//               where: {
-//                 type: "PACKING",
-//                 orderIds: { has: orderId },
-//                 ...(Object.keys(dateFilter).length > 0 && {
-//                   createdAt: dateFilter,
-//                 }),
-//               },
-//               include: {
-//                 assignedTo: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//                 startedBy: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//                 completedBy: {
-//                   select: { id: true, name: true, email: true },
-//                 },
-//               },
-//               orderBy: { createdAt: "desc" },
-//             });
-
-//             for (const task of workTasks) {
-//               // Task created/assigned
-//               timeline.push({
-//                 id: `task-created-${task.id}`,
-//                 type: "PACKING",
-//                 eventType: "TASK_CREATED",
-//                 timestamp: task.createdAt.toISOString(),
-//                 user: task.assignedTo,
-//                 metadata: {
-//                   taskNumber: task.taskNumber,
-//                   totalOrders: task.orderIds.length,
-//                   totalItems: task.totalItems || 0,
-//                 },
-//               });
-
-//               // Task started
-//               if (task.startedAt && task.startedBy) {
-//                 timeline.push({
-//                   id: `task-started-${task.id}`,
-//                   type: "PACKING",
-//                   eventType: "TASK_STARTED",
-//                   timestamp: task.startedAt.toISOString(),
-//                   user: task.startedBy,
-//                   metadata: {
-//                     taskNumber: task.taskNumber,
-//                   },
-//                 });
-//               }
-
-//               // Task completed
-//               if (task.completedAt && task.completedBy) {
-//                 timeline.push({
-//                   id: `task-completed-${task.id}`,
-//                   type: "PACKING",
-//                   eventType: "TASK_COMPLETED",
-//                   timestamp: task.completedAt.toISOString(),
-//                   user: task.completedBy,
-//                   metadata: {
-//                     taskNumber: task.taskNumber,
-//                     completedOrders: task.orderIds.length,
-//                     totalOrders: task.orderIds.length,
-//                   },
-//                 });
-//               }
-//             }
-
-//             summary.byCategory.packing = workTasks.length * 2; // Approximate
-//           }
-//         }
-//       } catch (error) {
-//         console.error("Error fetching packing events:", error);
-//       }
-//     }
-
-//     // 4. Fetch shipping events
-//     if (!eventType || eventType === "SHIPPING") {
-//       try {
-//         const packages = await prisma.shippingPackage.findMany({
-//           where: {
-//             orderId,
-//             ...(Object.keys(dateFilter).length > 0 && {
-//               createdAt: dateFilter,
-//             }),
-//           },
-//           include: {
-//             createdBy: {
-//               select: { id: true, name: true, email: true },
-//             },
-//             shippedBy: {
-//               select: { id: true, name: true, email: true },
-//             },
-//           },
-//           orderBy: { createdAt: "desc" },
-//         });
-
-//         for (const pkg of packages) {
-//           // Label created
-//           if (pkg.trackingNumber) {
-//             timeline.push({
-//               id: `label-${pkg.id}`,
-//               type: "SHIPPING",
-//               eventType: "LABEL_CREATED",
-//               timestamp: pkg.createdAt.toISOString(),
-//               user: pkg.createdBy,
-//               metadata: {
-//                 trackingNumber: pkg.trackingNumber,
-//                 carrier: pkg.carrier || "Unknown",
-//                 service: pkg.serviceLevel || "Standard",
-//                 weight: pkg.weight,
-//                 cost: pkg.shippingCost,
-//               },
-//             });
-//           }
-
-//           // Package shipped
-//           if (pkg.shippedAt && pkg.shippedBy) {
-//             timeline.push({
-//               id: `shipped-${pkg.id}`,
-//               type: "SHIPPING",
-//               eventType: "PACKAGE_SHIPPED",
-//               timestamp: pkg.shippedAt.toISOString(),
-//               user: pkg.shippedBy,
-//               metadata: {
-//                 trackingNumber: pkg.trackingNumber,
-//                 carrier: pkg.carrier || "Unknown",
-//               },
-//             });
-//           }
-//         }
-//         summary.byCategory.shipping = packages.length;
-//       } catch (error) {
-//         console.error("Error fetching shipping packages:", error);
-//       }
-//     }
-
-//     // 5. Fetch back order events
-//     if (!eventType || eventType === "BACK_ORDER") {
-//       try {
-//         const backOrders = await prisma.backOrder.findMany({
-//           where: {
-//             orderId,
-//             ...(Object.keys(dateFilter).length > 0 && {
-//               createdAt: dateFilter,
-//             }),
-//           },
-//           include: {
-//             item: {
-//               select: {
-//                 sku: true,
-//                 name: true,
-//               },
-//             },
-//             createdBy: {
-//               select: { id: true, name: true, email: true },
-//             },
-//             fulfilledBy: {
-//               select: { id: true, name: true, email: true },
-//             },
-//           },
-//           orderBy: { createdAt: "desc" },
-//         });
-
-//         for (const backOrder of backOrders) {
-//           // Back order created
-//           timeline.push({
-//             id: `backorder-created-${backOrder.id}`,
-//             type: "BACK_ORDER",
-//             eventType: "CREATED",
-//             timestamp: backOrder.createdAt.toISOString(),
-//             user: backOrder.createdBy,
-//             metadata: {
-//               quantity: backOrder.quantity,
-//               sku: backOrder.item.sku,
-//               itemName: backOrder.item.name,
-//               reason: backOrder.reason || "INSUFFICIENT_STOCK",
-//               expectedDate: backOrder.expectedRestockDate?.toISOString(),
-//             },
-//           });
-
-//           // Back order fulfilled
-//           if (backOrder.fulfilledAt && backOrder.fulfilledBy) {
-//             timeline.push({
-//               id: `backorder-fulfilled-${backOrder.id}`,
-//               type: "BACK_ORDER",
-//               eventType: "FULFILLED",
-//               timestamp: backOrder.fulfilledAt.toISOString(),
-//               user: backOrder.fulfilledBy,
-//               metadata: {
-//                 quantity: backOrder.quantity,
-//                 sku: backOrder.item.sku,
-//                 itemName: backOrder.item.name,
-//               },
-//             });
-//           }
-//         }
-//         summary.byCategory.backOrders = backOrders.length;
-//       } catch (error) {
-//         console.error("Error fetching back orders:", error);
-//       }
-//     }
-
-//     // Sort timeline by timestamp (most recent first)
-//     timeline.sort(
-//       (a, b) =>
-//         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-//     );
-
-//     summary.totalEvents = timeline.length;
-
-//     // Apply pagination
-//     const startIndex = (page - 1) * pageSize;
-//     const endIndex = startIndex + pageSize;
-//     const paginatedTimeline = timeline.slice(startIndex, endIndex);
-
-//     const response: AuditTrailResponse = {
-//       timeline: paginatedTimeline,
-//       summary,
-//       pagination: {
-//         total: timeline.length,
-//         page,
-//         pageSize,
-//         hasMore: endIndex < timeline.length,
-//       },
-//     };
-
-//     return NextResponse.json(response);
-//   } catch (error) {
-//     console.error("Audit trail error:", error);
-//     return NextResponse.json(
-//       {
-//         error: "Failed to fetch audit trail",
-//         message: error instanceof Error ? error.message : "Unknown error",
-//         details:
-//           process.env.NODE_ENV === "development"
-//             ? error instanceof Error
-//               ? error.stack
-//               : undefined
-//             : undefined,
-//       },
-//       { status: 500 }
-//     );
-//   }
-// }

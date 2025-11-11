@@ -4,11 +4,14 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { sku: string } }
+  { params }: { params: Promise<{ sku: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { sku } = await params;
+
     const forecast = await prisma.forecastSuggestion.findUnique({
-      where: { sku: params.sku },
+      where: { sku },
     });
 
     if (!forecast) {
@@ -20,7 +23,7 @@ export async function GET(
 
     // Get matching product variant from WMS
     const productVariant = await prisma.productVariant.findUnique({
-      where: { sku: params.sku },
+      where: { sku },
       include: {
         product: true,
         inventory: {

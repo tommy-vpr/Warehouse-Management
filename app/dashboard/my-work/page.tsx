@@ -12,6 +12,7 @@ import {
   Clock,
   CheckCircle2,
   PlayCircle,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ interface WorkTask {
   progress: number;
   priority: number;
   notes: string | null;
+  source: "WORK_TASK" | "PICK_LIST";
 }
 
 interface MyWorkResponse {
@@ -88,6 +90,8 @@ export default function MyWorkPage() {
   const tasks = data?.tasks || [];
   const totalPages = data?.totalPages || 1;
 
+  console.log(tasks);
+
   // Get stats
   const stats = {
     pending: tasks.filter((t) => t.status === "PENDING").length,
@@ -99,17 +103,23 @@ export default function MyWorkPage() {
   const getTaskIcon = (type: TaskType) => {
     switch (type) {
       case "PICKING":
-        return <Package className="w-5 h-5" />;
+        return <Package className="w-4 h-4" />;
       case "PACKING":
-        return <PackageCheck className="w-5 h-5" />;
+        return <PackageCheck className="w-4 h-4" />;
       case "SHIPPING":
-        return <Truck className="w-5 h-5" />;
+        return <Truck className="w-4 h-4" />;
       case "QC":
-        return <CheckCircle2 className="w-5 h-5" />;
+        return <CheckCircle2 className="w-4 h-4" />;
     }
   };
 
   const getTaskLink = (task: WorkTask) => {
+    // If it's a PickList, always go to picking progress page
+    if (task.source === "PICK_LIST") {
+      return `/dashboard/picking/progress/${task.id}`;
+    }
+
+    // Otherwise, route based on task type
     switch (task.type) {
       case "PICKING":
         return `/dashboard/picking/${task.id}`;
@@ -145,13 +155,13 @@ export default function MyWorkPage() {
 
   const getProgressColor = (progress: number) => {
     if (progress === 0) return "bg-gray-200";
-    if (progress < 50) return "bg-yellow-500";
-    if (progress < 100) return "bg-blue-500";
-    return "bg-green-500";
+    if (progress < 50) return "bg-orange-400 dark:bg-yellow-500";
+    if (progress < 100) return "bg-orange-400 dark:bg-orange-500";
+    return "bg-blue-400 dark:bg-blue-500";
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-2 max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">My Work</h1>
         <p className="text-gray-600 dark:text-gray-400">
@@ -210,7 +220,7 @@ export default function MyWorkPage() {
           <CardTitle>Filter Tasks</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex gap-4">
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">
                 Task Type
@@ -261,10 +271,12 @@ export default function MyWorkPage() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600 dark:text-gray-400">
-                Loading tasks...
-              </p>
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+                <p className="text-gray-600 dark:text-gray-400">
+                  Loading tasks...
+                </p>
+              </div>
             </div>
           ) : error ? (
             <div className="text-center py-12">
@@ -280,7 +292,7 @@ export default function MyWorkPage() {
               {/* Desktop Table */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Task #
@@ -305,18 +317,18 @@ export default function MyWorkPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-200 dark:divide-zinc-700">
                     {tasks.map((task) => (
-                      <tr key={task.id} className="hover:bg-gray-50">
+                      <tr key={task.id}>
                         <td className="px-6 py-4">
-                          <span className="text-sm font-mono text-gray-900 dark:text-gray-400">
+                          <span className="text-sm font-mono text-gray-900 dark:text-white">
                             {task.taskNumber}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 dark:text-gray-400">
                             {getTaskIcon(task.type)}
-                            <span className="font-medium">{task.type}</span>
+                            <span className="text-sm">{task.type}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">

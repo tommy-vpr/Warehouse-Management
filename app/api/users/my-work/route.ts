@@ -1,4 +1,4 @@
-// app/api/my-work/route.ts
+// app/api/users/my-work/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
@@ -7,127 +7,322 @@ import { authOptions } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type"); // picking, packing, shipping, or null for all
-    const status = searchParams.get("status"); // PENDING, IN_PROGRESS, COMPLETED
+    const type = searchParams.get("type");
+    const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
-
-    const skip = (page - 1) * limit;
     const userId = session.user.id;
 
-    console.log("📋 Fetching user tasks...", {
-      userId,
-      type,
-      status,
-      page,
-      limit,
-    });
+    console.log("📋 My Work Query:", { userId, type, status, page });
 
-    // Build where clause
-    const where: any = {
-      assignedTo: userId,
-    };
+    // Build where clauses
+    const workTaskWhere: any = { assignedTo: userId };
+    if (type && type !== "all") workTaskWhere.type = type.toUpperCase();
+    if (status && status !== "all") workTaskWhere.status = status;
 
-    if (type) {
-      where.type = type.toUpperCase();
-    }
+    const includePickLists =
+      !type || type === "all" || type.toLowerCase() === "picking";
+    const pickListWhere: any = { assignedTo: userId };
+    if (status && status !== "all") pickListWhere.status = status;
 
-    if (status) {
-      where.status = status;
-    }
-
-    // Get total count
-    const totalCount = await prisma.workTask.count({ where });
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Fetch tasks with related data
-    const tasks = await prisma.workTask.findMany({
-      where,
-      include: {
-        assignedUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Fetch everything
+    const [workTasks, pickLists] = await Promise.all([
+      prisma.workTask.findMany({
+        where: workTaskWhere,
+        include: {
+          assignedUser: { select: { id: true, name: true, email: true } },
+          taskItems: {
+            include: { order: { select: { id: true, orderNumber: true } } },
           },
         },
-        taskItems: {
-          include: {
-            order: {
-              select: {
-                id: true,
-                orderNumber: true,
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      }),
+      includePickLists
+        ? prisma.pickList.findMany({
+            where: pickListWhere,
+            include: {
+              assignedUser: { select: { id: true, name: true, email: true } },
+              items: {
+                include: {
+                  order: { select: { id: true, orderNumber: true } },
+                },
               },
             },
-          },
-        },
-      },
-      orderBy: [
-        {
-          status: "asc", // PENDING first, then IN_PROGRESS, then COMPLETED
-        },
-        {
-          createdAt: "desc",
-        },
-      ],
-      skip,
-      take: limit,
-    });
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+          })
+        : [],
+    ]);
 
-    // Add calculated fields
-    const tasksWithExtras = tasks.map((task) => {
-      // Get unique orders from task items
-      const uniqueOrders = new Map<string, string>();
-      task.taskItems.forEach((item) => {
-        if (item.order) {
-          uniqueOrders.set(item.order.id, item.order.orderNumber);
+    console.log(
+      `📊 Found: ${workTasks.length} WorkTasks, ${pickLists.length} PickLists`
+    );
+
+    // Transform WorkTasks
+    const transformedWorkTasks = workTasks.map((task) => ({
+      id: task.id,
+      taskNumber: task.taskNumber,
+      type: task.type,
+      status: task.status,
+      createdAt: task.createdAt.toISOString(),
+      totalOrders: task.totalOrders,
+      completedOrders: task.completedOrders,
+      orderNumbers: Array.from(
+        new Set(task.taskItems.map((i) => i.order?.orderNumber).filter(Boolean))
+      ),
+      progress:
+        task.totalOrders > 0
+          ? Math.round((task.completedOrders / task.totalOrders) * 100)
+          : 0,
+      priority: task.priority,
+      notes: task.notes,
+      source: "WORK_TASK" as const,
+    }));
+
+    // Transform PickLists
+    const transformedPickLists = pickLists.map((pl) => {
+      // ✅ Calculate completed orders
+      // An order is "completed" if ALL its items in this pick list are PICKED
+      const orderCompletionStatus = new Map<
+        string,
+        { total: number; picked: number }
+      >();
+
+      pl.items.forEach((item: any) => {
+        if (!item.orderId) return;
+
+        if (!orderCompletionStatus.has(item.orderId)) {
+          orderCompletionStatus.set(item.orderId, { total: 0, picked: 0 });
+        }
+
+        const orderStatus = orderCompletionStatus.get(item.orderId)!;
+        orderStatus.total++;
+        if (item.status === "PICKED") {
+          orderStatus.picked++;
         }
       });
 
-      const totalOrders = uniqueOrders.size;
-      const orderNumbers = Array.from(uniqueOrders.values());
+      // Count orders where all items are picked
+      let completedOrdersCount = 0;
+      for (const [orderId, orderStatus] of orderCompletionStatus.entries()) {
+        if (orderStatus.picked === orderStatus.total && orderStatus.total > 0) {
+          completedOrdersCount++;
+        }
+      }
 
-      // Use the completedOrders from the WorkTask model (already tracked)
-      const completedOrders = task.completedOrders;
-
-      // Calculate progress percentage
-      const progress =
-        totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
+      // Get unique order numbers
+      const orderNumbers = Array.from(
+        new Set(pl.items.map((i: any) => i.order?.orderNumber).filter(Boolean))
+      );
 
       return {
-        id: task.id,
-        taskNumber: task.taskNumber,
-        type: task.type,
-        status: task.status,
-        createdAt: task.createdAt.toISOString(),
-        totalOrders,
-        completedOrders,
+        id: pl.id,
+        taskNumber: pl.batchNumber,
+        type: "PICKING" as const,
+        status: pl.status,
+        createdAt: pl.createdAt.toISOString(),
+        totalOrders: orderCompletionStatus.size,
+        completedOrders: completedOrdersCount, // ✅ Now calculated!
         orderNumbers,
-        progress,
-        priority: task.priority,
-        notes: task.notes,
+        progress:
+          pl.totalItems > 0
+            ? Math.round((pl.pickedItems / pl.totalItems) * 100)
+            : 0,
+        priority: pl.priority,
+        notes: pl.notes,
+        source: "PICK_LIST" as const,
       };
     });
 
+    // Combine and sort
+    const allTasks = [...transformedWorkTasks, ...transformedPickLists].sort(
+      (a, b) => {
+        const statusOrder: any = {
+          PENDING: 1,
+          ASSIGNED: 2,
+          IN_PROGRESS: 3,
+          PAUSED: 4,
+          PARTIALLY_COMPLETED: 5,
+          COMPLETED: 6,
+          CANCELLED: 7,
+        };
+        const statusDiff =
+          (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        return statusDiff !== 0
+          ? statusDiff
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    );
+
+    // Paginate
+    const totalCount = allTasks.length;
+    const totalPages = Math.ceil(totalCount / limit);
+    const skip = (page - 1) * limit;
+    const paginatedTasks = allTasks.slice(skip, skip + limit);
+
     console.log(
-      `✅ Found ${tasks.length} tasks (page ${page}/${totalPages}, total: ${totalCount})`
+      `✅ Returning ${paginatedTasks.length}/${totalCount} tasks (page ${page})`
     );
 
     return NextResponse.json({
-      tasks: tasksWithExtras,
+      tasks: paginatedTasks,
       totalCount,
       totalPages,
       currentPage: page,
     });
   } catch (error) {
-    console.error("❌ Error fetching user tasks:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to fetch tasks";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    console.error("❌ My Work Error:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch tasks",
+        message: error instanceof Error ? error.message : "Unknown",
+      },
+      { status: 500 }
+    );
   }
 }
+
+// // app/api/users/my-work/route.ts
+// import { NextRequest, NextResponse } from "next/server";
+// import { prisma } from "@/lib/prisma";
+// import { getServerSession } from "next-auth";
+// import { authOptions } from "@/lib/auth";
+
+// export async function GET(request: NextRequest) {
+//   try {
+//     const session = await getServerSession(authOptions);
+//     if (!session?.user) {
+//       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//     }
+
+//     const { searchParams } = new URL(request.url);
+//     const type = searchParams.get("type");
+//     const status = searchParams.get("status");
+//     const page = parseInt(searchParams.get("page") || "1");
+//     const limit = parseInt(searchParams.get("limit") || "20");
+
+//     const skip = (page - 1) * limit;
+//     const userId = session.user.id;
+
+//     console.log("📋 Fetching user tasks...", {
+//       userId,
+//       type,
+//       status,
+//       page,
+//       limit,
+//     });
+
+//     // Build where clause
+//     const where: any = {
+//       assignedTo: userId,
+//     };
+
+//     if (type) {
+//       where.type = type.toUpperCase();
+//     }
+
+//     if (status) {
+//       where.status = status;
+//     }
+
+//     // Get total count
+//     const totalCount = await prisma.workTask.count({ where });
+//     const totalPages = Math.ceil(totalCount / limit);
+
+//     // Fetch tasks with related data
+//     const tasks = await prisma.workTask.findMany({
+//       where,
+//       include: {
+//         assignedUser: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//           },
+//         },
+//         taskItems: {
+//           include: {
+//             order: {
+//               select: {
+//                 id: true,
+//                 orderNumber: true,
+//               },
+//             },
+//           },
+//         },
+//       },
+//       orderBy: [
+//         {
+//           status: "asc",
+//         },
+//         {
+//           createdAt: "desc",
+//         },
+//       ],
+//       skip,
+//       take: limit,
+//     });
+
+//     // Add calculated fields
+//     const tasksWithExtras = tasks.map((task) => {
+//       // Get unique orders from task items for orderNumbers ONLY
+//       const uniqueOrders = new Map<string, string>();
+//       task.taskItems.forEach((item) => {
+//         if (item.order) {
+//           uniqueOrders.set(item.order.id, item.order.orderNumber);
+//         }
+//       });
+
+//       const orderNumbers = Array.from(uniqueOrders.values());
+
+//       // ✅ USE DATABASE VALUES - Don't recalculate!
+//       const totalOrders = task.totalOrders;
+//       const completedOrders = task.completedOrders;
+
+//       // Calculate progress percentage
+//       const progress =
+//         totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
+
+//       console.log(`Task ${task.taskNumber}:`, {
+//         totalOrders,
+//         completedOrders,
+//         progress,
+//         status: task.status,
+//       });
+
+//       return {
+//         id: task.id,
+//         taskNumber: task.taskNumber,
+//         type: task.type,
+//         status: task.status,
+//         createdAt: task.createdAt.toISOString(),
+//         totalOrders,
+//         completedOrders,
+//         orderNumbers,
+//         progress,
+//         priority: task.priority,
+//         notes: task.notes,
+//       };
+//     });
+
+//     console.log(
+//       `✅ Found ${tasks.length} tasks (page ${page}/${totalPages}, total: ${totalCount})`
+//     );
+
+//     return NextResponse.json({
+//       tasks: tasksWithExtras,
+//       totalCount,
+//       totalPages,
+//       currentPage: page,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching user tasks:", error);
+//     const errorMessage =
+//       error instanceof Error ? error.message : "Failed to fetch tasks";
+//     return NextResponse.json({ error: errorMessage }, { status: 500 });
+//   }
+// }

@@ -11,7 +11,7 @@ import BackOrderAllocationManager from "@/components/backorders/BackOrderAllocat
 
 export default function BackOrdersPage() {
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-2">
       <h1 className="text-3xl font-bold mb-6">Back Order Management</h1>
 
       <Tabs defaultValue="allocation" className="w-full">

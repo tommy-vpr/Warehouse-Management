@@ -31,10 +31,25 @@ export interface AuditEvent {
     taskNumber?: string;
     taskType?: string;
 
-    // Shipping metadata
+    // Shipping metadata - ✅ UPDATED/ADDED
     trackingNumber?: string;
     carrier?: string;
-    service?: string;
+    service?: string; // Keep this for backward compatibility
+    serviceLevel?: string; // ✅ Add this
+    weight?: number; // ✅ Add this
+    shippingCost?: string | number; // ✅ Add this
+    insuranceAmount?: number; // ✅ Add this
+    voidReason?: string; // ✅ Add this
+    dimensions?: {
+      // ✅ Add this
+      length: number;
+      width: number;
+      height: number;
+    };
+    packageId?: string; // ✅ Add this
+    manifestId?: string; // ✅ Add this
+    pickupDate?: string; // ✅ Add this
+    rateQuotes?: any; // ✅ Add this
 
     // Status change metadata
     fromStatus?: string;
@@ -46,6 +61,7 @@ export interface AuditEvent {
     itemName?: string;
     reason?: string;
     status?: string;
+    expectedDate?: string; // ✅ Add this for back orders
 
     // Reassignment metadata
     fromUserId?: string;

@@ -74,6 +74,7 @@ export default function SignIn() {
       } else if (result?.ok) {
         toast({
           title: "Welcome!",
+          description: "You’ve logged in successfully. Great to see you again!",
           variant: "success",
         });
         router.push("/dashboard");

@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { barcode: string } }
+  { params }: { params: Promise<{ barcode: string }> }
 ) {
   try {
-    const { barcode } = params;
+    const { barcode } = await params;
 
     // Find location by barcode (which is the location name)
     const location = await prisma.location.findUnique({

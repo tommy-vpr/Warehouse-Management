@@ -4,10 +4,10 @@ import { getProductTransactions } from "@/lib/services/product-transactions";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { variantId: string } }
+  { params }: { params: Promise<{ variantId: string }> }
 ) {
   try {
-    const { variantId } = params;
+    const { variantId } = await params;
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "10");
 

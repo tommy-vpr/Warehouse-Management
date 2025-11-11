@@ -263,7 +263,7 @@ export default function PackingTasksDashboard() {
             {tasks.length === 0 && !isFiltering && (
               <div className="text-center py-12">
                 <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-200 mb-2">
                   No packing tasks found
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
@@ -276,7 +276,7 @@ export default function PackingTasksDashboard() {
       </Card>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
+      {true && (
         <div className="flex items-center justify-between py-3">
           <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
             Showing page {currentPage} of {totalPages}

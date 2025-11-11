@@ -6,10 +6,10 @@ import { PDFDocument } from "pdf-lib";
 // GET /api/shipping/tracking/:id
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Fetch order with all related packages AND items
     const order = await prisma.order.findUnique({

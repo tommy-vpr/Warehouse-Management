@@ -227,7 +227,7 @@ export default function TransferDetailsPage() {
   const isRejected = transfer.metadata.status === "REJECTED";
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-2">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center mb-6">

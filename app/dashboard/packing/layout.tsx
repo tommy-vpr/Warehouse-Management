@@ -38,8 +38,8 @@ export default function PackingLayout({ children }: { children: ReactNode }) {
   return (
     <div>
       {isAdminOrManager && (
-        <div className="border-b bg-background mb-4 sm:mb-6">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3">
+        <div className="border-b bg-background my-6 max-w-7xl mx-auto px-4">
+          <div className="">
             {/* Mobile: Compact Segmented Control */}
             <div className="sm:hidden">
               <div className="inline-flex w-full bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">

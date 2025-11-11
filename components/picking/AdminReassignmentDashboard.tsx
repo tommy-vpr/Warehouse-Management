@@ -1,4 +1,3 @@
-// components/admin/AdminReassignmentDashboard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,11 +10,17 @@ import {
   Clock,
   History,
   Loader2,
+  X,
 } from "lucide-react";
 import type { ReassignmentReason } from "@/types/audit-trail";
+import type {
+  StaffMemberWithWorkload,
+  PickListForAdmin,
+  ReassignmentEvent,
+  ReassignmentRequest,
+} from "@/types/admin";
 import { toast } from "@/hooks/use-toast";
 
-// Standardized reassignment reasons matching the audit trail system
 const REASSIGNMENT_REASONS: { value: ReassignmentReason; label: string }[] = [
   { value: "STAFF_UNAVAILABLE", label: "Staff Unavailable" },
   { value: "SHIFT_CHANGE", label: "Shift Change" },
@@ -28,11 +33,12 @@ const REASSIGNMENT_REASONS: { value: ReassignmentReason; label: string }[] = [
 ];
 
 function AdminReassignmentDashboard() {
-  const [staff, setStaff] = useState([]);
-  const [pickLists, setPickLists] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [staff, setStaff] = useState<StaffMemberWithWorkload[]>([]);
+  const [pickLists, setPickLists] = useState<PickListForAdmin[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedStaff, setSelectedStaff] =
+    useState<StaffMemberWithWorkload | null>(null);
+  const [showAuditTrail, setShowAuditTrail] = useState<boolean>(false);
 
   useEffect(() => {
     loadData();
@@ -42,37 +48,38 @@ function AdminReassignmentDashboard() {
     setLoading(true);
 
     try {
-      // Fetch all active pick lists without pagination (or with a high limit)
-      // Since this is for admin workload management, we need all active lists
       const [staffRes, pickListsRes] = await Promise.all([
         fetch("/api/users?role=STAFF"),
         fetch("/api/pick-lists?status=IN_PROGRESS,ASSIGNED,PAUSED&limit=1000"),
       ]);
 
+      if (!staffRes.ok || !pickListsRes.ok) {
+        throw new Error("Failed to fetch data");
+      }
+
       const staffData = await staffRes.json();
       const pickListsResponse = await pickListsRes.json();
+      const pickListsData: PickListForAdmin[] =
+        pickListsResponse.pickLists || pickListsResponse;
 
-      // Handle new paginated response format
-      const pickListsData = pickListsResponse.pickLists || pickListsResponse;
+      const staffWithWorkload: StaffMemberWithWorkload[] = staffData.map(
+        (s: any) => {
+          const assignedLists = pickListsData.filter(
+            (pl) => pl.assignedTo === s.id
+          );
+          const totalRemaining = assignedLists.reduce(
+            (sum, pl) => sum + (pl.totalItems - pl.pickedItems),
+            0
+          );
 
-      // Calculate workload for each staff
-      const staffWithWorkload = staffData.map((s) => {
-        const assignedLists = pickListsData.filter(
-          (pl) => pl.assignedTo === s.id
-        );
-
-        const totalRemaining = assignedLists.reduce(
-          (sum, pl) => sum + (pl.totalItems - pl.pickedItems),
-          0
-        );
-
-        return {
-          ...s,
-          activeLists: assignedLists.length,
-          remainingItems: totalRemaining,
-          pickLists: assignedLists,
-        };
-      });
+          return {
+            ...s,
+            activeLists: assignedLists.length,
+            remainingItems: totalRemaining,
+            pickLists: assignedLists,
+          };
+        }
+      );
 
       setStaff(staffWithWorkload);
       setPickLists(pickListsData);
@@ -91,162 +98,149 @@ function AdminReassignmentDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-4 animate-spin" />{" "}
+        <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Staff Workload Management
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Monitor and reassign pick lists across your warehouse team
-          </p>
-        </div>
-
-        {/* Audit Trail Button */}
-        <button
-          onClick={() => setShowAuditTrail(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition text-gray-900 dark:text-gray-100"
-        >
-          <History className="w-4 h-4" />
-          <span>View Reassignment History</span>
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          icon={<Users className="w-6 h-6" />}
-          label="Active Staff"
-          value={staff.filter((s) => s.activeLists > 0).length}
-          total={staff.length}
-          color="blue"
-        />
-        <StatCard
-          icon={<Package className="w-6 h-6" />}
-          label="Active Pick Lists"
-          value={pickLists.length}
-          color="green"
-        />
-        <StatCard
-          icon={<AlertTriangle className="w-6 h-6" />}
-          label="Paused Lists"
-          value={pickLists.filter((pl) => pl.status === "PAUSED").length}
-          color="orange"
-        />
-        <StatCard
-          icon={<Activity className="w-6 h-6" />}
-          label="Items Remaining"
-          value={pickLists.reduce(
-            (sum, pl) => sum + (pl.totalItems - pl.pickedItems),
-            0
-          )}
-          color="purple"
-        />
-      </div>
-
-      {/* Staff Workload Table */}
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow mt-6 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Staff Member
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Workload
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Active Lists
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Items Remaining
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Pick Lists
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-zinc-700">
-              {staff.map((member) => (
-                <StaffWorkloadRow
-                  key={member.id}
-                  staff={member}
-                  onSelectStaff={() => setSelectedStaff(member)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Bulk Reassignment Modal */}
-      {selectedStaff && (
-        <BulkReassignmentModal
-          staff={selectedStaff}
-          allStaff={staff.filter((s) => s.id !== selectedStaff.id)}
-          onClose={() => setSelectedStaff(null)}
-          onSuccess={loadData}
-        />
-      )}
-
-      {/* Audit Trail Modal */}
-      {showAuditTrail && (
-        <ReassignmentAuditTrailModal onClose={() => setShowAuditTrail(false)} />
-      )}
-    </div>
-  );
-}
-
-function WorkloadBalanceIndicator({ staff }) {
-  const workloads = staff.map((s) => s.remainingItems);
-  const avg = workloads.reduce((a, b) => a + b, 0) / workloads.length;
-  const max = Math.max(...workloads);
-  const min = Math.min(...workloads);
-  const imbalance = max - min;
-
-  const isBalanced = imbalance < avg * 0.5;
-
-  return (
-    <div
-      className={`p-4 rounded-lg border ${
-        isBalanced
-          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-          : "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <TrendingUp
-          className={`w-5 h-5 ${
-            isBalanced
-              ? "text-green-600 dark:text-green-400"
-              : "text-yellow-600 dark:text-yellow-400"
-          }`}
-        />
-        <div>
-          <div className="font-semibold text-gray-900 dark:text-gray-100">
-            {isBalanced ? "Workload Balanced" : "Workload Imbalance Detected"}
+    <div className="min-h-screen bg-background p-3 sm:p-6 overflow-x-hidden">
+      <div className="max-w-7xl mx-auto">
+        {/* Header - Responsive */}
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Staff Workload Management
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+              Monitor and reassign pick lists across your warehouse team
+            </p>
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Range: {min} - {max} items • Average: {Math.round(avg)} items
-            {!isBalanced && " • Consider rebalancing"}
+
+          {/* Audit Trail Button - Full width on mobile */}
+          <button
+            onClick={() => setShowAuditTrail(true)}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition text-gray-900 dark:text-gray-100"
+          >
+            <History className="w-4 h-4" />
+            <span className="text-sm sm:text-base">
+              View Reassignment History
+            </span>
+          </button>
+        </div>
+
+        {/* Summary Cards - Responsive Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <StatCard
+            icon={<Users className="w-4 h-4 sm:w-6 sm:h-6" />}
+            label="Active Staff"
+            value={staff.filter((s) => s.activeLists > 0).length}
+            total={staff.length}
+            color="blue"
+          />
+          <StatCard
+            icon={<Package className="w-4 h-4 sm:w-6 sm:h-6" />}
+            label="Active Pick Lists"
+            value={pickLists.length}
+            color="green"
+          />
+          <StatCard
+            icon={<AlertTriangle className="w-4 h-4 sm:w-6 sm:h-6" />}
+            label="Paused Lists"
+            value={pickLists.filter((pl) => pl.status === "PAUSED").length}
+            color="orange"
+          />
+          <StatCard
+            icon={<Activity className="w-4 h-4 sm:w-6 sm:h-6" />}
+            label="Items Remaining"
+            value={pickLists.reduce(
+              (sum, pl) => sum + (pl.totalItems - pl.pickedItems),
+              0
+            )}
+            color="purple"
+          />
+        </div>
+
+        {/* Desktop: Table */}
+        <div className="hidden lg:block bg-white dark:bg-zinc-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Staff Member
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Workload
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Active Lists
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Items Remaining
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Pick Lists
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-zinc-700">
+                {staff.map((member) => (
+                  <StaffWorkloadRow
+                    key={member.id}
+                    staff={member}
+                    onSelectStaff={() => setSelectedStaff(member)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
+
+        {/* Mobile: Cards */}
+        <div className="lg:hidden space-y-3">
+          {staff.map((member) => (
+            <StaffWorkloadCard
+              key={member.id}
+              staff={member}
+              onSelectStaff={() => setSelectedStaff(member)}
+            />
+          ))}
+        </div>
+
+        {/* Bulk Reassignment Modal */}
+        {selectedStaff && (
+          <BulkReassignmentModal
+            staff={selectedStaff}
+            allStaff={staff.filter((s) => s.id !== selectedStaff.id)}
+            onClose={() => setSelectedStaff(null)}
+            onSuccess={loadData}
+          />
+        )}
+
+        {/* Audit Trail Modal */}
+        {showAuditTrail && (
+          <ReassignmentAuditTrailModal
+            onClose={() => setShowAuditTrail(false)}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, total, color }) {
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  total?: number;
+  color: "blue" | "green" | "orange" | "purple";
+}
+
+function StatCard({ icon, label, value, total, color }: StatCardProps) {
   const colors = {
     blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
     green:
@@ -258,24 +252,33 @@ function StatCard({ icon, label, value, total, color }) {
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6">
-      <div className={`inline-flex p-3 rounded-lg ${colors[color]} mb-3`}>
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-3 sm:p-6">
+      <div
+        className={`inline-flex p-2 sm:p-3 rounded-lg ${colors[color]} mb-2 sm:mb-3`}
+      >
         {icon}
       </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+      <div className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
         {value}
         {total && (
-          <span className="text-lg text-gray-400 dark:text-gray-500">
+          <span className="text-sm sm:text-lg text-gray-400 dark:text-gray-500">
             /{total}
           </span>
         )}
       </div>
-      <div className="text-sm text-gray-600 dark:text-gray-400">{label}</div>
+      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+        {label}
+      </div>
     </div>
   );
 }
 
-function StaffWorkloadRow({ staff, onSelectStaff }) {
+interface StaffWorkloadRowProps {
+  staff: StaffMemberWithWorkload;
+  onSelectStaff: () => void;
+}
+
+function StaffWorkloadRow({ staff, onSelectStaff }: StaffWorkloadRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   const getWorkloadLevel = () => {
@@ -288,7 +291,7 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
 
   const workloadLevel = getWorkloadLevel();
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "IN_PROGRESS":
         return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
@@ -304,11 +307,10 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
   return (
     <>
       <tr className="hover:bg-gray-50 dark:hover:bg-zinc-700/50">
-        {/* Staff Member */}
         <td className="px-6 py-4">
           <div>
             <div className="font-medium text-gray-900 dark:text-gray-100">
-              {staff.name}
+              {staff.name || staff.email}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {staff.email}
@@ -316,7 +318,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
           </div>
         </td>
 
-        {/* Workload Badge */}
         <td className="px-6 py-4">
           <span
             className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center
@@ -335,7 +336,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
           </span>
         </td>
 
-        {/* Active Lists Count */}
         <td className="px-6 py-4">
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -345,14 +345,12 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
           </div>
         </td>
 
-        {/* Items Remaining */}
         <td className="px-6 py-4">
           <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {staff.remainingItems}
           </div>
         </td>
 
-        {/* Pick Lists Toggle */}
         <td className="px-6 py-4">
           {staff.pickLists.length > 0 ? (
             <button
@@ -369,7 +367,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
           )}
         </td>
 
-        {/* Actions */}
         <td className="px-6 py-4 text-right">
           {staff.pickLists.length > 0 && (
             <button
@@ -382,7 +379,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
         </td>
       </tr>
 
-      {/* Expanded Pick Lists Details */}
       {expanded && staff.pickLists.length > 0 && (
         <tr>
           <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-zinc-900">
@@ -392,7 +388,6 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                 {staff.pickLists.map((pl) => {
-                  // Extract unique order numbers from pick list items
                   const orderNumbers = [
                     ...new Set(
                       pl.items
@@ -424,18 +419,13 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
                       <div className="text-xs text-gray-500 dark:text-gray-500">
                         {pl.totalItems - pl.pickedItems} remaining
                       </div>
-                      <div className="border-t border-gray-200 dark:border-zinc-700 pt-2 mt-2 flex gap-2">
-                        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                          Order:{" "}
-                          <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 rounded text-xs">
-                            {orderNumbers.length > 0 ? (
-                              <>{orderNumbers}</>
-                            ) : (
-                              "No orders"
-                            )}
-                          </span>
+                      {orderNumbers.length > 0 && (
+                        <div className="border-t border-gray-200 dark:border-zinc-700 pt-2 mt-2">
+                          <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            Order: {orderNumbers.join(", ")}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -448,15 +438,141 @@ function StaffWorkloadRow({ staff, onSelectStaff }) {
   );
 }
 
-function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
-  const [targetStaffId, setTargetStaffId] = useState("");
-  const [selectedLists, setSelectedLists] = useState([]);
-  const [reason, setReason] = useState<ReassignmentReason>("WORKLOAD_BALANCE");
-  const [notes, setNotes] = useState("");
-  const [strategy, setStrategy] = useState("split");
-  const [loading, setLoading] = useState(false);
+// NEW: Mobile Card View Component
+interface StaffWorkloadCardProps {
+  staff: StaffMemberWithWorkload;
+  onSelectStaff: () => void;
+}
 
-  const toggleList = (listId) => {
+function StaffWorkloadCard({ staff, onSelectStaff }: StaffWorkloadCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const getWorkloadLevel = () => {
+    if (staff.remainingItems === 0) return { label: "Idle", color: "gray" };
+    if (staff.remainingItems < 50) return { label: "Light", color: "green" };
+    if (staff.remainingItems < 150)
+      return { label: "Moderate", color: "yellow" };
+    return { label: "Heavy", color: "red" };
+  };
+
+  const workloadLevel = getWorkloadLevel();
+
+  return (
+    <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-4">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+            {staff.name || staff.email}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+            {staff.email}
+          </div>
+        </div>
+        <span
+          className={`ml-2 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+            workloadLevel.color === "gray"
+              ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+              : workloadLevel.color === "green"
+              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              : workloadLevel.color === "yellow"
+              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+          }`}
+        >
+          {workloadLevel.label}
+        </span>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Active Lists
+          </div>
+          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {staff.activeLists}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            Items Remaining
+          </div>
+          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {staff.remainingItems}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {staff.pickLists.length > 0 && (
+          <>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-zinc-600 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 text-gray-900 dark:text-gray-100"
+            >
+              {expanded ? "Hide" : "Show"} Lists
+            </button>
+            <button
+              onClick={onSelectStaff}
+              className="flex-1 px-3 py-2 text-sm bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600"
+            >
+              Reassign
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Expanded Pick Lists */}
+      {expanded && staff.pickLists.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-700 space-y-2">
+          {staff.pickLists.map((pl) => (
+            <div
+              key={pl.id}
+              className="p-2 bg-gray-50 dark:bg-zinc-900 rounded border border-gray-200 dark:border-zinc-700"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {pl.batchNumber}
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  {pl.status}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                {pl.pickedItems}/{pl.totalItems} picked •{" "}
+                {pl.totalItems - pl.pickedItems} remaining
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface BulkReassignmentModalProps {
+  staff: StaffMemberWithWorkload;
+  allStaff: StaffMemberWithWorkload[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function BulkReassignmentModal({
+  staff,
+  allStaff,
+  onClose,
+  onSuccess,
+}: BulkReassignmentModalProps) {
+  const [targetStaffId, setTargetStaffId] = useState<string>("");
+  const [selectedLists, setSelectedLists] = useState<string[]>([]);
+  const [reason, setReason] = useState<ReassignmentReason>("WORKLOAD_BALANCE");
+  const [notes, setNotes] = useState<string>("");
+  const [strategy, setStrategy] = useState<"split" | "simple">("split");
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const toggleList = (listId: string) => {
     setSelectedLists((prev) =>
       prev.includes(listId)
         ? prev.filter((id) => id !== listId)
@@ -474,16 +590,18 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
     setLoading(true);
 
     try {
+      const payload: ReassignmentRequest = {
+        pickListIds: selectedLists,
+        toUserId: targetStaffId,
+        reason,
+        notes: notes.trim() || undefined,
+        strategy,
+      };
+
       const response = await fetch("/api/pick-lists/reassign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pickListIds: selectedLists,
-          toUserId: targetStaffId,
-          reason,
-          notes: notes.trim() || undefined,
-          strategy,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -503,7 +621,7 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
       toast({
         variant: "destructive",
         title: "❌ Reassignment Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Unknown error",
       });
     } finally {
       setLoading(false);
@@ -512,25 +630,33 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-zinc-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-zinc-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-zinc-700">
-          <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
-            Reassign Pick Lists from {staff.name}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Select destination staff member and pick lists to reassign
-          </p>
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-zinc-700 flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
+              Reassign Pick Lists
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              from {staff.name || staff.email}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-4 p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Target Staff Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -544,8 +670,8 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
               <option value="">Select staff member...</option>
               {allStaff.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} - {s.remainingItems} items remaining ({s.activeLists}{" "}
-                  active lists)
+                  {s.name || s.email} - {s.remainingItems} items (
+                  {s.activeLists} lists)
                 </option>
               ))}
             </select>
@@ -575,38 +701,38 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
               Reassignment Strategy
             </label>
             <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700">
+              <label className="flex items-start gap-3 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700">
                 <input
                   type="radio"
                   name="strategy"
                   value="split"
                   checked={strategy === "split"}
-                  onChange={(e) => setStrategy(e.target.value)}
-                  className="w-4 h-4"
+                  onChange={(e) => setStrategy(e.target.value as "split")}
+                  className="w-4 h-4 mt-0.5"
                 />
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
                     Smart Split & Reassign
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     Create new pick lists for unpicked items
                   </div>
                 </div>
               </label>
-              <label className="flex items-center gap-3 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700">
+              <label className="flex items-start gap-3 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700">
                 <input
                   type="radio"
                   name="strategy"
                   value="simple"
                   checked={strategy === "simple"}
-                  onChange={(e) => setStrategy(e.target.value)}
-                  className="w-4 h-4"
+                  onChange={(e) => setStrategy(e.target.value as "simple")}
+                  className="w-4 h-4 mt-0.5"
                 />
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
                     Simple Reassignment
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     Keep existing lists, just change assignee
                   </div>
                 </div>
@@ -622,8 +748,8 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add context or details about this reassignment..."
-              className="w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2 h-20 dark:bg-zinc-700 dark:text-gray-100 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="Add context or details..."
+              className="w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2 h-20 text-sm dark:bg-zinc-700 dark:text-gray-100 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               maxLength={500}
             />
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -657,25 +783,25 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
               {staff.pickLists.map((pl) => (
                 <label
                   key={pl.id}
-                  className="flex items-center gap-3 p-4 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700"
+                  className="flex items-center gap-3 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700"
                 >
                   <input
                     type="checkbox"
                     checked={selectedLists.includes(pl.id)}
                     onChange={() => toggleList(pl.id)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 flex-shrink-0"
                   />
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
                       {pl.batchNumber}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
                       {pl.pickedItems}/{pl.totalItems} picked •{" "}
                       {pl.totalItems - pl.pickedItems} remaining
                     </div>
                   </div>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
+                    className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
                       pl.status === "IN_PROGRESS"
                         ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                         : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
@@ -691,7 +817,7 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
           {/* Summary */}
           {selectedLists.length > 0 && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="text-sm text-blue-900 dark:text-blue-200">
+              <div className="text-xs sm:text-sm text-blue-900 dark:text-blue-200">
                 <strong>Summary:</strong> Reassigning {selectedLists.length}{" "}
                 pick list(s) with approximately {totalItemsReassigning}{" "}
                 remaining items
@@ -704,7 +830,7 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-zinc-700 flex gap-3">
+        <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-zinc-700 flex flex-col sm:flex-row gap-3">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition text-gray-900 dark:text-gray-100"
@@ -726,9 +852,15 @@ function BulkReassignmentModal({ staff, allStaff, onClose, onSuccess }) {
   );
 }
 
-function ReassignmentAuditTrailModal({ onClose }) {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+interface ReassignmentAuditTrailModalProps {
+  onClose: () => void;
+}
+
+function ReassignmentAuditTrailModal({
+  onClose,
+}: ReassignmentAuditTrailModalProps) {
+  const [events, setEvents] = useState<ReassignmentEvent[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     loadReassignmentHistory();
@@ -736,14 +868,19 @@ function ReassignmentAuditTrailModal({ onClose }) {
 
   const loadReassignmentHistory = async () => {
     try {
-      // Fetch recent reassignment events
       const response = await fetch(
         "/api/pick-events?eventType=PICK_REASSIGNED,PICK_SPLIT&limit=50"
       );
+      if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setEvents(data);
     } catch (error) {
       console.error("Failed to load reassignment history:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load reassignment history",
+      });
     } finally {
       setLoading(false);
     }
@@ -751,62 +888,70 @@ function ReassignmentAuditTrailModal({ onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-zinc-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-zinc-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-gray-200 dark:border-zinc-700">
-          <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
-            Reassignment History
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Recent pick list reassignments
-          </p>
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-zinc-700 flex items-start justify-between">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
+              Reassignment History
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Recent pick list reassignments
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-4 p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
             </div>
           ) : events.length === 0 ? (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               No reassignments found
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-zinc-700/50"
+                  className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-zinc-700/50"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100">
                         {event.data?.fromUserName || "Unknown"} →{" "}
                         {event.data?.toUserName || "Unknown"}
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         Pick List: {event.pickList?.batchNumber}
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {new Date(event.createdAt).toLocaleString()}
                     </span>
                   </div>
                   {event.data?.reason && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       Reason:{" "}
                       {REASSIGNMENT_REASONS.find(
-                        (r) => r.value === event.data.reason
+                        (r) => r.value === event.data?.reason
                       )?.label || event.data.reason}
                     </div>
                   )}
                   {event.notes && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 italic mt-1">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 italic mt-1">
                       {event.notes}
                     </div>
                   )}
@@ -816,7 +961,7 @@ function ReassignmentAuditTrailModal({ onClose }) {
           )}
         </div>
 
-        <div className="p-6 border-t border-gray-200 dark:border-zinc-700">
+        <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-zinc-700">
           <button
             onClick={onClose}
             className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition text-gray-900 dark:text-gray-100"

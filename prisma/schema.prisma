@@ -237,6 +237,12 @@ model User {
   poBarcodeEvents POBarcodeEvent[]    
   receivingEvents ReceivingEvent[] 
 
+  // Audit trail
+  createdShippingPackages ShippingPackage[] @relation("ShippingPackageCreatedBy")
+  shippedPackages         ShippingPackage[] @relation("ShippingPackageShippedBy")
+  createdBackOrders       BackOrder[]       @relation("BackOrderCreatedBy")
+  fulfilledBackOrders     BackOrder[]       @relation("BackOrderFulfilledBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -818,6 +824,13 @@ model ShippingPackage {
   weight         Decimal? @db.Decimal(8, 2)
   dimensions     Json?
 
+  // Audit Trail
+  createdBy      String?
+  createdByUser  User?    @relation("ShippingPackageCreatedBy", fields: [createdBy], references: [id])
+  shippedBy      String?
+  shippedByUser  User?    @relation("ShippingPackageShippedBy", fields: [shippedBy], references: [id])
+  shippedAt      DateTime?
+
   // For multi-package orders
   packageNumber  Int      @default(1) 
   totalPackages  Int      @default(1)    
@@ -1137,6 +1150,13 @@ model BackOrder {
   // Context (where backorder originated)
   createdDuring          String // "ORDER_ALLOCATION" | "PICKING"
   originalPickListItemId String? // Only if created during picking
+
+  // Audit trail
+  createdBy           String?
+  createdByUser       User?    @relation("BackOrderCreatedBy", fields: [createdBy], references: [id])
+  fulfilledBy         String?
+  fulfilledByUser     User?    @relation("BackOrderFulfilledBy", fields: [fulfilledBy], references: [id])
+  expectedRestockDate DateTime?
 
   // Dates
   createdAt   DateTime  @default(now())

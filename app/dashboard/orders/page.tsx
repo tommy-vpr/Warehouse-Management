@@ -1524,11 +1524,11 @@ export default function OrdersManagementDashboard() {
           </div>
         )}
 
-        {isFiltering && (
+        {/* {isFiltering && (
           <div className="text-center text-sm text-gray-500 mt-2">
             Loading...
           </div>
-        )}
+        )} */}
       </div>
 
       {insufficientModal && (
